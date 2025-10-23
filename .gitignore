@@ -6,3 +6,5 @@ colmap_project_dir
 input_**
 
 RESULTS**
+
+__pycache__

@@ -1,5 +1,8 @@
 {
     "python.analysis.extraPaths": [
-        "./external/vggt"
+        "external/vggt",
+        "external/vggt/vggt/dependency",
+        "external/gsplat/examples",
+        "external/gsplat/examples/datasets"
     ]
 }
