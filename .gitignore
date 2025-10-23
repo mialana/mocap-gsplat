@@ -2,4 +2,7 @@ colmap_project_dir
 
 .cache
 
+.gradio
+input_**
+
 RESULTS
