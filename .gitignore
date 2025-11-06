@@ -8,3 +8,7 @@ input_**
 RESULTS**
 
 __pycache__
+
+.python-version
+.env
+.venv
