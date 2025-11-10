@@ -16,6 +16,30 @@ model.refine_sample_pixels = 80000
 model.refine_threshold = 0.1
 model = model.to(device)
 
+def show(masks):
+    cols = 4
+    rows = (len(masks) + cols - 1) // cols
+    fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(cols * 4, rows * 4))
+    fig.suptitle("backgroundmattingv2_resnet101_fp32", fontsize=16)
+    axs = axs.flatten() if isinstance(axs, np.ndarray) else [axs]
+
+    for i, ax in enumerate(axs):
+        if i < len(masks):
+            img = masks[i]
+            ax.imshow(F.to_pil_image(img), cmap="gray")
+        ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+    plt.tight_layout()
+
+    # Save output
+    os.makedirs("RESULTS/segmentation", exist_ok=True)
+    out_path = f"RESULTS/segmentation/backgroundmattingv2_{str(model.backbone_scale).replace('.', '_')}_{model.refine_mode}_{str(model.refine_threshold).replace('.', '_')}.png"
+    out_path = f"RESULTS/segmentation/backgroundmattingv2_{str(model.backbone_scale).replace('.', '_')}_{model.refine_mode}_{model.refine_sample_pixels}.png"
+    plt.savefig(out_path, bbox_inches="tight", dpi=200)
+    plt.close()
+    print(f"✅ Saved grid: {out_path}")
+
+
 # ------------------ BATCHED compare() ------------------
 def compare(background_files, source_files):
 
@@ -36,10 +60,16 @@ def compare(background_files, source_files):
     with torch.no_grad():
         pha, fgr = model(src_batch, bgr_batch)[:2]
 
+    com = pha * fgr
+
     # Return all alpha mattes to CPU
-    return [pha[i].cpu() for i in range(pha.shape[0])]
+    return pha, com
 # -------------------------------------------------------------
 
+def save(img_stack):
+    for idx, img_data in enumerate(img_stack):
+        img = F.to_pil_image(img_data)
+        img.save(f"RESULTS/processed/{idx}.png")
 
 def main():
     parser = argparse.ArgumentParser(description="Process two directories of background/source images in batch")
@@ -66,30 +96,11 @@ def main():
     src_paths = [os.path.join(src_dir, f) for f in common_files]
 
     # Batch process all
-    masks = compare(bg_paths, src_paths)
+    masks, composite = compare(bg_paths, src_paths)
 
-    # ---------------- matplotlib grid identical to earlier ----------------
-    cols = 4
-    rows = (len(masks) + cols - 1) // cols
-    fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(cols * 4, rows * 4))
-    fig.suptitle("backgroundmattingv2_resnet101_fp32", fontsize=16)
-    axs = axs.flatten() if isinstance(axs, np.ndarray) else [axs]
+    show(masks)
 
-    for i, ax in enumerate(axs):
-        if i < len(masks):
-            img = masks[i]
-            ax.imshow(F.to_pil_image(img), cmap="gray")
-        ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
-
-    plt.tight_layout()
-
-    # Save output
-    os.makedirs("RESULTS/segmentation", exist_ok=True)
-    out_path = f"RESULTS/segmentation/backgroundmattingv2_{str(model.backbone_scale).replace('.', '_')}_{model.refine_mode}_{str(model.refine_threshold).replace('.', '_')}.png"
-    out_path = f"RESULTS/segmentation/backgroundmattingv2_{str(model.backbone_scale).replace('.', '_')}_{model.refine_mode}_{model.refine_sample_pixels}.png"
-    plt.savefig(out_path, bbox_inches="tight", dpi=200)
-    plt.close()
-    print(f"✅ Saved grid: {out_path}")
+    save(composite)
 
 
 if __name__ == "__main__":

@@ -31,8 +31,7 @@ print("Initializing and loading VGGT model...")
 
 model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="C:/Users/aliu/.cache/vggt")
 
-model.eval()
-model = model.to(device)
+model.to(device).eval()
 
 
 # -------------------------------------------------------------------------
@@ -439,7 +438,7 @@ with gr.Blocks(
                 label="Preview",
                 columns=4,
                 height="300px",
-                show_download_button=True,
+                # show_download_button=True,
                 object_fit="contain",
                 preview=True,
             )
