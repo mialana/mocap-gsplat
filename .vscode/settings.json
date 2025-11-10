@@ -4,6 +4,5 @@
         "external/vggt/vggt/dependency",
         "external/gsplat/examples",
         "external/gsplat/examples/datasets"
-    ],
-    "autoHide.autoHideSideBar": true
+    ]
 }

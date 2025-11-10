@@ -1,5 +1,3 @@
-colmap_project_dir
-
 .cache
 
 .gradio
@@ -14,3 +12,5 @@ __pycache__
 .venv
 
 *.egg-info
+
+resources
