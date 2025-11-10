@@ -6,17 +6,18 @@ import torchvision.transforms.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
+device = torch.device("cuda")
+precision = torch.float32
+
+model = torch.jit.load(r"resources/models/torchscript_resnet101_fp32.pth")
+model.backbone_scale = 0.25
+model.refine_mode = "sampling"
+model.refine_sample_pixels = 80000
+model.refine_threshold = 0.1
+model = model.to(device)
+
 # ------------------ BATCHED compare() ------------------
 def compare(background_files, source_files):
-    device = torch.device("cuda")
-    precision = torch.float32
-
-    # Load model once
-    model = torch.jit.load(r"resources/models/torchscript_resnet101_fp32.pth")
-    model.backbone_scale = 0.25
-    model.refine_mode = "sampling"
-    model.refine_sample_pixels = 80_000
-    model = model.to(device)
 
     # Load and stack all images
     src_tensors, bgr_tensors = [], []
@@ -33,7 +34,7 @@ def compare(background_files, source_files):
 
     # Run model once on entire batch
     with torch.no_grad():
-        pha, _ = model(src_batch, bgr_batch)[:2]
+        pha, fgr = model(src_batch, bgr_batch)[:2]
 
     # Return all alpha mattes to CPU
     return [pha[i].cpu() for i in range(pha.shape[0])]
@@ -84,7 +85,8 @@ def main():
 
     # Save output
     os.makedirs("RESULTS/segmentation", exist_ok=True)
-    out_path = "RESULTS/segmentation/backgroundmattingv2_resnet101_fp32.png"
+    out_path = f"RESULTS/segmentation/backgroundmattingv2_{str(model.backbone_scale).replace('.', '_')}_{model.refine_mode}_{str(model.refine_threshold).replace('.', '_')}.png"
+    out_path = f"RESULTS/segmentation/backgroundmattingv2_{str(model.backbone_scale).replace('.', '_')}_{model.refine_mode}_{model.refine_sample_pixels}.png"
     plt.savefig(out_path, bbox_inches="tight", dpi=200)
     plt.close()
     print(f"✅ Saved grid: {out_path}")
