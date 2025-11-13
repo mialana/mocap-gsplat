@@ -14,3 +14,35 @@ for ($cam in $cams) {
     rotate -r -os 0 0 180 $cam;
 };
 ```
+
+### Using uv python manager
+
+- Run python scripts with env variables.
+
+```bash
+uv run --env-file .env .\src\vggt\demo_colmap.py --scene_dir .\resources\colmap_project_dir\
+```
+
+- Can also look into using a custom shebang like so to simplify things:
+
+```bash
+#!/usr/bin/env -S uv run --env-file .env
+```
+
+Then `.env` file will look something like:
+
+```bash
+VGGT_CACHE_DIR="C:/Users/aliu/.cache/vggt"
+```
+
+To sync up PyPI packages:
+
+```bash
+uv sync --group vggt
+```
+
+Haven't figured out how to also get an additional dependency group working with different versions of a package, but when I do it will change to something like:
+
+```bash
+uv sync --group gsplat --no-group=vggt
+```

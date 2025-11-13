@@ -8,7 +8,7 @@ import torch
 import numpy as np
 
 import sys
-sys.path.append("external/vggt/vggt/dependency")
+sys.path.append(".")
 
 from external.vggt.vggt.dependency.vggsfm_utils import *
 
