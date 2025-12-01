@@ -29,7 +29,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Initializing and loading VGGT model...")
 # model = VGGT.from_pretrained("facebook/VGGT-1B")  # another way to load the model
 
-model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="C:/Users/aliu/.cache/vggt")
+model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="/home/aliu/.cache/vggt")
 
 model.to(device).eval()
 
@@ -64,7 +64,9 @@ def run_model(target_dir, model) -> dict:
 
     # Run inference
     print("Running inference...")
-    dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    dtype = (
+        torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    )
 
     with torch.no_grad():
         with torch.cuda.amp.autocast(dtype=dtype):
@@ -72,20 +74,26 @@ def run_model(target_dir, model) -> dict:
 
     # Convert pose encoding to extrinsic and intrinsic matrices
     print("Converting pose encoding to extrinsic and intrinsic matrices...")
-    extrinsic, intrinsic = pose_encoding_to_extri_intri(predictions["pose_enc"], images.shape[-2:])
+    extrinsic, intrinsic = pose_encoding_to_extri_intri(
+        predictions["pose_enc"], images.shape[-2:]
+    )
     predictions["extrinsic"] = extrinsic
     predictions["intrinsic"] = intrinsic
 
     # Convert tensors to numpy
     for key in predictions.keys():
         if isinstance(predictions[key], torch.Tensor):
-            predictions[key] = predictions[key].cpu().numpy().squeeze(0)  # remove batch dimension
-    predictions['pose_enc_list'] = None # remove pose_enc_list
+            predictions[key] = (
+                predictions[key].cpu().numpy().squeeze(0)
+            )  # remove batch dimension
+    predictions["pose_enc_list"] = None  # remove pose_enc_list
 
     # Generate world points from depth map
     print("Computing world points from depth map...")
     depth_map = predictions["depth"]  # (S, H, W, 1)
-    world_points = unproject_depth_map_to_point_map(depth_map, predictions["extrinsic"], predictions["intrinsic"])
+    world_points = unproject_depth_map_to_point_map(
+        depth_map, predictions["extrinsic"], predictions["intrinsic"]
+    )
     predictions["world_points_from_depth"] = world_points
 
     # Clean up
@@ -148,7 +156,9 @@ def handle_uploads(input_video, input_images):
                 break
             count += 1
             if count % frame_interval == 0:
-                image_path = os.path.join(target_dir_images, f"{video_frame_num:06}.png")
+                image_path = os.path.join(
+                    target_dir_images, f"{video_frame_num:06}.png"
+                )
                 cv2.imwrite(image_path, frame)
                 image_paths.append(image_path)
                 video_frame_num += 1
@@ -157,7 +167,9 @@ def handle_uploads(input_video, input_images):
     image_paths = sorted(image_paths)
 
     end_time = time.time()
-    print(f"Files copied to {target_dir_images}; took {end_time - start_time:.3f} seconds")
+    print(
+        f"Files copied to {target_dir_images}; took {end_time - start_time:.3f} seconds"
+    )
     return target_dir, image_paths
 
 
@@ -173,7 +185,12 @@ def update_gallery_on_upload(input_video, input_images):
     if not input_video and not input_images:
         return None, None, None, None
     target_dir, image_paths = handle_uploads(input_video, input_images)
-    return None, target_dir, image_paths, "Upload complete. Click 'Reconstruct' to begin 3D processing."
+    return (
+        None,
+        target_dir,
+        image_paths,
+        "Upload complete. Click 'Reconstruct' to begin 3D processing.",
+    )
 
 
 # -------------------------------------------------------------------------
@@ -201,7 +218,11 @@ def gradio_demo(
 
     # Prepare frame_filter dropdown
     target_dir_images = os.path.join(target_dir, "images")
-    all_files = sorted(os.listdir(target_dir_images)) if os.path.isdir(target_dir_images) else []
+    all_files = (
+        sorted(os.listdir(target_dir_images))
+        if os.path.isdir(target_dir_images)
+        else []
+    )
     all_files = [f"{i}: {filename}" for i, filename in enumerate(all_files)]
     frame_filter_choices = ["All"] + all_files
 
@@ -244,9 +265,15 @@ def gradio_demo(
 
     end_time = time.time()
     print(f"Total time: {end_time - start_time:.2f} seconds (including IO)")
-    log_msg = f"Reconstruction Success ({len(all_files)} frames). Waiting for visualization."
+    log_msg = (
+        f"Reconstruction Success ({len(all_files)} frames). Waiting for visualization."
+    )
 
-    return glbfile, log_msg, gr.Dropdown(choices=frame_filter_choices, value=frame_filter, interactive=True)
+    return (
+        glbfile,
+        log_msg,
+        gr.Dropdown(choices=frame_filter_choices, value=frame_filter, interactive=True),
+    )
 
 
 # -------------------------------------------------------------------------
@@ -267,7 +294,15 @@ def update_log():
 
 
 def update_visualization(
-    target_dir, conf_thres, frame_filter, mask_black_bg, mask_white_bg, show_cam, mask_sky, prediction_mode, is_example
+    target_dir,
+    conf_thres,
+    frame_filter,
+    mask_black_bg,
+    mask_white_bg,
+    show_cam,
+    mask_sky,
+    prediction_mode,
+    is_example,
 ):
     """
     Reload saved predictions from npz, create (or reuse) the GLB for new parameters,
@@ -276,14 +311,23 @@ def update_visualization(
 
     # If it's an example click, skip as requested
     if is_example == "True":
-        return None, "No reconstruction available. Please click the Reconstruct button first."
+        return (
+            None,
+            "No reconstruction available. Please click the Reconstruct button first.",
+        )
 
     if not target_dir or target_dir == "None" or not os.path.isdir(target_dir):
-        return None, "No reconstruction available. Please click the Reconstruct button first."
+        return (
+            None,
+            "No reconstruction available. Please click the Reconstruct button first.",
+        )
 
     predictions_path = os.path.join(target_dir, "predictions.npz")
     if not os.path.exists(predictions_path):
-        return None, f"No reconstruction available at {predictions_path}. Please run 'Reconstruct' first."
+        return (
+            None,
+            f"No reconstruction available at {predictions_path}. Please run 'Reconstruct' first.",
+        )
 
     key_list = [
         "pose_enc",
@@ -432,7 +476,9 @@ with gr.Blocks(
     with gr.Row():
         with gr.Column(scale=2):
             input_video = gr.Video(label="Upload Video", interactive=True)
-            input_images = gr.File(file_count="multiple", label="Upload Images", interactive=True)
+            input_images = gr.File(
+                file_count="multiple", label="Upload Images", interactive=True
+            )
 
             image_gallery = gr.Gallery(
                 label="Preview",
@@ -447,14 +493,24 @@ with gr.Blocks(
             with gr.Column():
                 gr.Markdown("**3D Reconstruction (Point Cloud and Camera Poses)**")
                 log_output = gr.Markdown(
-                    "Please upload a video or images, then click Reconstruct.", elem_classes=["custom-log"]
+                    "Please upload a video or images, then click Reconstruct.",
+                    elem_classes=["custom-log"],
                 )
-                reconstruction_output = gr.Model3D(height=520, zoom_speed=0.5, pan_speed=0.5)
+                reconstruction_output = gr.Model3D(
+                    height=520, zoom_speed=0.5, pan_speed=0.5
+                )
 
             with gr.Row():
                 submit_btn = gr.Button("Reconstruct", scale=1, variant="primary")
                 clear_btn = gr.ClearButton(
-                    [input_video, input_images, reconstruction_output, log_output, target_dir_output, image_gallery],
+                    [
+                        input_video,
+                        input_images,
+                        reconstruction_output,
+                        log_output,
+                        target_dir_output,
+                        image_gallery,
+                    ],
                     scale=1,
                 )
 
@@ -468,23 +524,112 @@ with gr.Blocks(
                 )
 
             with gr.Row():
-                conf_thres = gr.Slider(minimum=0, maximum=100, value=50, step=0.1, label="Confidence Threshold (%)")
-                frame_filter = gr.Dropdown(choices=["All"], value="All", label="Show Points from Frame")
+                conf_thres = gr.Slider(
+                    minimum=0,
+                    maximum=100,
+                    value=50,
+                    step=0.1,
+                    label="Confidence Threshold (%)",
+                )
+                frame_filter = gr.Dropdown(
+                    choices=["All"], value="All", label="Show Points from Frame"
+                )
                 with gr.Column():
                     show_cam = gr.Checkbox(label="Show Camera", value=True)
                     mask_sky = gr.Checkbox(label="Filter Sky", value=False)
-                    mask_black_bg = gr.Checkbox(label="Filter Black Background", value=False)
-                    mask_white_bg = gr.Checkbox(label="Filter White Background", value=False)
+                    mask_black_bg = gr.Checkbox(
+                        label="Filter Black Background", value=False
+                    )
+                    mask_white_bg = gr.Checkbox(
+                        label="Filter White Background", value=False
+                    )
 
     # ---------------------- Examples section ----------------------
     examples = [
-        [colosseum_video, "22", None, 20.0, False, False, True, False, "Depthmap and Camera Branch", "True"],
-        [pyramid_video, "30", None, 35.0, False, False, True, False, "Depthmap and Camera Branch", "True"],
-        [single_cartoon_video, "1", None, 15.0, False, False, True, False, "Depthmap and Camera Branch", "True"],
-        [single_oil_painting_video, "1", None, 20.0, False, False, True, True, "Depthmap and Camera Branch", "True"],
-        [room_video, "8", None, 5.0, False, False, True, False, "Depthmap and Camera Branch", "True"],
-        [kitchen_video, "25", None, 50.0, False, False, True, False, "Depthmap and Camera Branch", "True"],
-        [fern_video, "20", None, 45.0, False, False, True, False, "Depthmap and Camera Branch", "True"],
+        [
+            colosseum_video,
+            "22",
+            None,
+            20.0,
+            False,
+            False,
+            True,
+            False,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
+        [
+            pyramid_video,
+            "30",
+            None,
+            35.0,
+            False,
+            False,
+            True,
+            False,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
+        [
+            single_cartoon_video,
+            "1",
+            None,
+            15.0,
+            False,
+            False,
+            True,
+            False,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
+        [
+            single_oil_painting_video,
+            "1",
+            None,
+            20.0,
+            False,
+            False,
+            True,
+            True,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
+        [
+            room_video,
+            "8",
+            None,
+            5.0,
+            False,
+            False,
+            True,
+            False,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
+        [
+            kitchen_video,
+            "25",
+            None,
+            50.0,
+            False,
+            False,
+            True,
+            False,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
+        [
+            fern_video,
+            "20",
+            None,
+            45.0,
+            False,
+            False,
+            True,
+            False,
+            "Depthmap and Camera Branch",
+            "True",
+        ],
     ]
 
     def example_pipeline(
@@ -509,7 +654,14 @@ with gr.Blocks(
         # Always use "All" for frame_filter in examples
         frame_filter = "All"
         glbfile, log_msg, dropdown = gradio_demo(
-            target_dir, conf_thres, frame_filter, mask_black_bg, mask_white_bg, show_cam, mask_sky, prediction_mode
+            target_dir,
+            conf_thres,
+            frame_filter,
+            mask_black_bg,
+            mask_white_bg,
+            show_cam,
+            mask_sky,
+            prediction_mode,
         )
         return glbfile, log_msg, target_dir, dropdown, image_paths
 
@@ -529,7 +681,13 @@ with gr.Blocks(
             prediction_mode,
             is_example,
         ],
-        outputs=[reconstruction_output, log_output, target_dir_output, frame_filter, image_gallery],
+        outputs=[
+            reconstruction_output,
+            log_output,
+            target_dir_output,
+            frame_filter,
+            image_gallery,
+        ],
         fn=example_pipeline,
         cache_examples=False,
         examples_per_page=50,

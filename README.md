@@ -32,7 +32,7 @@ uv run --env-file .env .\src\vggt\demo_colmap.py --scene_dir .\resources\colmap_
 Then `.env` file will look something like:
 
 ```bash
-VGGT_CACHE_DIR="C:/Users/aliu/.cache/vggt"
+VGGT_CACHE_DIR="/home/aliu/.cache/vggt"
 ```
 
 To sync up PyPI packages:
@@ -45,4 +45,10 @@ Haven't figured out how to also get an additional dependency group working with 
 
 ```bash
 uv sync --group gsplat --no-group=vggt
+```
+
+### demo_colmap trials
+
+```bash
+python src/vggt/demo_colmap.py --scene_dir=resources/colmap_project_dir --use_ba --max_query_pts=1024 --query_frame_num=8
 ```

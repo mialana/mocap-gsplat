@@ -115,7 +115,7 @@ def demo_fn(args):
     print(f"Using dtype: {dtype}")
 
     # Run VGGT for camera and depth estimation
-    model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir=os.getenv("VGGT_CACHE_DIR"))
+    model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="/home/aliu/.cache/vggt")
 
     model.to(device).eval()
     print(f"Model loaded")

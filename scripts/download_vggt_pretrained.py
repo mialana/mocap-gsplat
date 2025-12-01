@@ -19,11 +19,11 @@ print("Downloading model if running for the first time...")
 
 # Initialize the model and load the pretrained weights.
 # This will automatically download the model weights the first time it's run, which may take a while.
-model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="C:/Users/aliu/.cache/vggt").to(device)
+model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="/home/aliu/.cache/vggt").to(device)
 
 print("Model initialized successfully")
 
-image_directory = "colmap_project_dir/images"
+image_directory = "resources/colmap_project_dir/images"
 
 image_names = []
 for root, _, files in os.walk(image_directory):

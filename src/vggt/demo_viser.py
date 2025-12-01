@@ -346,7 +346,7 @@ def main():
     print("Initializing and loading VGGT model...")
     # model = VGGT.from_pretrained("facebook/VGGT-1B")
 
-    model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="C:/Users/aliu/.cache/vggt")
+    model = VGGT.from_pretrained("facebook/VGGT-1B", cache_dir="/home/aliu/.cache/vggt")
 
     model.eval()
     model = model.to(device)
