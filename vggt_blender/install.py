@@ -2,10 +2,13 @@ import bpy
 import sys
 import site
 import subprocess
-import threading
 import importlib
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, wait
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+from . import constants
+from . import helpers
+
 
 # List of packages required by the add-on/plugin
 REQUIRED_PACKAGES = {
@@ -14,6 +17,8 @@ REQUIRED_PACKAGES = {
     "torchvision": "torchvision --index-url https://download.pytorch.org/whl/cu130",
     "einops": "einops",
     "safetensors": "safetensors",
+    "huggingface_hub": "huggingface_hub",
+    "GitPython": "GitPython",
 }
 
 
@@ -33,29 +38,11 @@ def get_blender_python_path():
     return sys.executable
 
 
-def get_modules_path(path: str):
-    """Return a writable directory for installing Python packages."""
-    return bpy.utils.user_resource("SCRIPTS", path=path, create=True)
-
-
 def append_modules_to_sys_path(modules_path):
     """Ensure Blender can find installed packages."""
     if modules_path not in sys.path:
         sys.path.append(modules_path)
     site.addsitedir(modules_path)
-
-
-def display_message(message, title="Notification", icon="INFO"):
-    """Show a popup message in Blender."""
-
-    def draw(self, context):
-        self.layout.label(text=message)
-
-    def show_popup():
-        bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
-        return None  # Stops timer
-
-    bpy.app.timers.register(show_popup)
 
 
 def install_package(module_name, pip_spec, modules_path):
@@ -79,47 +66,70 @@ def install_package(module_name, pip_spec, modules_path):
 
         print(f"{module_name} installed with spec '{pip_spec}' successfully.")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to install {pip_spec}. Error: {e}")
-        display_message(
+        print(f"Failed to install {pip_spec}. Error: {e}")
+        helpers.display_message(
             f"Failed to install {pip_spec}. Check console for details.", icon="ERROR"
         )
 
 
 def install_packages(packages, modules_path):
-    wm = bpy.context.window_manager
+    install_list = list(packages.items())
 
-    install_list = list(packages.items())[3:]
+    wm = bpy.context.window_manager
     wm.progress_begin(0, len(install_list))
     for i, (module_name, pip_spec) in enumerate(install_list):
-        try:
-            importlib.import_module(module_name)
-            print(f"'{module_name}' is already installed.")
-        except ImportError:
-            install_package(module_name, pip_spec, modules_path)
+        installed: bool = False
+        while not installed:
+            try:
+                importlib.import_module(module_name)
+                print(f"'{module_name}' is already installed.")
+                installed = True
+            except ImportError:
+                install_package(module_name, pip_spec, modules_path)
         wm.progress_update(i + 1)
     wm.progress_end()
-    display_message("All required packages installed successfully.")
+    helpers.display_message("All required packages installed successfully.")
 
 
-def download_model():
-    pass
+def install_vggt():
+    git = importlib.import_module("git")
+
+    wm = helpers.get_window_manager()
+    wm.progress_begin(0, 2)  # start at 0, 2 steps
+
+    out_dir: str = bpy.utils.user_resource(
+        "SCRIPTS", path=constants.VGGT_REPO_SUBPATH, create=True
+    )
+    git.Repo.clone_from("https://github.com/facebookresearch/vggt.git", out_dir)
+
+    wm.progress_update(1)
+
+    try:
+        subprocess.check_call(["python", "-m" "pip", "install", "-e", out_dir])
+        wm.progress_update(2)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to install vggt as Python module. Error: {e}")
+        helpers.display_message(
+            f"Failed to install vggt as Python module. Check console for details.",
+            icon="ERROR",
+        )
+    wm.progress_end()
+
+
+def background_installation(modules_path):
+    install_packages(REQUIRED_PACKAGES, modules_path)
+    install_vggt()
 
 
 def main():
     ensure_pip()
-    modules_path = get_modules_path("modules/vggt_blender")
+    modules_path = helpers.resolve_script_file_path(constants.ADDON_SUBPATH)
+
     append_modules_to_sys_path(modules_path)
 
-    executor = ThreadPoolExecutor(max_workers=4)
-    task1 = executor.submit(install_packages, REQUIRED_PACKAGES, modules_path)
-    task2 = executor.submit(download_model)
-
-    def check_done(_):
-        if task1.done() and task2.done():
-            print("done")
-
-    task1.add_done_callback(check_done)
-    task2.add_done_callback(check_done)
+    threading.Thread(
+        target=background_installation, daemon=True, args=(modules_path,)
+    ).start()
 
 
 if __name__ == "__main__":
