@@ -1,8 +1,8 @@
 {
     "python.analysis.extraPaths": [
         "external/vggt",
-        "external/vggt/vggt/dependency",
-        "external/gsplat/examples",
-        "external/gsplat/examples/datasets"
-    ]
+        "external/vggt/vggt/dependency"
+    ],
+    "autoHide.autoHidePanel": false,
+    "blender.addon.logLevel": "debug-with-flask"
 }
