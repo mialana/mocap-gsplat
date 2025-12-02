@@ -7,8 +7,6 @@ import importlib
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
 
-from .log_utils import logger
-
 # List of packages required by the add-on/plugin
 REQUIRED_PACKAGES = {
     "numpy": "numpy==1.26.1",

@@ -1,5 +1,4 @@
 from . import install
-from .log_utils import logger
 
 bl_info = {
     "name": "VGGT Blender",
