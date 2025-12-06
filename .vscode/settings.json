@@ -3,6 +3,16 @@
         "external/vggt",
         "external/vggt/vggt/dependency"
     ],
-    "autoHide.autoHidePanel": false,
-    "blender.addon.logLevel": "debug-with-flask"
+    "autoHide.autoHidePanel": true,
+    "blender.addon.logLevel": "debug",
+    "blender.addon.loadDirectory": "auto",
+    "blender.addon.moduleName": "auto",
+    "blender.addon.sourceDirectory": "auto",
+
+    "workspaceKeybindings.inBlenderDevelopmentMode.enabled": true,
+    "terminal.integrated.commandsToSkipShell": [
+        "blender.start",
+        "blender.stop",
+        "blender.reloadAddons"
+    ]
 }

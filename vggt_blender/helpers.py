@@ -1,9 +1,10 @@
 import bpy
-import sys
 
 
 def resolve_script_file_path(path: str) -> str:
-    return bpy.utils.user_resource("SCRIPTS", path=path, create=True)
+    filepath = bpy.utils.user_resource("SCRIPTS", path=path, create=True)
+    print(filepath)
+    return filepath
 
 
 def get_window_manager() -> bpy.types.WindowManager:
