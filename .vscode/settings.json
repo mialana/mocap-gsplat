@@ -14,5 +14,8 @@
         "blender.start",
         "blender.stop",
         "blender.reloadAddons"
-    ]
+    ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportInvalidTypeForm": "none"
+    }
 }
