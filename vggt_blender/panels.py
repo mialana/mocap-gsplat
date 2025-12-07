@@ -61,23 +61,40 @@ class VGGT_PT_main_panel(Panel):
                 )
             else:
                 # Show model download options
-                box.label(text="Download VGGT model weights from HuggingFace")
+                box.label(text="Model Settings")
                 box.prop(props, "model_path")
                 box.prop(props, "cache_directory")
                 
                 row = box.row()
                 row.scale_y = 1.5
-                row.operator("vggt.install_model", text="Download VGGT Model", icon='IMPORT')
+                row.operator("vggt.install_model", text="Initialize VGGT Model", icon='IMPORT')
             
             return
         
         # Everything installed, show normal UI
         # Model settings section
+
         box = layout.box()
-        box.label(text="Model Settings", icon='PREFERENCES')
-        box.prop(props, "model_path")
-        box.prop(props, "cache_directory")
-        
+
+        if props.installation_in_progress:
+            # Show installation progress
+            col = box.column(align=True)
+            col.label(text=props.installation_message)
+            col.progress(
+                factor=props.installation_progress / 100.0,
+                type='BAR',
+                text=f"{props.installation_progress:.0f}%"
+            )
+        else:
+            # Show model download options
+            box.label(text="Model Settings")
+            box.prop(props, "model_path")
+            box.prop(props, "cache_directory")
+            
+            row = box.row()
+            row.scale_y = 1.5
+            row.operator("vggt.install_model", text="Initialize VGGT Model", icon='IMPORT')
+
         layout.separator()
         
         # Image loading section
@@ -89,8 +106,8 @@ class VGGT_PT_main_panel(Panel):
         row.operator("vggt.load_images", text="Load Images", icon='FILEBROWSER')
         
         # Status display
-        if props.num_frames > 0:
-            box.label(text=f"Loaded: {props.num_frames} frames", icon='INFO')
+        if props.num_cameras > 0:
+            box.label(text=f"Loaded: {props.num_cameras} cameras", icon='INFO')
         
         layout.separator()
         
@@ -127,7 +144,7 @@ class VGGT_PT_parameters_panel(Panel):
     @classmethod
     def poll(cls, context):
         props = context.scene.vggt_props
-        return props.vggt_model_installed and props.is_loaded
+        return props.vggt_model_installed
     
     def draw(self, context):
         layout = self.layout
@@ -156,17 +173,7 @@ class VGGT_PT_parameters_panel(Panel):
         col.prop(props, "mask_black_bg")
         col.prop(props, "mask_white_bg")
         col.prop(props, "mask_sky")
-        
-        layout.separator()
-        
-        # Visualization options
-        box = layout.box()
-        box.label(text="Visualization", icon='HIDE_OFF')
-        
-        col = box.column(align=True)
         col.prop(props, "show_cameras")
-        col.prop(props, "point_size")
-        col.prop(props, "camera_scale")
         
         layout.separator()
         
@@ -215,6 +222,3 @@ class VGGT_PT_export_panel(Panel):
         row = layout.row()
         row.scale_y = 1.5
         row.operator("vggt.export_gaussian_splat", text="Export PLY", icon='EXPORT')
-
-
-# Registration handled by __init__.py

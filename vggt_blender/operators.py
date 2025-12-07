@@ -132,6 +132,8 @@ class VGGT_OT_install_packages(Operator):
             # Ensure pip is available
             props.installation_message = "Ensuring pip is installed..."
             install.ensure_pip()
+
+            props.installation_progress = 10.0
             
             # Get modules path
             modules_path = helpers.resolve_script_file_path(constants.ADDON_SUBPATH)
@@ -142,7 +144,7 @@ class VGGT_OT_install_packages(Operator):
             
             for i, pkg in enumerate(install.REQUIRED_PACKAGES):
                 # Update progress (0-70%)
-                progress = (i / total_packages) * 70
+                progress = ((i / total_packages) * 60.0) + 10.0
                 props.installation_progress = progress
                 
                 # Check if already installed
@@ -457,7 +459,7 @@ class VGGT_OT_load_images(Operator):
             return {'CANCELLED'}
         
         # Update properties
-        props.num_frames = len(image_files)
+        props.num_cameras = len(image_files)
         
         self.report({'INFO'}, f"Found {len(image_files)} images")
         return {'FINISHED'}
@@ -497,11 +499,15 @@ class VGGT_OT_run_inference(Operator):
             
             # Update properties
             props.is_loaded = True
-            props.num_frames = predictions.num_frames
+            props.num_cameras = predictions.num_cameras
             props.num_points = predictions.get_total_points()
+
+            print("Model inference complete and predictions stored")
             
             # Create initial visualization
             self._create_visualization(context, predictions, props)
+
+            print("Point cloud creation completion")
             
             self.report({'INFO'}, f"VGGT inference complete. Generated {props.num_points:,} points.")
             return {'FINISHED'}
@@ -688,7 +694,7 @@ class VGGT_OT_clear_scene(Operator):
             
             # Reset properties
             props.is_loaded = False
-            props.num_frames = 0
+            props.num_cameras = 0
             props.num_points = 0
             
             self.report({'INFO'}, "VGGT data cleared")

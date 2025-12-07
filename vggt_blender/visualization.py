@@ -63,44 +63,20 @@ def create_point_cloud(
     Returns:
         The created Blender mesh object
     """
-    if len(points) == 0:
-        # Create empty mesh if no points
-        mesh = bpy.data.meshes.new(name)
-        mesh.from_pydata([], [], [])
-        obj = bpy.data.objects.new(name, mesh)
+
+    num_points = points.shape[0]
+
+    mesh = bpy.data.meshes.new(name) # Create mesh from vertices only
+    obj = bpy.data.objects.new(name, mesh) # Create object from mesh
+
+    if len(points) > 0:
+        mesh.vertices.add(num_points)
+        mesh.vertices.foreach_set("co", points.ravel())
+
         bpy.context.collection.objects.link(obj)
-        return obj
 
-    # Create mesh from vertices only (point cloud)
-    mesh = bpy.data.meshes.new(name)
-    mesh.from_pydata(points.tolist(), [], [])
     mesh.update()
-
-    # Add vertex colors if provided
-    if colors is not None and len(colors) == len(points):
-        # Normalize colors to 0-1 range if needed
-        if colors.max() > 1.0:
-            colors = colors.astype(np.float32) / 255.0
-
-        # Store colors as custom attributes (works better for point clouds without faces)
-        if "color" not in mesh.attributes:
-            mesh.attributes.new(name="color", type="FLOAT_COLOR", domain="POINT")
-
-        color_attr = mesh.attributes["color"]
-
-        # Set vertex colors
-        for i, (r, g, b) in enumerate(colors):
-            color_attr.data[i].color = (r, g, b, 1.0)
-
-    # Create object from mesh
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-
-    # Add geometry nodes modifier to render points as spheres
-    _add_point_cloud_geometry_nodes(obj, point_size)
-
-    # Create and assign material with vertex colors
-    _create_point_cloud_material(obj, name)
+    mesh.validate()
 
     return obj
 

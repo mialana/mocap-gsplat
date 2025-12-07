@@ -59,7 +59,7 @@ class VGGTProperties(PropertyGroup):
     conf_thres: FloatProperty(
         name="Confidence Threshold (%)",
         description="Percentage of low-confidence points to filter out",
-        default=50.0,
+        default=95.0,
         min=0.0,
         max=100.0,
         soft_min=0.0,
@@ -116,14 +116,12 @@ class VGGTProperties(PropertyGroup):
         update=lambda self, context: update_visualization_callback(self, context),
     )
 
-    # Frame selection
     # Note: EnumProperty with dynamic items requires the callback function
-    # to be defined before the class. We use a lambda wrapper to avoid
-    # forward reference issues.
-    frame_filter: EnumProperty(
-        name="Show Points from Frame",
-        description="Select which frames to display points from",
-        items=lambda self, context: get_frame_filter_items(self, context),
+    # to be defined before the class. 
+    camera_filter: EnumProperty(
+        name="Show Points from Camera",
+        description="Select which camera to display points from",
+        items=lambda self, context: get_camera_items(self, context),
         update=lambda self, context: update_visualization_callback(self, context),
     )
 
@@ -179,9 +177,9 @@ class VGGTProperties(PropertyGroup):
         default=False,
     )
 
-    num_frames: IntProperty(
-        name="Number of Frames",
-        description="Number of frames in the current dataset",
+    num_cameras: IntProperty(
+        name="Number of Cameras",
+        description="Number of cameras in the current dataset",
         default=0,
     )
 
@@ -223,20 +221,20 @@ class VGGTProperties(PropertyGroup):
     )
 
 
-def get_frame_filter_items(self, context):
+def get_camera_items(self, context):
     """
     Dynamically generate frame filter enum items based on loaded data.
 
     Returns:
         list: List of enum items for frame selection
     """
-    items = [("ALL", "All Frames", "Show points from all frames")]
+    items = [("ALL", "All Cameras", "Show points from all cameras")]
 
     if context and hasattr(context, "scene") and context.scene:
         props = context.scene.vggt_props
-        for i in range(props.num_frames):
+        for i in range(props.num_cameras):
             items.append(
-                (f"FRAME_{i}", f"Frame {i}", f"Show points from frame {i} only")
+                (f"CAMERA_{i}", f"Camera {i}", f"Show points from camera {i} only")
             )
 
     return items

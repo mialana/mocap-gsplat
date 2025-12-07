@@ -36,8 +36,8 @@ class VGGTPredictions:
     depth: Optional[np.ndarray] = None
     
     @property
-    def num_frames(self) -> int:
-        """Return the number of frames in the predictions."""
+    def num_cameras(self) -> int:
+        """Return the number of cameras in the predictions."""
         if self.images is not None:
             return self.images.shape[0]
         if self.world_points is not None:
@@ -47,7 +47,7 @@ class VGGTPredictions:
         return 0
     
     def get_total_points(self) -> int:
-        """Return the total number of 3D points across all frames."""
+        """Return the total number of 3D points across all cameras."""
         if self.world_points is not None:
             return np.prod(self.world_points.shape[:-1])
         if self.world_points_from_depth is not None:
@@ -163,16 +163,6 @@ class VGGTInterface:
         self._initialized = False
     
     def initialize_model(self, model_path: str = "facebook/VGGT-1B", cache_dir: Optional[str] = None):
-        """
-        Initialize the VGGT model.
-        
-        Args:
-            model_path: HuggingFace model ID or path to model weights
-            cache_dir: Optional directory for caching model weights
-        """
-        if self._initialized:
-            return
-        
         try:
             import torch
             from vggt.models.vggt import VGGT
@@ -183,13 +173,21 @@ class VGGTInterface:
                 "is initialized and dependencies are installed."
             )
         
+        if self.model:
+            del self.model
+            self.model = None
+            gc.collect()
+            torch.cuda.empty_cache()
+        
         # Set up device and dtype
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         if torch.cuda.is_available():
+            print("Cuda is available.")
             self.dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
         else:
             self.dtype = torch.float32
+            print("Cuda is not available.")
         
         # Initialize model
         if model_path.startswith("facebook/") or "/" not in model_path:
@@ -216,16 +214,7 @@ class VGGTInterface:
         print("Model successfully initialized.")
     
     def run_inference(self, images_directory: str) -> VGGTPredictions:
-        """
-        Run VGGT inference on images in the specified directory.
-        
-        Args:
-            images_directory: Path to directory containing input images
-            
-        Returns:
-            VGGTPredictions object containing all model outputs
-        """
-        if not self._initialized:
+        if not self._initialized or not self.model:
             raise RuntimeError("Model not initialized. Call initialize_model() first.")
         
         import torch
@@ -233,6 +222,7 @@ class VGGTInterface:
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
         from vggt.utils.geometry import unproject_depth_map_to_point_map
 
+        # garbage collect and clear cache
         gc.collect()
         torch.cuda.empty_cache()
         
@@ -251,6 +241,8 @@ class VGGTInterface:
         
         # Run inference with automatic mixed precision when CUDA is available
         with torch.no_grad():
+            enabled = self.device == "cuda"
+            print(f"Running inference with cuda: {enabled}")
             with torch.amp.autocast(self.device, dtype=self.dtype, enabled=(self.device == "cuda")):
                 predictions = self.model(images)
         
@@ -279,7 +271,7 @@ class VGGTInterface:
             )
             result["world_points_from_depth"] = world_points
         
-        # Clean up GPU memory (only if CUDA is available)
+        # clean up
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         
@@ -301,5 +293,6 @@ class VGGTInterface:
             import torch
             del self.model
             self.model = None
+            gc.collect()
             torch.cuda.empty_cache()
         self._initialized = False
