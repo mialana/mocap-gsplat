@@ -1,6 +1,8 @@
 from . import install
 
 from .operators import (
+    VGGT_OT_install_packages,
+    VGGT_OT_install_model,
     VGGT_OT_load_images,
     VGGT_OT_run_inference,
     VGGT_OT_update_visualization,
@@ -24,6 +26,8 @@ bl_info = {
 
 classes = (
     VGGTProperties,
+    VGGT_OT_install_packages,
+    VGGT_OT_install_model,
     VGGT_OT_load_images,
     VGGT_OT_run_inference,
     VGGT_OT_update_visualization,
@@ -36,13 +40,13 @@ classes = (
 
 
 def register():
-    print("Hello World")
-    install.main()
-
+    print("VGGT Blender addon registration starting...")
+    
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.vggt_props = bpy.props.PointerProperty(type=VGGTProperties)
-    print("Async add-on registration completed")
+    
+    print("VGGT Blender addon registration completed. Use the VGGT panel to install dependencies.")
 
 
 def unregister():
@@ -50,16 +54,11 @@ def unregister():
         try:
             bpy.utils.unregister_class(cls)
         except RuntimeError as e:
-            print(f"Error occurred in unregistration of {cls.__name__} class: {e}")
-            print(f"Likely the class was never registered")
+            print(f"Error during unregistration of {cls.__name__}: {e}")
+    
     try:
         del bpy.types.Scene.vggt_props
     except AttributeError as e:
-        print(
-            f"Error occurred in unregistration of {bpy.types.Scene.vggt_props.__name__} type: {e}"
-        )
-        print(f"Likely the type was never registered")
-
-    print("Safe unregistration completed")
-
-    print("Goodbye World")
+        print(f"Error during unregistration of Scene.vggt_props: {e}")
+    
+    print("VGGT Blender addon unregistration completed")

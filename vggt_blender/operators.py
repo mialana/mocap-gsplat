@@ -1,5 +1,7 @@
 """
 Defines the operators for the VGGT Blender integration, including:
+- Installing pip packages
+- Installing VGGT model
 - Loading images
 - Running VGGT inference
 - Updating visualization
@@ -7,11 +9,19 @@ Defines the operators for the VGGT Blender integration, including:
 """
 
 import os
+import sys
+import subprocess
+import threading
+import importlib
+import shutil
 import bpy
 from bpy.types import Operator
 from bpy.props import StringProperty
 
 from .vggt_interface import VGGTInterface, VGGTPredictions
+from . import constants
+from . import helpers
+from . import install
 
 
 # Prediction mode constants
@@ -47,6 +57,369 @@ def clear_predictions():
     """Clear stored VGGT predictions."""
     global _vggt_predictions
     _vggt_predictions = None
+
+
+class VGGT_OT_install_packages(Operator):
+    """Install required pip packages for VGGT."""
+    
+    bl_idname = "vggt.install_packages"
+    bl_label = "Install Dependencies"
+    bl_description = "Install required Python packages for VGGT"
+    bl_options = {'REGISTER'}
+    
+    _timer = None
+    _thread = None
+    
+    def modal(self, context, event):
+        props = context.scene.vggt_props
+        
+        if event.type == 'TIMER':
+            # Check if installation thread is complete
+            if self._thread is not None and not self._thread.is_alive():
+                # Installation complete
+                context.window_manager.event_timer_remove(self._timer)
+                props.installation_in_progress = False
+                
+                # Check if installation was successful
+                if props.packages_installed:
+                    props.installation_message = "All packages installed successfully!"
+                    self.report({'INFO'}, "Package installation completed successfully")
+                else:
+                    props.installation_message = "Package installation failed. Check console for details."
+                    self.report({'ERROR'}, "Package installation failed")
+                
+                # Redraw panel
+                for area in context.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        area.tag_redraw()
+                
+                return {'FINISHED'}
+        
+        return {'PASS_THROUGH'}
+    
+    def execute(self, context):
+        props = context.scene.vggt_props
+        
+        if props.installation_in_progress:
+            self.report({'WARNING'}, "Installation already in progress")
+            return {'CANCELLED'}
+        
+        # Mark installation as in progress
+        props.installation_in_progress = True
+        props.installation_message = "Starting package installation..."
+        props.installation_progress = 0.0
+        
+        # Start installation in background thread
+        self._thread = threading.Thread(
+            target=self._install_packages_thread,
+            args=(context,),
+            daemon=True
+        )
+        self._thread.start()
+        
+        # Set up modal timer
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.5, window=context.window)
+        wm.modal_handler_add(self)
+        
+        return {'RUNNING_MODAL'}
+    
+    def _install_packages_thread(self, context):
+        """Background thread for package installation and VGGT repository setup."""
+        props = context.scene.vggt_props
+        
+        try:
+            # Ensure pip is available
+            props.installation_message = "Ensuring pip is installed..."
+            install.ensure_pip()
+            
+            # Get modules path
+            modules_path = helpers.resolve_script_file_path(constants.ADDON_SUBPATH)
+            install.append_modules_to_sys_path(modules_path)
+            
+            # Install packages (70% of progress)
+            total_packages = len(install.REQUIRED_PACKAGES)
+            
+            for i, pkg in enumerate(install.REQUIRED_PACKAGES):
+                # Update progress (0-70%)
+                progress = (i / total_packages) * 70
+                props.installation_progress = progress
+                
+                # Check if already installed
+                installed = False
+                try:
+                    props.installation_message = f"Checking {pkg.module_name}..."
+                    module = importlib.import_module(pkg.module_name)
+                    
+                    if module.__file__ is not None:
+                        installed = True
+                        props.installation_message = f"{pkg.module_name} already installed"
+                except ImportError:
+                    props.installation_message = f"Installing {pkg.module_name}..."
+                
+                # Install if needed
+                if not installed:
+                    try:
+                        install.install_package(pkg.module_name, pkg.pip_spec, modules_path)
+                        props.installation_message = f"{pkg.module_name} installed successfully"
+                    except subprocess.CalledProcessError as e:
+                        props.installation_message = f"Failed to install {pkg.module_name}"
+                        print(f"Error installing {pkg.module_name}: {e}")
+                        props.packages_installed = False
+                        props.installation_in_progress = False
+                        return
+                    except Exception as e:
+                        props.installation_message = f"Failed to install {pkg.module_name}: {str(e)}"
+                        print(f"Error installing {pkg.module_name}: {e}")
+                        props.packages_installed = False
+                        props.installation_in_progress = False
+                        return
+                
+                # Check if package exists in modules_path
+                pkg_path = os.path.join(modules_path, pkg.module_name)
+                if not installed and os.path.exists(pkg_path):
+                    installed = True
+            
+            props.installation_progress = 70.0
+            props.installation_message = "All packages installed. Setting up VGGT repository..."
+            
+            # Install VGGT repository (remaining 30% of progress)
+            try:
+                # Check if already installed
+                props.installation_message = "Checking for existing VGGT installation..."
+                props.installation_progress = 75.0
+                
+                vggt_already_installed = False
+                try:
+                    importlib.import_module("vggt")
+                    importlib.import_module("vggt.modules.vggt")
+                    vggt_already_installed = True
+                    props.installation_message = "VGGT repository already installed"
+                except ImportError:
+                    pass
+                
+                if not vggt_already_installed:
+                    # Import git module
+                    props.installation_message = "Preparing to clone VGGT repository..."
+                    props.installation_progress = 80.0
+                    
+                    try:
+                        git = importlib.import_module("git")
+                    except ImportError as e:
+                        props.installation_message = "GitPython module not found"
+                        print(f"GitPython not available: {e}")
+                        props.packages_installed = False
+                        props.installation_in_progress = False
+                        return
+                    
+                    # Clone VGGT repository
+                    out_dir = bpy.utils.user_resource(
+                        "SCRIPTS", path=constants.VGGT_REPO_SUBPATH, create=False
+                    )
+                    
+                    props.installation_message = f"Cloning VGGT repository..."
+                    props.installation_progress = 85.0
+                    
+                    if os.path.isdir(out_dir):
+                        shutil.rmtree(out_dir)
+                    
+                    try:
+                        git.Repo.clone_from(
+                            "https://github.com/facebookresearch/vggt.git",
+                            out_dir,
+                            multi_options=["--recurse-submodules"],
+                        )
+                    except Exception as e:
+                        props.installation_message = f"Failed to clone VGGT repository"
+                        print(f"Error cloning VGGT from GitHub: {e}")
+                        props.packages_installed = False
+                        props.installation_in_progress = False
+                        return
+                    
+                    props.installation_progress = 90.0
+                    
+                    # Install as Python module
+                    props.installation_message = "Installing VGGT as Python module..."
+                    
+                    try:
+                        subprocess.check_call(
+                            [
+                                install.get_blender_python_path(),
+                                "-m",
+                                "pip",
+                                "install",
+                                "--force-reinstall",
+                                "--quiet",
+                                "--upgrade",
+                                "--target",
+                                modules_path,
+                                "-e",
+                                out_dir,
+                            ]
+                        )
+                    except subprocess.CalledProcessError as e:
+                        props.installation_message = "Failed to install VGGT as Python module"
+                        print(f"Failed to install vggt as Python module. Error: {e}")
+                        props.packages_installed = False
+                        props.installation_in_progress = False
+                        return
+                    except Exception as e:
+                        props.installation_message = f"Failed to install VGGT: {str(e)}"
+                        print(f"Error installing VGGT: {e}")
+                        props.packages_installed = False
+                        props.installation_in_progress = False
+                        return
+                    
+                    # Add to sys.path
+                    install.append_modules_to_sys_path(out_dir)
+            
+            except Exception as e:
+                props.installation_message = f"Error setting up VGGT repository: {str(e)}"
+                print(f"VGGT repository setup error: {e}")
+                props.packages_installed = False
+                props.installation_in_progress = False
+                return
+            
+            # All dependencies installed
+            props.installation_progress = 100.0
+            props.installation_message = "All dependencies installed successfully!"
+            props.packages_installed = True
+            
+        except Exception as e:
+            props.installation_message = f"Installation error: {str(e)}"
+            print(f"Package installation error: {e}")
+            props.packages_installed = False
+            props.installation_in_progress = False
+
+
+class VGGT_OT_install_model(Operator):
+    """Download VGGT model weights from HuggingFace."""
+    
+    bl_idname = "vggt.install_model"
+    bl_label = "Download VGGT Model"
+    bl_description = "Download VGGT model weights from HuggingFace"
+    bl_options = {'REGISTER'}
+    
+    _timer = None
+    _thread = None
+    
+    def modal(self, context, event):
+        props = context.scene.vggt_props
+        
+        if event.type == 'TIMER':
+            # Check if installation thread is complete
+            if self._thread is not None and not self._thread.is_alive():
+                # Installation complete
+                context.window_manager.event_timer_remove(self._timer)
+                props.installation_in_progress = False
+                
+                # Check if installation was successful
+                if props.vggt_model_installed:
+                    props.installation_message = "VGGT model downloaded successfully!"
+                    self.report({'INFO'}, "VGGT model download completed successfully")
+                else:
+                    props.installation_message = "VGGT model download failed. Check console for details."
+                    self.report({'ERROR'}, "VGGT model download failed")
+                
+                # Redraw panel
+                for area in context.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        area.tag_redraw()
+                
+                return {'FINISHED'}
+        
+        return {'PASS_THROUGH'}
+    
+    def execute(self, context):
+        props = context.scene.vggt_props
+        
+        if props.installation_in_progress:
+            self.report({'WARNING'}, "Installation already in progress")
+            return {'CANCELLED'}
+        
+        if not props.packages_installed:
+            self.report({'ERROR'}, "Please install dependencies first")
+            return {'CANCELLED'}
+        
+        # Mark installation as in progress
+        props.installation_in_progress = True
+        props.installation_message = "Starting VGGT model download..."
+        props.installation_progress = 0.0
+        
+        # Start installation in background thread
+        self._thread = threading.Thread(
+            target=self._install_model_thread,
+            args=(context,),
+            daemon=True
+        )
+        self._thread.start()
+        
+        # Set up modal timer
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.5, window=context.window)
+        wm.modal_handler_add(self)
+        
+        return {'RUNNING_MODAL'}
+    
+    def _install_model_thread(self, context):
+        """Background thread for downloading VGGT model weights from HuggingFace."""
+        props = context.scene.vggt_props
+        
+        try:
+            props.installation_message = "Preparing to download VGGT model..."
+            props.installation_progress = 10.0
+            
+            # Import required modules
+            try:
+                import torch
+                from vggt.models.vggt import VGGT
+            except ImportError as e:
+                props.installation_message = "VGGT module not found. Please install dependencies first."
+                print(f"Import error: {e}")
+                props.vggt_model_installed = False
+                props.installation_in_progress = False
+                return
+            
+            props.installation_progress = 20.0
+            
+            # Get model path and cache directory from properties
+            model_path = props.model_path if props.model_path else "facebook/VGGT-1B"
+            cache_dir = bpy.path.abspath(props.cache_directory) if props.cache_directory else None
+            
+            props.installation_message = f"Downloading model from {model_path}..."
+            props.installation_progress = 30.0
+            
+            # Download and initialize the model (this triggers HuggingFace download)
+            try:
+                # Get the VGGT interface
+                interface = get_vggt_interface()
+                props.installation_progress = 40.0
+                
+                # Configure the interface
+                cache_dir = bpy.path.abspath(props.cache_directory) if props.cache_directory else None
+                interface.initialize_model(props.model_path, cache_dir)
+                
+                
+                props.installation_progress = 90.0
+                props.installation_message = "Model downloaded successfully. Verifying..."
+                
+            except Exception as e:
+                props.installation_message = f"Failed to download model from HuggingFace"
+                print(f"Error downloading model: {e}")
+                props.vggt_model_installed = False
+                props.installation_in_progress = False
+                return
+            
+            # Complete
+            props.installation_progress = 100.0
+            props.installation_message = "VGGT model downloaded successfully!"
+            props.vggt_model_installed = True
+            
+        except Exception as e:
+            props.installation_message = f"Model download error: {str(e)}"
+            print(f"VGGT model download error: {e}")
+            props.vggt_model_installed = False
+            props.installation_in_progress = False
 
 
 class VGGT_OT_load_images(Operator):
@@ -114,10 +487,6 @@ class VGGT_OT_run_inference(Operator):
         try:
             # Get the VGGT interface
             interface = get_vggt_interface()
-            
-            # Configure the interface
-            cache_dir = bpy.path.abspath(props.cache_directory) if props.cache_directory else None
-            interface.initialize_model(props.model_path, cache_dir)
             
             # Run inference
             self.report({'INFO'}, "Running VGGT inference... This may take a moment.")

@@ -67,6 +67,7 @@ def get_blender_python_path():
 
 
 def ensure_pip():
+    """Ensure pip is installed in Blender's Python environment."""
     try:
         subprocess.check_call(
             [
@@ -78,9 +79,6 @@ def ensure_pip():
         )
     except subprocess.CalledProcessError as e:
         print(f"Failed to install pip. Error: {e}")
-        helpers.display_message(
-            f"Failed to install pip. Check console for details.", icon="ERROR"
-        )
         raise
 
 
@@ -134,10 +132,6 @@ def install_packages(packages, modules_path):
                 install_package(p.module_name, p.pip_spec, modules_path)
             except subprocess.CalledProcessError as e:
                 print(f"Failed to install {p.pip_spec}. Error: {e}")
-                helpers.display_message(
-                    f"Failed to install {p.pip_spec}. Check console for details.",
-                    icon="ERROR",
-                )
                 raise
 
         pkg_path = os.path.join(modules_path, p.module_name)
@@ -148,7 +142,7 @@ def install_packages(packages, modules_path):
         wm.progress_update(i + 1)
 
     wm.progress_end()
-    helpers.display_message("All required packages installed successfully.")
+    print("All required packages installed successfully.")
 
 
 def install_vggt(modules_path):
@@ -185,7 +179,8 @@ def install_vggt(modules_path):
             subprocess.check_call(
                 [
                     get_blender_python_path(),
-                    "-m" "pip",
+                    "-m",
+                    "pip",
                     "install",
                     "--force-reinstall",
                     "--quiet",
@@ -199,10 +194,6 @@ def install_vggt(modules_path):
             wm.progress_update(2)
         except subprocess.CalledProcessError as e:
             print(f"Failed to install vggt as Python module. Error: {e}")
-            helpers.display_message(
-                f"Failed to install vggt as Python module. Check console for details.",
-                icon="ERROR",
-            )
             raise
         wm.progress_end()
 

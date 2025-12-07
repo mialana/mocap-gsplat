@@ -188,6 +188,39 @@ class VGGTProperties(PropertyGroup):
     num_points: IntProperty(
         name="Number of Points", description="Total number of 3D points", default=0
     )
+    
+    # Installation state tracking
+    packages_installed: BoolProperty(
+        name="Packages Installed",
+        description="Whether required pip packages have been installed",
+        default=False,
+    )
+    
+    vggt_model_installed: BoolProperty(
+        name="VGGT Model Installed",
+        description="Whether the VGGT model has been downloaded and installed",
+        default=False,
+    )
+    
+    installation_in_progress: BoolProperty(
+        name="Installation In Progress",
+        description="Whether an installation operation is currently running",
+        default=False,
+    )
+    
+    installation_message: StringProperty(
+        name="Installation Message",
+        description="Current status message during installation",
+        default="",
+    )
+    
+    installation_progress: FloatProperty(
+        name="Installation Progress",
+        description="Progress of current installation (0-100)",
+        default=0.0,
+        min=0.0,
+        max=100.0,
+    )
 
 
 def get_frame_filter_items(self, context):

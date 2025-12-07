@@ -20,6 +20,58 @@ class VGGT_PT_main_panel(Panel):
         layout = self.layout
         props = context.scene.vggt_props
         
+        # Check installation state
+        if not props.packages_installed:
+            # Show only install packages button
+            box = layout.box()
+            box.label(text="Setup Required", icon='INFO')
+            
+            if props.installation_in_progress:
+                # Show installation progress
+                col = box.column(align=True)
+                col.label(text=props.installation_message)
+                col.progress(
+                    factor=props.installation_progress / 100.0,
+                    type='BAR',
+                    text=f"{props.installation_progress:.0f}%"
+                )
+            else:
+                # Show install button
+                box.label(text="Install Python packages and VGGT repository")
+                row = box.row()
+                row.scale_y = 1.5
+                row.operator("vggt.install_packages", text="Install Dependencies", icon='PREFERENCES')
+            
+            return
+        
+        # Packages installed, check if model is installed
+        if not props.vggt_model_installed:
+            # Show model download UI with cache path option
+            box = layout.box()
+            box.label(text="Model Download", icon='IMPORT')
+            
+            if props.installation_in_progress:
+                # Show installation progress
+                col = box.column(align=True)
+                col.label(text=props.installation_message)
+                col.progress(
+                    factor=props.installation_progress / 100.0,
+                    type='BAR',
+                    text=f"{props.installation_progress:.0f}%"
+                )
+            else:
+                # Show model download options
+                box.label(text="Download VGGT model weights from HuggingFace")
+                box.prop(props, "model_path")
+                box.prop(props, "cache_directory")
+                
+                row = box.row()
+                row.scale_y = 1.5
+                row.operator("vggt.install_model", text="Download VGGT Model", icon='IMPORT')
+            
+            return
+        
+        # Everything installed, show normal UI
         # Model settings section
         box = layout.box()
         box.label(text="Model Settings", icon='PREFERENCES')
@@ -74,7 +126,8 @@ class VGGT_PT_parameters_panel(Panel):
     
     @classmethod
     def poll(cls, context):
-        return context.scene.vggt_props.is_loaded
+        props = context.scene.vggt_props
+        return props.vggt_model_installed and props.is_loaded
     
     def draw(self, context):
         layout = self.layout
@@ -136,7 +189,8 @@ class VGGT_PT_export_panel(Panel):
     
     @classmethod
     def poll(cls, context):
-        return context.scene.vggt_props.is_loaded
+        props = context.scene.vggt_props
+        return props.vggt_model_installed and props.is_loaded
     
     def draw(self, context):
         layout = self.layout

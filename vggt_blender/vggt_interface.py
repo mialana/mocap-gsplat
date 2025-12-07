@@ -4,6 +4,7 @@ This module handles model initialization, inference, and prediction processing.
 """
 
 import os
+import gc
 import glob
 import numpy as np
 from dataclasses import dataclass, field
@@ -196,7 +197,9 @@ class VGGTInterface:
             kwargs = {}
             if cache_dir:
                 kwargs['cache_dir'] = cache_dir
+                print("Local cache directory found.")
             self.model = VGGT.from_pretrained(model_path, **kwargs)
+            print("Model loaded from pretrained.")
         else:
             # Load from local path
             self.model = VGGT()
@@ -209,6 +212,8 @@ class VGGTInterface:
         self.model.eval()
         self.model = self.model.to(self.device)
         self._initialized = True
+
+        print("Model successfully initialized.")
     
     def run_inference(self, images_directory: str) -> VGGTPredictions:
         """
@@ -227,6 +232,9 @@ class VGGTInterface:
         from vggt.utils.load_fn import load_and_preprocess_images
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
         from vggt.utils.geometry import unproject_depth_map_to_point_map
+
+        gc.collect()
+        torch.cuda.empty_cache()
         
         # Find and load images
         image_patterns = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff', '*.tif']
