@@ -107,7 +107,7 @@ class VGGT_OT_install_packages(Operator):
         # Mark installation as in progress
         props.installation_in_progress = True
         props.installation_message = "Starting package installation..."
-        props.installation_progress = 0.0
+        props.installation_progress = 10.0
         
         # Start installation in background thread
         self._thread = threading.Thread(
@@ -133,7 +133,7 @@ class VGGT_OT_install_packages(Operator):
             props.installation_message = "Ensuring pip is installed..."
             install.ensure_pip()
 
-            props.installation_progress = 10.0
+            props.installation_progress = 20.0
             
             # Get modules path
             modules_path = helpers.resolve_script_file_path(constants.ADDON_SUBPATH)
@@ -143,10 +143,6 @@ class VGGT_OT_install_packages(Operator):
             total_packages = len(install.REQUIRED_PACKAGES)
             
             for i, pkg in enumerate(install.REQUIRED_PACKAGES):
-                # Update progress (0-70%)
-                progress = ((i / total_packages) * 60.0) + 10.0
-                props.installation_progress = progress
-                
                 # Check if already installed
                 installed = False
                 try:
@@ -156,6 +152,7 @@ class VGGT_OT_install_packages(Operator):
                     if module.__file__ is not None:
                         installed = True
                         props.installation_message = f"{pkg.module_name} already installed"
+                        print(f"{pkg.module_name} already installed")
                 except ImportError:
                     props.installation_message = f"Installing {pkg.module_name}..."
                 
@@ -164,6 +161,7 @@ class VGGT_OT_install_packages(Operator):
                     try:
                         install.install_package(pkg.module_name, pkg.pip_spec, modules_path)
                         props.installation_message = f"{pkg.module_name} installed successfully"
+                        print(f"{pkg.module_name} installed successfully")
                     except subprocess.CalledProcessError as e:
                         props.installation_message = f"Failed to install {pkg.module_name}"
                         print(f"Error installing {pkg.module_name}: {e}")
@@ -181,29 +179,28 @@ class VGGT_OT_install_packages(Operator):
                 pkg_path = os.path.join(modules_path, pkg.module_name)
                 if not installed and os.path.exists(pkg_path):
                     installed = True
-            
-            props.installation_progress = 70.0
-            props.installation_message = "All packages installed. Setting up VGGT repository..."
+                    
+                props.installation_progress += 10.0
+
+            print("All packages installed. Setting up VGGT repository...")
             
             # Install VGGT repository (remaining 30% of progress)
             try:
                 # Check if already installed
                 props.installation_message = "Checking for existing VGGT installation..."
-                props.installation_progress = 75.0
                 
                 vggt_already_installed = False
                 try:
                     importlib.import_module("vggt")
                     importlib.import_module("vggt.modules.vggt")
                     vggt_already_installed = True
-                    props.installation_message = "VGGT repository already installed"
+                    print("VGGT repository already installed")
                 except ImportError:
                     pass
                 
                 if not vggt_already_installed:
                     # Import git module
-                    props.installation_message = "Preparing to clone VGGT repository..."
-                    props.installation_progress = 80.0
+                    print("Preparing to clone VGGT repository...")
                     
                     try:
                         git = importlib.import_module("git")
@@ -220,7 +217,6 @@ class VGGT_OT_install_packages(Operator):
                     )
                     
                     props.installation_message = f"Cloning VGGT repository..."
-                    props.installation_progress = 85.0
                     
                     if os.path.isdir(out_dir):
                         shutil.rmtree(out_dir)
@@ -238,10 +234,11 @@ class VGGT_OT_install_packages(Operator):
                         props.installation_in_progress = False
                         return
                     
-                    props.installation_progress = 90.0
-                    
+                    props.installation_progress += 5.0
+
                     # Install as Python module
                     props.installation_message = "Installing VGGT as Python module..."
+                    print("Installing VGGT as Python module...")
                     
                     try:
                         subprocess.check_call(
@@ -389,6 +386,7 @@ class VGGT_OT_install_model(Operator):
             cache_dir = bpy.path.abspath(props.cache_directory) if props.cache_directory else None
             
             props.installation_message = f"Downloading model from {model_path}..."
+            print(f"Downloading model from {model_path}...")
             props.installation_progress = 30.0
             
             # Download and initialize the model (this triggers HuggingFace download)
@@ -415,6 +413,7 @@ class VGGT_OT_install_model(Operator):
             # Complete
             props.installation_progress = 100.0
             props.installation_message = "VGGT model downloaded successfully!"
+            print("VGGT model downloaded successfully!")
             props.vggt_model_installed = True
             
         except Exception as e:
