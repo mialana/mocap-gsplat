@@ -11,24 +11,24 @@ import numpy as np
 from typing import Optional, List
 
 
-# Prefix for all VGGT-generated objects
-VGGT_OBJECT_PREFIX = "VGGT_"
+# Prefix for all MOSPLAT-generated objects
+MOSPLAT_OBJECT_PREFIX = "MOSPLAT_"
 
 
 def remove_vggt_objects():
     """
-    Remove all VGGT-generated objects from the Blender scene.
+    Remove all MOSPLAT-generated objects from the Blender scene.
 
     This includes point clouds, cameras, and any other objects
-    with the VGGT prefix.
+    with the MOSPLAT prefix.
     """
     # Deselect all objects first
     bpy.ops.object.select_all(action="DESELECT")
 
-    # Find and select all VGGT objects
+    # Find and select all MOSPLAT objects
     objects_to_remove = []
     for obj in bpy.data.objects:
-        if obj.name.startswith(VGGT_OBJECT_PREFIX):
+        if obj.name.startswith(MOSPLAT_OBJECT_PREFIX):
             objects_to_remove.append(obj)
 
     # Remove objects
@@ -37,18 +37,18 @@ def remove_vggt_objects():
 
     # Clean up orphan meshes and materials
     for mesh in bpy.data.meshes:
-        if mesh.name.startswith(VGGT_OBJECT_PREFIX) and mesh.users == 0:
+        if mesh.name.startswith(MOSPLAT_OBJECT_PREFIX) and mesh.users == 0:
             bpy.data.meshes.remove(mesh)
 
     for mat in bpy.data.materials:
-        if mat.name.startswith(VGGT_OBJECT_PREFIX) and mat.users == 0:
+        if mat.name.startswith(MOSPLAT_OBJECT_PREFIX) and mat.users == 0:
             bpy.data.materials.remove(mat)
 
 
 def create_point_cloud(
     points: np.ndarray,
     colors: Optional[np.ndarray] = None,
-    name: str = "VGGT_PointCloud",
+    name: str = "MOSPLAT_PointCloud",
     point_size: float = 0.01,
 ) -> bpy.types.Object:
     """
@@ -94,7 +94,7 @@ def _add_point_cloud_geometry_nodes(obj: bpy.types.Object, point_size: float):
 
     # Create new node tree
     node_tree = bpy.data.node_groups.new(
-        name=f"{VGGT_OBJECT_PREFIX}PointCloudNodes", type="GeometryNodeTree"
+        name=f"{MOSPLAT_OBJECT_PREFIX}PointCloudNodes", type="GeometryNodeTree"
     )
     modifier.node_group = node_tree
 
@@ -190,7 +190,7 @@ def _create_point_cloud_material(obj: bpy.types.Object, name: str):
 
 
 def create_cameras(
-    extrinsic_matrices: np.ndarray, name_prefix: str = "VGGT_Camera", scale: float = 0.1
+    extrinsic_matrices: np.ndarray, name_prefix: str = "MOSPLAT_Camera", scale: float = 0.1
 ) -> List[bpy.types.Object]:
     """
     Create camera objects in Blender from extrinsic matrices.
@@ -246,28 +246,28 @@ def create_cameras(
     return cameras
 
 
-def get_vggt_point_cloud() -> Optional[bpy.types.Object]:
+def get_mosplat_point_cloud() -> Optional[bpy.types.Object]:
     """
-    Get the VGGT point cloud object from the scene.
+    Get the MOSPLAT point cloud object from the scene.
 
     Returns:
         The point cloud object if found, None otherwise
     """
     for obj in bpy.data.objects:
-        if obj.name.startswith(f"{VGGT_OBJECT_PREFIX}PointCloud"):
+        if obj.name.startswith(f"{MOSPLAT_OBJECT_PREFIX}PointCloud"):
             return obj
     return None
 
 
 def get_vggt_cameras() -> List[bpy.types.Object]:
     """
-    Get all VGGT camera objects from the scene.
+    Get all MOSPLAT camera objects from the scene.
 
     Returns:
         List of camera objects
     """
     cameras = []
     for obj in bpy.data.objects:
-        if obj.name.startswith(f"{VGGT_OBJECT_PREFIX}Camera") and obj.type == "CAMERA":
+        if obj.name.startswith(f"{MOSPLAT_OBJECT_PREFIX}Camera") and obj.type == "CAMERA":
             cameras.append(obj)
     return sorted(cameras, key=lambda x: x.name)

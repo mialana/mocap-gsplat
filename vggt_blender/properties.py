@@ -1,5 +1,5 @@
 """
-Defines all the properties for the VGGT Blender integration.
+Defines all the properties for the MOSPLAT Blender integration.
 """
 
 import bpy
@@ -13,7 +13,9 @@ from bpy.props import (
 )
 from bpy.types import PropertyGroup
 
-class VGGTImageItem(PropertyGroup):
+import os
+
+class MOSPLATImageItem(PropertyGroup):
     """Property group for storing loaded image paths."""
 
     filepath: StringProperty(
@@ -25,12 +27,9 @@ class VGGTImageItem(PropertyGroup):
     name: StringProperty(name="Name", description="Image filename", default="")
 
 
-class VGGTProperties(PropertyGroup):
+class MOSPLATProperties(PropertyGroup):
     """
-    Property group containing all VGGT parameters and settings.
-
-    These properties mirror the parameter tuning options available
-    in the VGGT Gradio demo for consistency.
+    Property group containing all MOSPLAT parameters and settings.
     """
 
     # Image loading properties
@@ -51,7 +50,7 @@ class VGGTProperties(PropertyGroup):
     cache_directory: StringProperty(
         name="Cache Directory",
         description="Directory for caching model weights",
-        default="",
+        default=os.path.expanduser("~/.cache/vggt/"),
         subtype="DIR_PATH",
     )
 
@@ -84,14 +83,14 @@ class VGGTProperties(PropertyGroup):
                 "Use direct pointmap regression for world points",
             ),
         ],
-        default="DEPTHMAP_CAMERA",
+        default="POINTMAP",
         update=lambda self, context: update_visualization_callback(self, context),
     )
 
     mask_black_bg: BoolProperty(
         name="Filter Black Background",
         description="Remove points with black background (sum of RGB < 16)",
-        default=False,
+        default=True,
         update=lambda self, context: update_visualization_callback(self, context),
     )
 
@@ -154,7 +153,7 @@ class VGGTProperties(PropertyGroup):
     export_path: StringProperty(
         name="Export Path",
         description="Path for exporting Gaussian splatting data",
-        default="//vggt_export.ply",
+        default="vggt_export.ply",
         subtype="FILE_PATH",
     )
 
@@ -231,7 +230,7 @@ def get_camera_items(self, context):
     items = [("ALL", "All Cameras", "Show points from all cameras")]
 
     if context and hasattr(context, "scene") and context.scene:
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         for i in range(props.num_cameras):
             items.append(
                 (f"CAMERA_{i}", f"Camera {i}", f"Show points from camera {i} only")

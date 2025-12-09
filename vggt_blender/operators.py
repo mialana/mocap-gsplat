@@ -1,5 +1,5 @@
 """
-Defines the operators for the VGGT Blender integration, including:
+Defines the operators for the MOSPLAT Blender integration, including:
 - Installing pip packages
 - Installing VGGT model
 - Loading images
@@ -28,7 +28,7 @@ from . import install
 PREDICTION_MODE_POINTMAP = 'POINTMAP'
 PREDICTION_MODE_DEPTHMAP = 'DEPTHMAP_CAMERA'
 
-# Global storage for VGGT data between operator calls
+# Global storage for MOSPLAT data between operator calls
 _vggt_interface = None
 _vggt_predictions = None
 
@@ -59,19 +59,19 @@ def clear_predictions():
     _vggt_predictions = None
 
 
-class VGGT_OT_install_packages(Operator):
-    """Install required pip packages for VGGT."""
+class MOSPLAT_OT_install_packages(Operator):
+    """Install required pip packages for MOSPLAT."""
     
-    bl_idname = "vggt.install_packages"
+    bl_idname = "mosplat.install_packages"
     bl_label = "Install Dependencies"
-    bl_description = "Install required Python packages for VGGT"
+    bl_description = "Install required Python packages and clone VGGT GitHub repository."
     bl_options = {'REGISTER'}
     
     _timer = None
     _thread = None
     
     def modal(self, context, event):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         if event.type == 'TIMER':
             # Check if installation thread is complete
@@ -98,7 +98,7 @@ class VGGT_OT_install_packages(Operator):
         return {'PASS_THROUGH'}
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         if props.installation_in_progress:
             self.report({'WARNING'}, "Installation already in progress")
@@ -119,14 +119,14 @@ class VGGT_OT_install_packages(Operator):
         
         # Set up modal timer
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.5, window=context.window)
+        self._timer = wm.event_timer_add(0.25, window=context.window)
         wm.modal_handler_add(self)
         
         return {'RUNNING_MODAL'}
     
     def _install_packages_thread(self, context):
         """Background thread for package installation and VGGT repository setup."""
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         try:
             # Ensure pip is available
@@ -291,19 +291,19 @@ class VGGT_OT_install_packages(Operator):
             props.installation_in_progress = False
 
 
-class VGGT_OT_install_model(Operator):
-    """Download VGGT model weights from HuggingFace."""
+class MOSPLAT_OT_install_model(Operator):
+    """Install VGGT model weights from HuggingFace."""
     
-    bl_idname = "vggt.install_model"
-    bl_label = "Download VGGT Model"
-    bl_description = "Download VGGT model weights from HuggingFace"
+    bl_idname = "mosplat.install_vggt_model"
+    bl_label = "Install VGGT Model"
+    bl_description = "Install VGGT model weights from HuggingFace"
     bl_options = {'REGISTER'}
     
     _timer = None
     _thread = None
     
     def modal(self, context, event):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         if event.type == 'TIMER':
             # Check if installation thread is complete
@@ -314,11 +314,11 @@ class VGGT_OT_install_model(Operator):
                 
                 # Check if installation was successful
                 if props.vggt_model_installed:
-                    props.installation_message = "VGGT model downloaded successfully!"
-                    self.report({'INFO'}, "VGGT model download completed successfully")
+                    props.installation_message = "VGGT model installed successfully!"
+                    self.report({'INFO'}, "VGGT model installation completed successfully")
                 else:
-                    props.installation_message = "VGGT model download failed. Check console for details."
-                    self.report({'ERROR'}, "VGGT model download failed")
+                    props.installation_message = "VGGT model installation failed. Check console for details."
+                    self.report({'ERROR'}, "VGGT model installation failed")
                 
                 # Redraw panel
                 for area in context.screen.areas:
@@ -330,7 +330,7 @@ class VGGT_OT_install_model(Operator):
         return {'PASS_THROUGH'}
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         if props.installation_in_progress:
             self.report({'WARNING'}, "Installation already in progress")
@@ -342,7 +342,7 @@ class VGGT_OT_install_model(Operator):
         
         # Mark installation as in progress
         props.installation_in_progress = True
-        props.installation_message = "Starting VGGT model download..."
+        props.installation_message = "Starting VGGT model installation..."
         props.installation_progress = 0.0
         
         # Start installation in background thread
@@ -355,17 +355,17 @@ class VGGT_OT_install_model(Operator):
         
         # Set up modal timer
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.5, window=context.window)
+        self._timer = wm.event_timer_add(0.25, window=context.window)
         wm.modal_handler_add(self)
         
         return {'RUNNING_MODAL'}
     
     def _install_model_thread(self, context):
         """Background thread for downloading VGGT model weights from HuggingFace."""
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         try:
-            props.installation_message = "Preparing to download VGGT model..."
+            props.installation_message = "Preparing to install VGGT model..."
             props.installation_progress = 10.0
             
             # Import required modules
@@ -383,10 +383,9 @@ class VGGT_OT_install_model(Operator):
             
             # Get model path and cache directory from properties
             model_path = props.model_path if props.model_path else "facebook/VGGT-1B"
-            cache_dir = bpy.path.abspath(props.cache_directory) if props.cache_directory else None
-            
-            props.installation_message = f"Downloading model from {model_path}..."
-            print(f"Downloading model from {model_path}...")
+
+            props.installation_message = f"Installing model from {model_path}..."
+            print(f"Installing model from {model_path}...")
             props.installation_progress = 30.0
             
             # Download and initialize the model (this triggers HuggingFace download)
@@ -396,43 +395,43 @@ class VGGT_OT_install_model(Operator):
                 props.installation_progress = 40.0
                 
                 # Configure the interface
-                cache_dir = bpy.path.abspath(props.cache_directory) if props.cache_directory else None
+                cache_dir = props.cache_directory if os.path.isdir(props.cache_directory) else os.path.expanduser(".cache/vggt/")
                 interface.initialize_model(props.model_path, cache_dir)
                 
                 
                 props.installation_progress = 90.0
-                props.installation_message = "Model downloaded successfully. Verifying..."
+                props.installation_message = "Model installed successfully. Verifying..."
                 
             except Exception as e:
-                props.installation_message = f"Failed to download model from HuggingFace"
-                print(f"Error downloading model: {e}")
+                props.installation_message = f"Failed to install model from HuggingFace"
+                print(f"Error installing model: {e}")
                 props.vggt_model_installed = False
                 props.installation_in_progress = False
                 return
             
             # Complete
             props.installation_progress = 100.0
-            props.installation_message = "VGGT model downloaded successfully!"
-            print("VGGT model downloaded successfully!")
+            props.installation_message = "VGGT model installed successfully!"
+            print("VGGT model installed successfully!")
             props.vggt_model_installed = True
             
         except Exception as e:
-            props.installation_message = f"Model download error: {str(e)}"
-            print(f"VGGT model download error: {e}")
+            props.installation_message = f"Model installation error: {str(e)}"
+            print(f"VGGT model installation error: {e}")
             props.vggt_model_installed = False
             props.installation_in_progress = False
 
 
-class VGGT_OT_load_images(Operator):
+class MOSPLAT_OT_load_images(Operator):
     """Load images from the specified directory for VGGT processing."""
     
-    bl_idname = "vggt.load_images"
+    bl_idname = "mosplat.load_images"
     bl_label = "Load Images"
     bl_description = "Load images from the specified directory"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         if not props.images_directory:
             self.report({'ERROR'}, "Please specify an images directory")
@@ -464,16 +463,16 @@ class VGGT_OT_load_images(Operator):
         return {'FINISHED'}
 
 
-class VGGT_OT_run_inference(Operator):
+class MOSPLAT_OT_run_inference(Operator):
     """Run VGGT inference on the loaded images."""
     
-    bl_idname = "vggt.run_inference"
+    bl_idname = "mosplat.run_inference"
     bl_label = "Run VGGT Inference"
     bl_description = "Run VGGT model inference on the loaded images"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         if not props.images_directory:
             self.report({'ERROR'}, "Please specify an images directory")
@@ -529,14 +528,14 @@ class VGGT_OT_run_inference(Operator):
             mask_black_bg=props.mask_black_bg,
             mask_white_bg=props.mask_white_bg,
             prediction_mode=prediction_mode,
-            frame_filter=props.frame_filter
+            frame_filter=props.camera_filter
         )
         
         # Create point cloud
         create_point_cloud(
             points, 
             colors, 
-            name="VGGT_PointCloud",
+            name="MOSPLAT_PointCloud",
             point_size=props.point_size
         )
         
@@ -544,25 +543,25 @@ class VGGT_OT_run_inference(Operator):
         if props.show_cameras:
             create_cameras(
                 predictions.extrinsic,
-                name_prefix="VGGT_Camera",
+                name_prefix="MOSPLAT_Camera",
                 scale=props.camera_scale
             )
 
 
-class VGGT_OT_update_visualization(Operator):
+class MOSPLAT_OT_update_visualization(Operator):
     """Update the visualization based on current parameter settings."""
     
-    bl_idname = "vggt.update_visualization"
+    bl_idname = "mosplat.update_visualization"
     bl_label = "Update Visualization"
     bl_description = "Update the 3D visualization with current parameter settings"
     bl_options = {'REGISTER', 'UNDO'}
     
     @classmethod
     def poll(cls, context):
-        return context.scene.vggt_props.is_loaded
+        return context.scene.mosplat_props.is_loaded
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         predictions = get_predictions()
         
         if predictions is None:
@@ -571,13 +570,13 @@ class VGGT_OT_update_visualization(Operator):
         
         try:
             from .visualization import (
-                remove_vggt_objects, 
+                remove_mosplat_objects, 
                 create_point_cloud, 
                 create_cameras
             )
             
-            # Remove existing VGGT objects
-            remove_vggt_objects()
+            # Remove existing MOSPLAT objects
+            remove_mosplat_objects()
             
             # Get filtered points based on current settings
             prediction_mode = PREDICTION_MODE_POINTMAP if props.prediction_mode == 'POINTMAP' else PREDICTION_MODE_DEPTHMAP
@@ -596,7 +595,7 @@ class VGGT_OT_update_visualization(Operator):
             create_point_cloud(
                 points, 
                 colors, 
-                name="VGGT_PointCloud",
+                name="MOSPLAT_PointCloud",
                 point_size=props.point_size
             )
             
@@ -604,7 +603,7 @@ class VGGT_OT_update_visualization(Operator):
             if props.show_cameras:
                 create_cameras(
                     predictions.extrinsic,
-                    name_prefix="VGGT_Camera",
+                    name_prefix="MOSPLAT_Camera",
                     scale=props.camera_scale
                 )
             
@@ -616,20 +615,20 @@ class VGGT_OT_update_visualization(Operator):
             return {'CANCELLED'}
 
 
-class VGGT_OT_export_gaussian_splat(Operator):
-    """Export VGGT data to Gaussian splatting-compatible PLY format."""
+class MOSPLAT_OT_export_gaussian_splat(Operator):
+    """Export MOSPLAT data to Gaussian splatting-compatible PLY format."""
     
-    bl_idname = "vggt.export_gaussian_splat"
+    bl_idname = "mosplat.export_gaussian_splat"
     bl_label = "Export Gaussian Splat"
     bl_description = "Export point cloud to Gaussian splatting-compatible PLY format"
     bl_options = {'REGISTER', 'UNDO'}
     
     @classmethod
     def poll(cls, context):
-        return context.scene.vggt_props.is_loaded
+        return context.scene.mosplat_props.is_loaded
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         predictions = get_predictions()
         
         if predictions is None:
@@ -671,22 +670,22 @@ class VGGT_OT_export_gaussian_splat(Operator):
             return {'CANCELLED'}
 
 
-class VGGT_OT_clear_scene(Operator):
-    """Clear all VGGT data and objects from the scene."""
+class MOSPLAT_OT_clear_scene(Operator):
+    """Clear all MOSPLAT data and objects from the scene."""
     
-    bl_idname = "vggt.clear_scene"
-    bl_label = "Clear VGGT Data"
-    bl_description = "Remove all VGGT objects and clear stored data"
+    bl_idname = "mosplat.clear_scene"
+    bl_label = "Clear MOSPLAT Data"
+    bl_description = "Remove all MOSPLAT objects and clear stored data"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        props = context.scene.vggt_props
+        props = context.scene.mosplat_props
         
         try:
-            from .visualization import remove_vggt_objects
+            from .visualization import remove_mosplat_objects
             
-            # Remove VGGT objects from scene
-            remove_vggt_objects()
+            # Remove MOSPLAT objects from scene
+            remove_mosplat_objects()
             
             # Clear predictions
             clear_predictions()
@@ -696,7 +695,7 @@ class VGGT_OT_clear_scene(Operator):
             props.num_cameras = 0
             props.num_points = 0
             
-            self.report({'INFO'}, "VGGT data cleared")
+            self.report({'INFO'}, "MOSPLAT data cleared")
             return {'FINISHED'}
             
         except Exception as e:

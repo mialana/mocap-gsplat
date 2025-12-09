@@ -1,52 +1,52 @@
 from . import install
 
 from .operators import (
-    VGGT_OT_install_packages,
-    VGGT_OT_install_model,
-    VGGT_OT_load_images,
-    VGGT_OT_run_inference,
-    VGGT_OT_update_visualization,
-    VGGT_OT_export_gaussian_splat,
-    VGGT_OT_clear_scene,
+    MOSPLAT_OT_install_packages,
+    MOSPLAT_OT_install_model,
+    MOSPLAT_OT_load_images,
+    MOSPLAT_OT_run_inference,
+    MOSPLAT_OT_update_visualization,
+    MOSPLAT_OT_export_gaussian_splat,
+    MOSPLAT_OT_clear_scene,
 )
-from .panels import VGGT_PT_main_panel, VGGT_PT_parameters_panel, VGGT_PT_export_panel
-from .properties import VGGTProperties
+from .panels import MOSPLAT_PT_main_panel, MOSPLAT_PT_parameters_panel, MOSPLAT_PT_export_panel
+from .properties import MOSPLATProperties
 
 import bpy
 
 bl_info = {
-    "name": "VGGT Blender",
+    "name": "MOSPLAT Blender",
     "blender": (4, 2, 0),
     "category": "Pipeline",
-    "location": "View3D > Sidebar > VGGT",
-    "description": "Integrate VGGT model for 3D reconstruction with Gaussian splatting support",
-    "warning": "Requires external dependencies (PyTorch, VGGT)",
+    "location": "View3D > Sidebar > MOSPLAT",
+    "description": "Integrate MOSPLAT model for 3D reconstruction with Gaussian splatting support",
+    "warning": "Requires external dependencies (PyTorch, MOSPLAT)",
     "category": "3D View",
 }
 
 classes = (
-    VGGTProperties,
-    VGGT_OT_install_packages,
-    VGGT_OT_install_model,
-    VGGT_OT_load_images,
-    VGGT_OT_run_inference,
-    VGGT_OT_update_visualization,
-    VGGT_OT_export_gaussian_splat,
-    VGGT_OT_clear_scene,
-    VGGT_PT_main_panel,
-    VGGT_PT_parameters_panel,
-    VGGT_PT_export_panel,
+    MOSPLATProperties,
+    MOSPLAT_OT_install_packages,
+    MOSPLAT_OT_install_model,
+    MOSPLAT_OT_load_images,
+    MOSPLAT_OT_run_inference,
+    MOSPLAT_OT_update_visualization,
+    MOSPLAT_OT_export_gaussian_splat,
+    MOSPLAT_OT_clear_scene,
+    MOSPLAT_PT_main_panel,
+    MOSPLAT_PT_parameters_panel,
+    MOSPLAT_PT_export_panel,
 )
 
 
 def register():
-    print("VGGT Blender addon registration starting...")
+    print("MOSPLAT Blender addon registration starting...")
     
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.vggt_props = bpy.props.PointerProperty(type=VGGTProperties)
+    bpy.types.Scene.mosplat_props = bpy.props.PointerProperty(type=MOSPLATProperties)
     
-    print("VGGT Blender addon registration completed. Use the VGGT panel to install dependencies.")
+    print("MOSPLAT Blender addon registration completed. Use the MOSPLAT panel to install dependencies.")
 
 
 def unregister():
@@ -57,8 +57,8 @@ def unregister():
             print(f"Error during unregistration of {cls.__name__}: {e}")
     
     try:
-        del bpy.types.Scene.vggt_props
+        del bpy.types.Scene.mosplat_props
     except AttributeError as e:
-        print(f"Error during unregistration of Scene.vggt_props: {e}")
+        print(f"Error during unregistration of Scene.mosplat_props: {e}")
     
-    print("VGGT Blender addon unregistration completed")
+    print("MOSPLAT Blender addon unregistration completed")
