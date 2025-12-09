@@ -180,11 +180,11 @@ class MOSPLAT_OT_install_packages(Operator):
                 if not installed and os.path.exists(pkg_path):
                     installed = True
                     
-                props.installation_progress += 10.0
+                props.installation_progress += 5.0
 
             print("All packages installed. Setting up VGGT repository...")
             
-            # Install VGGT repository (remaining 30% of progress)
+            # Install VGGT repository
             try:
                 # Check if already installed
                 props.installation_message = "Checking for existing VGGT installation..."
@@ -234,7 +234,7 @@ class MOSPLAT_OT_install_packages(Operator):
                         props.installation_in_progress = False
                         return
                     
-                    props.installation_progress += 5.0
+                    props.installation_progress += 10.0
 
                     # Install as Python module
                     props.installation_message = "Installing VGGT as Python module..."

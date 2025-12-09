@@ -58,6 +58,7 @@ REQUIRED_PACKAGES = [
         "GitPython",
         "GitPython",
     ),
+    PackageSpecification("plyfile", "plyfile", "plyfile")
 ]
 
 
