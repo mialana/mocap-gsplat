@@ -3,7 +3,7 @@
         "external/vggt",
         "external/vggt/vggt/dependency"
     ],
-    "autoHide.autoHidePanel": true,
+    "autoHide.autoHidePanel": false,
     "blender.addon.logLevel": "debug",
     "blender.addon.loadDirectory": "auto",
     "blender.addon.moduleName": "auto",

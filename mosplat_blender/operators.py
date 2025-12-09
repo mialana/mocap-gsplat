@@ -530,13 +530,17 @@ class MOSPLAT_OT_run_inference(Operator):
             prediction_mode=prediction_mode,
             frame_filter=props.camera_filter
         )
+
+        print(f"POINTS shape {points.shape} and datatype {points.dtype}.")
+        print(f"COLORS shape {colors.shape} and datatype {colors.dtype}.")
+        print(f"CONFIDENCE shape {confidence.shape} and datatype {confidence.dtype}.")
         
         # Create point cloud
         create_point_cloud(
             points, 
             colors, 
             name="MOSPLAT_PointCloud",
-            point_size=props.point_size
+            point_size=confidence
         )
         
         # Create cameras if enabled

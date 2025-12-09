@@ -9,6 +9,7 @@ Pillow
 huggingface_hub
 einops
 safetensors
+plyfile
 
 # demo requirements
 gradio==5.17.1

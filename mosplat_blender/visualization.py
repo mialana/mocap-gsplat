@@ -10,12 +10,15 @@ import mathutils
 import numpy as np
 from typing import Optional, List
 
+import os
+from datetime import datetime
+
 
 # Prefix for all MOSPLAT-generated objects
 MOSPLAT_OBJECT_PREFIX = "MOSPLAT_"
 
 
-def remove_vggt_objects():
+def remove_mosplat_objects():
     """
     Remove all MOSPLAT-generated objects from the Blender scene.
 
@@ -49,20 +52,47 @@ def create_point_cloud(
     points: np.ndarray,
     colors: Optional[np.ndarray] = None,
     name: str = "MOSPLAT_PointCloud",
-    point_size: float = 0.01,
+    point_size: np.ndarray = 0.01,
+    output_path: str = os.path.expanduser(f"~/Downloads/mosplat/mosplat_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.ply"),
+    as_binary = False
 ) -> bpy.types.Object:
     """
-    Create a point cloud mesh in Blender from 3D points.
-
-    Args:
-        points: Nx3 array of 3D point coordinates
-        colors: Optional Nx3 array of RGB colors (0-255)
-        name: Name for the Blender object
-        point_size: Size of individual points (for geometry nodes)
-
-    Returns:
-        The created Blender mesh object
+    points: (N,3) float32 or float64 array of XYZ coordinates
+    colors: (N,3) uint8 array of RGB values
+    point_size: (N, 3) float size attribute stored per vertex
     """
+
+    from plyfile import PlyData, PlyElement
+
+    assert points.shape == colors.shape
+    assert points.shape[1] == 3
+
+    N = points.shape[0]
+
+    # Build structured array matching PLY vertex layout
+    vertex_dtype = [
+        ('x', 'f4'), ('y', 'f4'), ('z', 'f4'),
+        ('red', 'u1'), ('green', 'u1'), ('blue', 'u1'),
+        ('size', 'f4')
+    ]
+
+    vertices = np.empty(N, dtype=vertex_dtype)
+    vertices['x'] = points[:, 0]
+    vertices['y'] = points[:, 1]
+    vertices['z'] = points[:, 2]
+    vertices['red']   = colors[:, 0]
+    vertices['green'] = colors[:, 1]
+    vertices['blue']  = colors[:, 2]
+    vertices['size']  = point_size
+
+    # Create PlyElement and PlyData
+    vertex_element = PlyElement.describe(vertices, 'vertex')
+
+    output_dir = os.path.dirname(output_path)
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    PlyData([vertex_element], text=(not as_binary)).write(output_path)
 
     num_points = points.shape[0]
 
