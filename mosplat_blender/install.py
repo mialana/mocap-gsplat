@@ -12,8 +12,6 @@ from . import helpers
 
 from dataclasses import dataclass
 
-print(sys.executable)
-
 
 @dataclass
 class PackageSpecification:
@@ -58,13 +56,14 @@ REQUIRED_PACKAGES = [
         "GitPython",
         "GitPython",
     ),
-    PackageSpecification("plyfile", "plyfile", "plyfile")
+    PackageSpecification("plyfile", "plyfile", "plyfile"),
 ]
 
 
 def get_blender_python_path():
     """Returns the path of Blender's embedded Python interpreter."""
-    return sys.executable
+    interpreter_path = sys.executable
+    return interpreter_path
 
 
 def ensure_pip():
@@ -83,7 +82,7 @@ def ensure_pip():
         raise
 
 
-def append_modules_to_sys_path(modules_path):
+def append_to_path(modules_path):
     """Ensure Blender can find installed packages."""
     if modules_path not in sys.path:
         sys.path.append(modules_path)
@@ -91,59 +90,33 @@ def append_modules_to_sys_path(modules_path):
     print(f"{modules_path} added to PATH")
 
 
+def ensure_package_installed(module_name):
+    return importlib.util.find_spec(module_name) is not None
+
+
 def install_package(module_name, pip_spec, modules_path):
     """Install a single package using Blender's Python."""
     print(f"Installing {pip_spec}...")
 
-    subprocess_list = [
-        get_blender_python_path(),
-        "-m",
-        "pip",
-        "install",
-        "--force-reinstall",
-        "--quiet",
-        "--upgrade",
-        "--target",
-        modules_path,
-    ] + pip_spec.split(" ")
+    try:
+        subprocess_list = [
+            get_blender_python_path(),
+            "-m",
+            "pip",
+            "install",
+            "--force-reinstall",
+            "--quiet",
+            "--upgrade",
+            "--target",
+            modules_path,
+        ] + pip_spec.split(" ")
 
-    subprocess.check_call(subprocess_list)
+        subprocess.check_call(subprocess_list)
+        print(f"{module_name} installed with spec '{pip_spec}' successfully.")
 
-    print(f"{module_name} installed with spec '{pip_spec}' successfully.")
-
-
-def install_packages(packages, modules_path):
-    wm = bpy.context.window_manager
-    wm.progress_begin(0, len(packages))
-
-    for i, p in enumerate(packages):
-        installed: bool = False
-        try:
-            module = importlib.import_module(p.module_name)
-
-            module_file = module.__file__
-            print(f"found module file for {p.module_name} is: {module_file}")
-            if module_file is None:
-                raise ImportError()
-
-            installed = True
-        except ImportError:
-            print(f"{p.module_name} not installed. Installing...")
-            try:
-                install_package(p.module_name, p.pip_spec, modules_path)
-            except subprocess.CalledProcessError as e:
-                print(f"Failed to install {p.pip_spec}. Error: {e}")
-                raise
-
-        pkg_path = os.path.join(modules_path, p.module_name)
-        if not installed and os.path.exists(pkg_path):
-            installed = True
-
-        print(f"'{p.module_name}' is installed.")
-        wm.progress_update(i + 1)
-
-    wm.progress_end()
-    print("All required packages installed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing {module_name}: {e}")
+        raise
 
 
 def install_vggt(modules_path):
@@ -198,26 +171,6 @@ def install_vggt(modules_path):
             raise
         wm.progress_end()
 
-        append_modules_to_sys_path(out_dir)
+        append_to_path(out_dir)
 
     print("'vggt' is installed")
-
-
-def background_installation(modules_path):
-    install_packages(REQUIRED_PACKAGES, modules_path)
-    install_vggt(modules_path)
-
-
-def main():
-    ensure_pip()
-    modules_path = helpers.resolve_script_file_path(constants.ADDON_SUBPATH)
-
-    append_modules_to_sys_path(modules_path)
-
-    threading.Thread(
-        target=background_installation, daemon=True, args=(modules_path,)
-    ).start()
-
-
-if __name__ == "__main__":
-    main()

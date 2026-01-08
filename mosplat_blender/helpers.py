@@ -3,7 +3,6 @@ import bpy
 
 def resolve_script_file_path(path: str) -> str:
     filepath = bpy.utils.user_resource("SCRIPTS", path=path, create=True)
-    print(filepath)
     return filepath
 
 
