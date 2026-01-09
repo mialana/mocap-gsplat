@@ -15,7 +15,7 @@ from .properties import MOSPLATProperties
 import bpy
 
 bl_info = {
-    "name": "MOSPLAT Blender",
+    "name": "MOSPLAT Blender Old",
     "blender": (4, 2, 0),
     "category": "Pipeline",
     "location": "View3D > Sidebar > MOSPLAT",

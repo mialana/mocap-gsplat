@@ -1,21 +1,10 @@
 {
     "python.analysis.extraPaths": [
         "external/vggt",
-        "external/vggt/vggt/dependency"
+        "external/vggt/vggt/dependency",
+        "mosplat_blender",
+        "mosplat_blender/operators"
     ],
     "autoHide.autoHidePanel": false,
     "blender.addon.logLevel": "debug",
-    "blender.addon.loadDirectory": "auto",
-    "blender.addon.moduleName": "auto",
-    "blender.addon.sourceDirectory": "auto",
-
-    "workspaceKeybindings.inBlenderDevelopmentMode.enabled": true,
-    "terminal.integrated.commandsToSkipShell": [
-        "blender.start",
-        "blender.stop",
-        "blender.reloadAddons"
-    ],
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportInvalidTypeForm": "none"
-    }
 }

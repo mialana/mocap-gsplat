@@ -1,0 +1,34 @@
+### The base for generated `blender_manifest.toml` (this line is removed during generation)
+schema_version = "1.0.0"
+
+id = "mosplat_blender"
+version = "0.0.1"
+name = "Mo-splat Blender"
+tagline = "Generate 3D Gaussian Splats from Motion Capture data in Blender"
+maintainer = "Amy Liu"
+type = "add-on"
+
+website = "https://github.com/mialana/mocap-gsplat"
+tags = ["Pipeline", "3D View", "Import-Export"]
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+blender_version_min = "4.2.0"
+
+platforms = ["windows-x64", "linux-x64", "macos-arm64"]
+
+[permissions]
+network = "Access HuggingFace"
+files = "Import/export motion capture, pointcloud, and 3DGS data"
+
+[build]
+paths_exclude_pattern = [
+    "__pycache__/",
+    "/.git/",
+    "/*.zip",
+    "wheels/"
+]
+
+{wheels_block}

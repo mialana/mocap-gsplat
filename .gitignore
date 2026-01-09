@@ -5,14 +5,18 @@ input_**
 
 RESULTS**
 
+*.egg-info
+
+resources
+
+scenes
+
 __pycache__
 
 .python-version
 .env
 .venv
 
-*.egg-info
-
-resources
-
-scenes
+*.whl
+*.zip
+blender_manifest.toml
