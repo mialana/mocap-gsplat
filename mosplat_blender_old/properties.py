@@ -50,7 +50,7 @@ class MOSPLATProperties(PropertyGroup):
     cache_directory: StringProperty(
         name="Cache Directory",
         description="Directory for caching model weights",
-        default=os.path.expanduser("~/.cache/vggt/"),
+        default=os.path.join(os.path.expanduser("~"), ".cache", "vggt/"),
         subtype="DIR_PATH",
     )
 
