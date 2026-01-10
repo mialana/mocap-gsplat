@@ -5,7 +5,12 @@ from pythonjsonlogger.json import JsonFormatter
 from typing import TYPE_CHECKING, TypeAlias, Any
 
 from .base_ot import Mosplat_OT_Base
-from ..constants import LOGGER_NAME, DATE_LOG_FORMAT, JSON_LOG_FORMAT, STDOUT_LOG_FORMAT
+from ..constants import (
+    LOGGER_NAME,
+    JSON_DATE_LOG_FORMAT,
+    JSON_LOG_FORMAT,
+    STDOUT_LOG_FORMAT,
+)
 from ..properties import MosplatProperties
 
 if TYPE_CHECKING:
@@ -37,12 +42,14 @@ class OT_InitLogging(Mosplat_OT_Base):
         logger = logging.getLogger(LOGGER_NAME)
         logger.setLevel(logging.DEBUG)
 
-        stdout_formatter = logging.Formatter(STDOUT_LOG_FORMAT, datefmt=DATE_LOG_FORMAT)
+        stdout_formatter = logging.Formatter(
+            STDOUT_LOG_FORMAT, datefmt=JSON_DATE_LOG_FORMAT
+        )
         stdout_handler = logging.StreamHandler(sys.stdout)
         stdout_handler.setFormatter(stdout_formatter)
         logger.addHandler(stdout_handler)
 
-        json_formatter = JsonFormatter(JSON_LOG_FORMAT, datefmt=DATE_LOG_FORMAT)
+        json_formatter = JsonFormatter(JSON_LOG_FORMAT, datefmt=JSON_DATE_LOG_FORMAT)
         json_handler = logging.FileHandler(props.logging_output)
         json_handler.setFormatter(json_formatter)
 

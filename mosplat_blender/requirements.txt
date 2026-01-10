@@ -9,3 +9,4 @@ plyfile
 
 # developer packages
 python-json-logger
+colorlog
