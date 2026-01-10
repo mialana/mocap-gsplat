@@ -1,20 +1,50 @@
 import bpy
-import sys
 import logging
-from pythonjsonlogger.json import JsonFormatter
+from typing import Type, Sequence
 
-LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
-json_formatter = JsonFormatter(LOG_FORMAT)
+from .properties import MosplatProperties
+from .operators import Mosplat_OT_Base, MosplatOperatorMixin, all_operators
+from .constants import LOGGER_NAME
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setFormatter(json_formatter)
-logger.addHandler(stdout_handler)
+
+classes: Sequence[Type[bpy.types.PropertyGroup] | Type[Mosplat_OT_Base]] = [
+    MosplatProperties
+] + all_operators
+
+logger = logging.getLogger(LOGGER_NAME)
+
 
 def register():
-    logger.info("MOSPLAT Blender addon registration starting.")
+    for c in classes:
+        if issubclass(c, MosplatOperatorMixin):
+            c.setup_bl_info()  # call a classmethod on all Mosplat operators
+        bpy.utils.register_class(c)
+
+    setattr(
+        bpy.types.Scene,
+        "mosplat_properties",
+        bpy.props.PointerProperty(type=MosplatProperties),
+    )
+
+    # run logging operator after file load
+    bpy.app.handlers.load_post.append(getattr(bpy.ops, "mosplat.logging"))
 
 
 def unregister():
-    logger.info("MOSPLAT Blender addon unregistration completed.")
+    global logger
+
+    # unregister all classes
+    for cls in reversed(classes):
+        try:
+            bpy.utils.unregister_class(cls)
+        except RuntimeError as e:
+            logger.error(f"Error during unregistration of `{cls.__name__}`: {e}")
+
+    try:
+        delattr(bpy.types.Scene, "mosplat_properties")
+    except AttributeError as e:
+        logger.error(
+            f"Error during unregistration of `bpy.types.Scene.mosplat_properties`: {e}"
+        )
+
+    logger.info("Mosplat Blender addon unregistration completed.")

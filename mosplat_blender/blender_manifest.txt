@@ -3,7 +3,7 @@ schema_version = "1.0.0"
 
 id = "mosplat_blender"
 version = "0.0.1"
-name = "Mo-splat Blender"
+name = "Mosplat Blender"
 tagline = "Generate 3D Gaussian Splats from Motion Capture data in Blender"
 maintainer = "Amy Liu"
 type = "add-on"
@@ -19,6 +19,8 @@ blender_version_min = "4.2.0"
 
 platforms = ["windows-x64", "linux-x64", "macos-arm64"]
 
+{wheels_block}
+
 [permissions]
 network = "Access HuggingFace"
 files = "Import/export motion capture, pointcloud, and 3DGS data"
@@ -30,5 +32,3 @@ paths_exclude_pattern = [
     "/*.zip",
     "wheels/"
 ]
-
-{wheels_block}

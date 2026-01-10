@@ -1,5 +1,5 @@
-torch
-torchvision
+torch==2.8.0 # current `WinError 1114` in latest `2.9.1` branch
+torchvision==0.23.0
 numpy
 Pillow
 huggingface_hub
