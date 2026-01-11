@@ -1,5 +1,5 @@
 from typing import List, Type
 
-from .base_ot import Mosplat_OT_Base, MosplatOperatorMixin
+from ..types import Mosplat_OT_Base
 
 all_operators: List[Type[Mosplat_OT_Base]] = []

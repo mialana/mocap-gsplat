@@ -1,8 +1,16 @@
 {
     "python.languageServer": "Pylance",
-    "blender.addon.logLevel": "debug",
+    "blender.addon.logLevel": "info",
     "blender.environmentVariables": {
         "BLENDER_USER_RESOURCES": "${workspaceFolder}/.cache/",
         "PYTHONNOUSERSITE": 1
+    },
+    "[python]": {
+        "editor.rulers": [
+            {
+                "column": 88,
+                "color": "#764462"
+            }
+        ]
     }
 }

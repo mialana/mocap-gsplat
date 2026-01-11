@@ -6,6 +6,6 @@
         "external/vggt/vggt/dependency",
         "mosplat_blender",
         "mosplat_blender/operators",
-        "mosplat_blender/typings/bpy/types"
+        "mosplat_blender/panels",
     ]
 }

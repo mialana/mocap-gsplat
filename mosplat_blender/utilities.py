@@ -4,14 +4,14 @@ import os
 import sys
 import logging
 import datetime
-from typing import Tuple
+from typing import ClassVar, List
 from pythonjsonlogger.json import JsonFormatter
 import coloredlogs
 from humanfriendly.compat import coerce_string
 from humanfriendly.terminal import ansi_wrap
 
 from .constants import (
-    LOGGER_NAME,
+    DEFAULT_LOGGER_NAME,
     STDOUT_DATE_LOG_FORMAT,
     STDOUT_LOG_FORMAT,
     JSON_DATE_LOG_FORMAT,
@@ -31,45 +31,117 @@ class MosplatStreamFormatter(coloredlogs.ColoredFormatter):
 
     def format(self, record: logging.LogRecord) -> str:
         style = self.nn.get(self.level_styles, record.levelname)
+        # make custom level-aware record field that is first letter of log level
         if style:
-            # make custom level-aware record field that is first letter of log level
             record.levelletter = ansi_wrap(coerce_string(record.levelname[0]), **style)
-
-        # truncate path to directory + filename
-        record.dirname = os.path.basename(os.path.dirname(record.pathname))
 
         return super().format(record)
 
 
-def init_logging() -> Tuple[logging.Logger, logging.StreamHandler, logging.FileHandler]:
+def set_log_record_factory():
+    """sets a custom log record factory"""
+    old_factory = logging.getLogRecordFactory()
 
-    logger: logging.Logger = logging.getLogger(LOGGER_NAME)
-    # set logger to most verbose
-    logger.setLevel(logging.DEBUG)
+    def mosplat_record_factory(*args, **kwargs):
+        record = old_factory(*args, **kwargs)
+        record.levelletter = record.levelname[0]
+        record.dirname = os.path.basename(os.path.dirname(record.pathname))
+        return record
 
-    # set formatter of stdout logger and add as handler
-    stdout_log_formatter = MosplatStreamFormatter(
-        fmt=STDOUT_LOG_FORMAT, datefmt=STDOUT_DATE_LOG_FORMAT
-    )
-    stdout_log_handler: logging.StreamHandler = logging.StreamHandler(sys.stdout)
-    stdout_log_handler.setFormatter(stdout_log_formatter)
-    logger.addHandler(stdout_log_handler)
+    logging.setLogRecordFactory(mosplat_record_factory)
 
-    # build path for json log output file, set formatter, and add as handler
-    json_log_formatter = JsonFormatter(JSON_LOG_FORMAT, datefmt=JSON_DATE_LOG_FORMAT)
-    json_log_outdir = bpy.utils.user_resource(
-        "EXTENSIONS",
-        path=str(JSON_LOG_OUTSUBDIR),
-    )  # full path to log directory
-    os.makedirs(json_log_outdir, exist_ok=True)  # make the log directory if necessary
-    json_log_outfile = os.path.join(
-        json_log_outdir, datetime.datetime.now().strftime(JSON_LOG_OUTFILE)
-    )
 
-    json_log_handler: logging.FileHandler = logging.FileHandler(json_log_outfile)
-    json_log_handler.setFormatter(json_log_formatter)
-    logger.addHandler(json_log_handler)
+class MosplatLogging:
+    stdout_log_handler: ClassVar[logging.StreamHandler]
+    json_log_handler: ClassVar[logging.FileHandler]
 
-    logger.debug("Custom Mosplat logging instantiated.")
+    loggers: ClassVar[List[logging.Logger]] = []
 
-    return (logger, stdout_log_handler, json_log_handler)
+    _default_logger: ClassVar[logging.Logger] = logging.getLogger(DEFAULT_LOGGER_NAME)
+    _initialized: ClassVar[bool] = False
+
+    @classmethod
+    def init_once(cls):
+        if not cls._initialized:
+            try:
+                set_log_record_factory()
+                cls.init_logging_handlers()
+                cls.configure_logger_instance(
+                    DEFAULT_LOGGER_NAME
+                )  # set up default logger
+
+                cls._initialized = True
+            except Exception as e:
+                # change default logger to the root logger as ours aren't setup properly
+                cls._default_logger = logging.getLogger()
+                cls._default_logger.exception(
+                    f"An exception occured while setting up logging: {e}"
+                )
+        else:
+            # TODO: remove this when I'm confident
+            import inspect
+            cls._default_logger.debug(f"Logging initialized twice: {inspect.stack()[1]}")
+
+    @classmethod
+    def cleanup(cls):
+        """Remove all the handlers from the created loggers."""
+        if cls._initialized:
+            for logger in cls.loggers:
+                logger.removeHandler(cls.json_log_handler)
+                logger.removeHandler(cls.stdout_log_handler)
+
+            cls.json_log_handler.close()
+            cls.stdout_log_handler.close()
+
+    @classmethod
+    def default_logger(cls) -> logging.Logger:
+        if not cls._initialized:
+            cls.init_once()
+        return cls._default_logger
+
+    @classmethod
+    def init_logging_handlers(cls):
+        """set formatter of stdout logger and add as handler"""
+        stdout_log_formatter = MosplatStreamFormatter(
+            fmt=STDOUT_LOG_FORMAT, datefmt=STDOUT_DATE_LOG_FORMAT
+        )
+        cls.stdout_log_handler = logging.StreamHandler(sys.stdout)
+        cls.stdout_log_handler.setFormatter(stdout_log_formatter)
+
+        """build path for json log output file, set formatter, and add as handler"""
+        json_log_formatter = JsonFormatter(
+            JSON_LOG_FORMAT, datefmt=JSON_DATE_LOG_FORMAT
+        )
+        json_log_outdir = bpy.utils.user_resource(
+            "EXTENSIONS",
+            path=str(JSON_LOG_OUTSUBDIR),
+        )  # full path to log directory
+        os.makedirs(
+            json_log_outdir, exist_ok=True
+        )  # make the log directory if necessary
+        json_log_outfile = os.path.join(
+            json_log_outdir, datetime.datetime.now().strftime(JSON_LOG_OUTFILE)
+        )
+
+        cls.json_log_handler = logging.FileHandler(json_log_outfile)
+        cls.json_log_handler.setFormatter(json_log_formatter)
+
+    @classmethod
+    def configure_logger_instance(cls, name: str) -> logging.Logger:
+        if name is not DEFAULT_LOGGER_NAME and not cls._initialized:
+            cls.init_once()
+
+        logger: logging.Logger = logging.getLogger(name)
+        # set logger to most verbose
+        logger.setLevel(logging.DEBUG)
+        logger.propagate = False  # prevent propogation to parent loggers
+
+        logger.addHandler(cls.json_log_handler)
+        logger.debug(f"JSON logging configured for `{name}`.")
+
+        logger.addHandler(cls.stdout_log_handler)
+        logger.debug(f"Stdout logging configured for `{name}`.")
+
+        cls.loggers.append(logger)  # add to list of configured loggers
+
+        return logger
