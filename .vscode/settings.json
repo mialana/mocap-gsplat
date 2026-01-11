@@ -1,6 +1,5 @@
 {
     "python.languageServer": "Pylance",
-    "autoHide.autoHidePanel": false,
     "blender.addon.logLevel": "debug",
     "blender.environmentVariables": {
         "BLENDER_USER_RESOURCES": "${workspaceFolder}/.cache/",

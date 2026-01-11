@@ -6,7 +6,9 @@ import logging
 import datetime
 from typing import Tuple
 from pythonjsonlogger.json import JsonFormatter
-import colorlog
+import coloredlogs
+from humanfriendly.compat import coerce_string
+from humanfriendly.terminal import ansi_wrap
 
 from .constants import (
     LOGGER_NAME,
@@ -16,19 +18,25 @@ from .constants import (
     JSON_LOG_FORMAT,
     JSON_LOG_OUTSUBDIR,
     JSON_LOG_OUTFILE,
+    COLORED_FORMATTER_FIELD_STYLES,
+    COLORED_FORMATTER_LEVEL_STYLES,
 )
 
 
-class MosplatFormatter(colorlog.ColoredFormatter):
+class MosplatStreamFormatter(coloredlogs.ColoredFormatter):
+    def __init__(self, **kwargs):
+        kwargs["field_styles"] = COLORED_FORMATTER_FIELD_STYLES
+        kwargs["level_styles"] = COLORED_FORMATTER_LEVEL_STYLES
+        super().__init__(**kwargs)
+
     def format(self, record: logging.LogRecord) -> str:
-        # 1-letter log level
-        record.levelname = record.levelname[0]
+        style = self.nn.get(self.level_styles, record.levelname)
+        if style:
+            # make custom level-aware record field that is first letter of log level
+            record.levelletter = ansi_wrap(coerce_string(record.levelname[0]), **style)
 
         # truncate path to directory + filename
-        record.shortpath = os.path.join(
-            os.path.basename(os.path.dirname(record.pathname)),
-            os.path.basename(record.pathname),
-        )
+        record.dirname = os.path.basename(os.path.dirname(record.pathname))
 
         return super().format(record)
 
@@ -40,8 +48,8 @@ def init_logging() -> Tuple[logging.Logger, logging.StreamHandler, logging.FileH
     logger.setLevel(logging.DEBUG)
 
     # set formatter of stdout logger and add as handler
-    stdout_log_formatter = MosplatFormatter(
-        STDOUT_LOG_FORMAT, datefmt=STDOUT_DATE_LOG_FORMAT
+    stdout_log_formatter = MosplatStreamFormatter(
+        fmt=STDOUT_LOG_FORMAT, datefmt=STDOUT_DATE_LOG_FORMAT
     )
     stdout_log_handler: logging.StreamHandler = logging.StreamHandler(sys.stdout)
     stdout_log_handler.setFormatter(stdout_log_formatter)
@@ -62,6 +70,6 @@ def init_logging() -> Tuple[logging.Logger, logging.StreamHandler, logging.FileH
     json_log_handler.setFormatter(json_log_formatter)
     logger.addHandler(json_log_handler)
 
-    logger.info("Custom Mosplat logging instantiated.")
+    logger.debug("Custom Mosplat logging instantiated.")
 
     return (logger, stdout_log_handler, json_log_handler)
