@@ -1,7 +1,7 @@
 import bpy
 import logging
 
-from ..types import Mosplat_PT_Base
+from ..infrastructure.bases import Mosplat_PT_Base
 
 
 class Main_PT(Mosplat_PT_Base):
@@ -14,7 +14,8 @@ class Main_PT(Mosplat_PT_Base):
         return True
 
     def draw(self, context):
-        self.logger.debug(f"Draw called.")
+        if not (layout := self.layout):
+            return
 
 
 class Child_PT(Mosplat_PT_Base):
@@ -29,5 +30,3 @@ class Child_PT(Mosplat_PT_Base):
     def draw(self, context):
         if not (layout := self.layout):
             return
-
-        self.logger.debug("Draw called.")

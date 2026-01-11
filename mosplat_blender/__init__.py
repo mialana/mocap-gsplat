@@ -5,21 +5,24 @@ from typing import Type, Sequence
 from .properties import MosplatProperties
 from .operators import all_operators
 from .panels import all_panels
-from .utilities import MosplatLogging
-from .types import MosplatBlBaseMixin, Mosplat_OT_Base, Mosplat_PT_Base
+from .infrastructure.logs import MosplatLoggingBase
+from .infrastructure.bases import Mosplat_OT_Base, Mosplat_PT_Base
+from .infrastructure.mixins import MosplatBlMetaMixin
 
 
 classes: Sequence[
     Type[bpy.types.PropertyGroup] | Type[Mosplat_OT_Base] | Type[Mosplat_PT_Base]
 ] = ([MosplatProperties] + all_operators + all_panels)
 
-logger = MosplatLogging.default_logger()
+logger = MosplatLoggingBase.configure_logger_instance(__name__)
 
 
 def register():
+    MosplatLoggingBase.init_once(__name__) # initialize handlers and local "root" logger
+
     for c in classes:
         try:
-            if issubclass(c, MosplatBlBaseMixin):
+            if issubclass(c, MosplatBlMetaMixin):
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
         except Exception as e:
@@ -53,4 +56,4 @@ def unregister():
 
     logger.info("Mosplat Blender addon unregistration completed.")
 
-    MosplatLogging.cleanup()
+    MosplatLoggingBase.cleanup()

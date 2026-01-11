@@ -1,24 +1,30 @@
 from __future__ import annotations
 
-import bpy
 from typing import ClassVar, Type
-from logging import Logger
+import logging
 import inspect
 
-from .utilities import MosplatLogging
+from .logs import MosplatLoggingBase
 from .constants import _MISSING_
 
-
 class MosplatLogClassMixin:
-    logger: ClassVar[Logger] = _MISSING_
+    logger: ClassVar[logging.Logger] = _MISSING_
 
     @classmethod
     def create_logger_for_class(cls):
-        cls.logger = MosplatLogging.configure_logger_instance(f"{cls.__qualname__}")
+        cls.logger = MosplatLoggingBase.configure_logger_instance(
+            f"{cls.__module__}.{cls.__qualname__}"
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.logger is _MISSING_:
+            self.__class__.create_logger_for_class()
 
 
-class MosplatBlBaseMixin(MosplatLogClassMixin):
-    """A mixin class that standardizes metadata for Blender objects."""
+class MosplatBlMetaMixin(MosplatLogClassMixin):
+    """A mixin class that standardizes common metadata for Blender types."""
 
     short_name: ClassVar[str] = _MISSING_
     prefix_suffix: ClassVar[str] = _MISSING_
@@ -54,8 +60,8 @@ class MosplatBlBaseMixin(MosplatLogClassMixin):
                 )
 
 
-class MosplatBlPanelMixin(MosplatBlBaseMixin):
-    parent_class: ClassVar[Type[Mosplat_PT_Base] | None] = _MISSING_
+class MosplatBlMetaPanelMixin(MosplatBlMetaMixin):
+    parent_class: ClassVar[Type[MosplatBlMetaPanelMixin] | None] = _MISSING_
 
     @classmethod
     def at_registration(cls):
@@ -75,14 +81,3 @@ class MosplatBlPanelMixin(MosplatBlBaseMixin):
             )  # do not run if it already has the attribute
         ):
             cls.bl_parent_id = cls.parent_class.bl_idname
-
-
-class Mosplat_PT_Base(MosplatBlPanelMixin, bpy.types.Panel):
-    prefix_suffix = "PT"
-
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-
-
-class Mosplat_OT_Base(MosplatBlBaseMixin, bpy.types.Operator):
-    prefix_suffix = "OT"

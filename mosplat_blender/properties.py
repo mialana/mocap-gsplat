@@ -13,8 +13,9 @@ from bpy.props import (
     
 )
 import os
-import logging
+from .infrastructure.logs import MosplatLoggingBase
 
+logger = MosplatLoggingBase.configure_logger_instance(__name__)
 
 class MosplatProperties(PropertyGroup):
 

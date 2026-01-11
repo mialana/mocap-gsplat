@@ -1,10 +1,5 @@
 {
     "python.languageServer": "Pylance",
-    "blender.addon.logLevel": "info",
-    "blender.environmentVariables": {
-        "BLENDER_USER_RESOURCES": "${workspaceFolder}/.cache/",
-        "PYTHONNOUSERSITE": 1
-    },
     "[python]": {
         "editor.rulers": [
             {
@@ -12,5 +7,10 @@
                 "color": "#764462"
             }
         ]
-    }
+    },
+    "blender.addon.logLevel": "info",
+    "blender.environmentVariables": {
+        "BLENDER_USER_RESOURCES": "${workspaceFolder}/.cache/",
+        "PYTHONNOUSERSITE": 1
+    },
 }
