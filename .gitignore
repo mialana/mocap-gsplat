@@ -1,22 +1,9 @@
 .cache
-
-.gradio
-input_**
-
-RESULTS**
-
-*.egg-info
-
-resources
-
-scenes
-
+.venv
 __pycache__
 
-.python-version
 .env
-.venv
+blender_manifest.toml
 
 *.whl
 *.zip
-blender_manifest.toml

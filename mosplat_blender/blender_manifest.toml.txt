@@ -24,11 +24,3 @@ platforms = ["windows-x64", "linux-x64", "macos-arm64"]
 [permissions]
 network = "Access HuggingFace"
 files = "Import/export motion capture, pointcloud, and 3DGS data"
-
-[build]
-paths_exclude_pattern = [
-    "__pycache__/",
-    "/.git/",
-    "/*.zip",
-    "wheels/"
-]

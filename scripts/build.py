@@ -25,7 +25,7 @@ class BuildContext:
     timestamp_str: str
     wheels_dir: Path
     REQUIREMENTS_TXT_FILE: Path
-    MANIFEST_TXT_FILE: Path
+    MANIFEST_TOML_TXT_FILE: Path
     manifest_toml_file: Path
     DOTENV_TXT_FILE: Path
     dotenv_file: Path
@@ -112,10 +112,10 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     )
     print(f"`requirements.txt` File Path: {REQUIREMENTS_TXT_FILE}")
 
-    MANIFEST_TXT_FILE: Path = Path(
-        os.path.join(args.addon_src_dir, "blender_manifest.txt")
+    MANIFEST_TOML_TXT_FILE: Path = Path(
+        os.path.join(args.addon_src_dir, "blender_manifest.toml.txt")
     )
-    print(f"Input `blender_manifest.txt` File Path: {MANIFEST_TXT_FILE}")
+    print(f"Input `blender_manifest.txt` File Path: {MANIFEST_TOML_TXT_FILE}")
     manifest_toml_file: Path = Path(
         os.path.join(args.addon_src_dir, "blender_manifest.toml")
     )
@@ -131,7 +131,7 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
             timestamp_str,
             wheels_dir,
             REQUIREMENTS_TXT_FILE,
-            MANIFEST_TXT_FILE,
+            MANIFEST_TOML_TXT_FILE,
             manifest_toml_file,
             DOTENV_TXT_FILE,
             dotenv_file,
@@ -201,7 +201,7 @@ def generate_blender_manifest_toml(ctx: BuildContext):
     )
     WHEELS_STR = "wheels = [\n" + ",\n".join(wheels) + "\n]"
 
-    with open(ctx.MANIFEST_TXT_FILE, "r", encoding="utf-8") as f:
+    with open(ctx.MANIFEST_TOML_TXT_FILE, "r", encoding="utf-8") as f:
         next(f)  # skip the comment on the first line
         template = f.read()
 
@@ -252,7 +252,7 @@ def main():
 
     for p in [
         ctx.REQUIREMENTS_TXT_FILE,
-        ctx.MANIFEST_TXT_FILE,
+        ctx.MANIFEST_TOML_TXT_FILE,
         ctx.DOTENV_TXT_FILE,
         ctx.ENVVAR_REPO_DIR,
     ]:  # check that all required input resources are where they are supposed to be
