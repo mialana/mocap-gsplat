@@ -4,13 +4,12 @@ from typing import Type, Sequence
 from pathlib import Path
 
 from .properties import Mosplat_Properties
-from .preferences import Mosplat_AddonPreferences, ADDON_PREFS_ID
+from .preferences import Mosplat_AddonPreferences
 from .operators import all_operators
 from .panels import all_panels
 from .infrastructure.logs import MosplatLoggingManager
 from .infrastructure.bases import Mosplat_OT_Base, Mosplat_PT_Base
 from .infrastructure.mixins import MosplatBlMetaMixin
-
 
 classes: Sequence[
     Type[bpy.types.PropertyGroup]
@@ -37,7 +36,7 @@ def register_addon():
             bpy.props.PointerProperty(type=Mosplat_Properties),
         )
     try:
-        MosplatLoggingManager.init_handlers_from_addon_prefs(ADDON_PREFS_ID)
+        MosplatLoggingManager.init_handlers_from_addon_prefs()
     except Exception:
         logger.exception(
             "Something went wrong when initializing handlers. Continuing registration."

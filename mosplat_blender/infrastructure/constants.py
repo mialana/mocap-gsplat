@@ -1,4 +1,5 @@
-from typing import Any
+from typing import Any, Final
+from pathlib import Path
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {
@@ -24,3 +25,8 @@ COLORED_FORMATTER_LEVEL_STYLES = {
 }
 
 _MISSING_: Any = object()  # sentinel variable
+ADDON_ID: Final[str] = (
+    __package__.rsplit(".", 1)[0]
+    if __package__
+    else Path(__file__).resolve().parent.parent.name
+)  # current package is one level down from the one blender expects

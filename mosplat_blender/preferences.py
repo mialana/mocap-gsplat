@@ -1,18 +1,15 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
-import bpy
 from bpy.types import AddonPreferences, Context
 from bpy.props import (
     StringProperty,
 )
-from typing import Final
-import os
+
 from pathlib import Path
 
 from .infrastructure.logs import MosplatLoggingManager
 from .infrastructure.mixins import MosplatLogClassMixin
-
-ADDON_PREFS_ID: Final[str] = __package__ or __name__
+from .infrastructure.constants import ADDON_ID
 
 
 def update_stdout_logging(prefs: Mosplat_AddonPreferences, _: Context):
@@ -37,15 +34,12 @@ def update_json_logging(prefs: Mosplat_AddonPreferences, _: Context):
 
 
 class Mosplat_AddonPreferences(AddonPreferences, MosplatLogClassMixin):
-    bl_idname = ADDON_PREFS_ID
+    bl_idname = ADDON_ID
 
     cache_dir: StringProperty(
-        name="Cache Subdirectory",
+        name="Cache Directory",
         description="Cache directory used by the addon",
-        default=bpy.utils.user_resource(
-            "EXTENSIONS",
-            path=os.path.join(".cache", ADDON_PREFS_ID),
-        ),
+        default=str(Path.home().joinpath(".cache", ADDON_ID)),
         subtype="DIR_PATH",
         update=update_json_logging,
     )

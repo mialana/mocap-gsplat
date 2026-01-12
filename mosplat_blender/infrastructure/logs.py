@@ -15,6 +15,7 @@ from humanfriendly.terminal import ansi_wrap
 from .constants import (
     COLORED_FORMATTER_FIELD_STYLES,
     COLORED_FORMATTER_LEVEL_STYLES,
+    ADDON_ID,
 )
 from .protocols import SupportsMosplat_AddonPreferences
 from .decorators import run_once
@@ -60,13 +61,13 @@ class MosplatLoggingManager:
 
     @classmethod
     @run_once
-    def init_handlers_from_addon_prefs(cls, addon_prefs_id):
+    def init_handlers_from_addon_prefs(cls):
         if not hasattr(cls, "_root_logger"):
             return
 
         if (
             (prefs_ctx := bpy.context.preferences)
-            and (addons := prefs_ctx.addons.get(addon_prefs_id))
+            and (addons := prefs_ctx.addons.get(ADDON_ID))
             and (prefs := addons.preferences)
         ):
             prefs = cast(SupportsMosplat_AddonPreferences, prefs)  # appease pylance
