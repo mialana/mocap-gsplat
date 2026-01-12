@@ -1,0 +1,52 @@
+name: Build & Release Blender Addon
+
+on:
+    push:
+        tags:
+            - "v*"
+
+permissions:
+    contents: write
+
+jobs:
+    build_and_upload:
+        strategy:
+            matrix:
+                os:
+                    - name: windows
+                      runner: windows-latest
+                    - name: macos
+                      runner: macos-latest
+                    - name: linux
+                      runner: ubuntu-latest
+                blender_python_version: ["3.11", "3.12"]
+
+        runs-on: ${{ matrix.os.runner }}
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Build
+              run: |
+                  python scripts/build.py --clean --blender_python_version ${{ matrix.blender_python_version }}
+
+            - name: Validate Zip Size
+              run: |
+                  python scripts/validate.py
+
+            - name: Rename Zip
+              shell: bash
+              run: |
+                  mv mosplat_blender.zip \
+                     mosplat_blender_${{ github.ref_name }}-py${{ matrix.blender_python_version }}-${{ matrix.os.name }}.zip
+
+            - name: Upload Zip to release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  files: mosplat_blender_${{ github.ref_name }}-py${{ matrix.blender_python_version }}-${{ matrix.os.name }}.zip
+                  fail_on_unmatched_files: true
