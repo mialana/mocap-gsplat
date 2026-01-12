@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 numpy
 Pillow
 huggingface_hub
@@ -9,13 +11,12 @@ plyfile
 python-json-logger
 coloredlogs
 
-torch==2.8.0; sys_platform == "win32"  # current `WinError 1114` in latest `2.9.1` branch
-torchvision==0.23.0; sys_platform == "win32"
-
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"
 
-# use cpu versions solely for smaller downloaded wheels in linux releases
---extra-index-url https://download.pytorch.org/whl/cpu
+# use cpu versions solely for smaller downloaded wheels in linux and windows releases
+torch==2.8.0+cpu; sys_platform == "win32"  # current `WinError 1114` in latest `2.9.1` branch (01-09-2026)
+torchvision==0.23.0+cpu; sys_platform == "win32"
+
 torch==2.9.1+cpu; sys_platform == "linux"
 torchvision==0.24.1+cpu; sys_platform == "linux"
