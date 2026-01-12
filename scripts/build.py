@@ -24,17 +24,10 @@ class BuildContext:
 
     timestamp_str: str
     wheels_dir: Path
+    ADDON_SRC_DIR: Path
     REQUIREMENTS_TXT_FILE: Path
     MANIFEST_TOML_TXT_FILE: Path
     manifest_toml_file: Path
-    DOTENV_TXT_FILE: Path
-    dotenv_file: Path
-    ENVVAR_REPO_DIR: Path
-    ENVVAR_ADDON_SRC_DIR: Path
-    envvar_addon_id: str
-
-
-from typing import Iterable, Mapping, Any
 
 
 def buildcontext_factory(scope) -> BuildContext:
@@ -46,7 +39,6 @@ class ArgparseDefaults:
     """Argparse will override these defaults which in turn overrides build context"""
 
     addon_src_dir: Path
-    addon_id: str
 
 
 def get_args(defaults: ArgparseDefaults):
@@ -61,14 +53,6 @@ def get_args(defaults: ArgparseDefaults):
         help="Path to Mosplat Blender add-on directory",
         type=Path,
         default=defaults.addon_src_dir,
-    )
-
-    parser.add_argument(
-        "-i",
-        "--addon_id",
-        help="Add-on ID",
-        type=str,
-        default=defaults.addon_id,
     )
 
     parser.add_argument(
@@ -102,21 +86,17 @@ def get_args(defaults: ArgparseDefaults):
 
 def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     """generate global build context using results of argparse."""
-    ENVVAR_REPO_DIR: Path = Path(__file__).resolve().parent.parent  # used in `.env`
+    repo_dir: Path = Path(__file__).resolve().parent.parent  # used in `.env`
 
-    ENVVAR_ADDON_SRC_DIR: Path = ENVVAR_REPO_DIR.joinpath(
+    ADDON_SRC_DIR: Path = repo_dir.joinpath(
         "mosplat_blender"
     )  # used in `.env` and argparse
-    envvar_addon_id = "mosplat_blender"
 
-    defaults = ArgparseDefaults(
-        addon_src_dir=ENVVAR_ADDON_SRC_DIR, addon_id=envvar_addon_id
-    )
+    defaults = ArgparseDefaults(addon_src_dir=ADDON_SRC_DIR)
 
     args = get_args(defaults)  # get program args from argparse
 
-    ENVVAR_ADDON_SRC_DIR = args.addon_src_dir  # override defaults with new program args
-    envvar_addon_id = args.addon_id  # override defaults with new program args
+    ADDON_SRC_DIR = args.addon_src_dir  # override defaults with new program args
 
     timestamp: datetime.datetime = datetime.datetime.now()
     timestamp_str = f"# auto-generated in build: {timestamp} \n\n"
@@ -137,11 +117,6 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
         os.path.join(args.addon_src_dir, "blender_manifest.toml")
     )
     print(f"Output `blender_manifest.toml` File Path: {manifest_toml_file}")
-
-    DOTENV_TXT_FILE: Path = Path(os.path.join(args.addon_src_dir, ".env.txt"))
-    print(f"Input `.env.txt` File Path: {DOTENV_TXT_FILE}")
-    dotenv_file: Path = Path(os.path.join(args.addon_src_dir, ".env"))
-    print(f"Output `.env` File Path: {dotenv_file}")
 
     return (
         buildcontext_factory(locals()),
@@ -211,36 +186,13 @@ def generate_blender_manifest_toml(ctx: BuildContext):
         next(f)  # skip the comment on the first line
         template = f.read()
 
-    template = template.format(addon_id=ctx.envvar_addon_id, wheels_block=WHEELS_STR)
+    template = template.format(wheels_block=WHEELS_STR)
 
     with open(ctx.manifest_toml_file, "w", encoding="utf-8") as f:
         f.write(ctx.timestamp_str)
         f.write(template)
 
     print(f"`{ctx.manifest_toml_file}` successfully generated.")
-
-
-def generate_dotenv(ctx: BuildContext):
-    """
-    format the variables within the template `.env.txt` & save as `.env`.
-    """
-
-    print(f"`Generating `.env`...")
-
-    with open(ctx.DOTENV_TXT_FILE, "r", encoding="utf-8") as f:
-        template = f.read()
-
-    template = template.format(
-        addon_id=ctx.envvar_addon_id,
-        repo_dir=ctx.ENVVAR_REPO_DIR.as_posix(),
-        addon_src_dir=ctx.ENVVAR_ADDON_SRC_DIR.as_posix(),
-    )
-
-    with open(ctx.dotenv_file, "w", encoding="utf-8") as f:
-        f.write(ctx.timestamp_str)
-        f.write(template)
-
-    print(f"`{ctx.dotenv_file}` successfully generated.")
 
 
 def clean(wheels_dir):
@@ -259,10 +211,9 @@ def main():
     ctx, args = prepare_context()
 
     for p in [
+        ctx.ADDON_SRC_DIR,
         ctx.REQUIREMENTS_TXT_FILE,
         ctx.MANIFEST_TOML_TXT_FILE,
-        ctx.DOTENV_TXT_FILE,
-        ctx.ENVVAR_REPO_DIR,
     ]:  # check that all required input resources are where they are supposed to be
         if not os.path.exists(ctx.wheels_dir):
             raise RuntimeError(f"Expected {p!r} in file system, but was not found.")
@@ -282,9 +233,6 @@ def main():
     print()  # skip a line
 
     generate_blender_manifest_toml(ctx)
-    print()  # skip a line
-
-    generate_dotenv(ctx)
 
 
 if __name__ == "__main__":

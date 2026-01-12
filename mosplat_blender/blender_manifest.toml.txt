@@ -1,7 +1,7 @@
 ### The base for generated `blender_manifest.toml` (this line is removed during generation)
 schema_version = "1.0.0"
 
-id = "{addon_id}"
+id = "mosplat_blender"
 version = "0.0.1"
 name = "Mosplat Blender"
 tagline = "Generate 3D Gaussian Splats from Motion Capture data in Blender"
