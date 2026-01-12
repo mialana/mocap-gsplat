@@ -2,9 +2,8 @@
     "typeCheckingMode": "standard",
     "stubPath": "typings",
     "extraPaths": [
-        "external/vggt",
-        "external/vggt/vggt/dependency",
         "mosplat_blender",
+        "mosplat_blender/infrastructure",
         "mosplat_blender/operators",
         "mosplat_blender/panels",
     ]
