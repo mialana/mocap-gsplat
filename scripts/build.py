@@ -14,8 +14,8 @@ import os
 import shutil
 import subprocess
 import datetime
-from typing import Protocol, Tuple, Any
-from dataclasses import dataclass
+from typing import Tuple
+from dataclasses import dataclass, fields
 
 
 @dataclass
@@ -31,12 +31,22 @@ class BuildContext:
     dotenv_file: Path
     ENVVAR_REPO_DIR: Path
     ENVVAR_ADDON_SRC_DIR: Path
-    envvar_cache_dir: Path
+    envvar_addon_id: str
+
+
+from typing import Iterable, Mapping, Any
+
+
+def buildcontext_factory(scope) -> BuildContext:
+    return BuildContext(**{f.name: scope[f.name] for f in fields(BuildContext)})
 
 
 @dataclass
 class ArgparseDefaults:
-    addon_src_dir: Path  # overrides build context
+    """Argparse will override these defaults which in turn overrides build context"""
+
+    addon_src_dir: Path
+    addon_id: str
 
 
 def get_args(defaults: ArgparseDefaults):
@@ -51,6 +61,14 @@ def get_args(defaults: ArgparseDefaults):
         help="Path to Mosplat Blender add-on directory",
         type=Path,
         default=defaults.addon_src_dir,
+    )
+
+    parser.add_argument(
+        "-i",
+        "--addon_id",
+        help="Add-on ID",
+        type=str,
+        default=defaults.addon_id,
     )
 
     parser.add_argument(
@@ -85,24 +103,23 @@ def get_args(defaults: ArgparseDefaults):
 def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     """generate global build context using results of argparse."""
     ENVVAR_REPO_DIR: Path = Path(__file__).resolve().parent.parent  # used in `.env`
-    envvar_cache_dir: Path = ENVVAR_REPO_DIR.joinpath(".cache")  # used in `.env`
 
-    ENVVAR_addon_path: Path = ENVVAR_REPO_DIR.joinpath(
+    ENVVAR_ADDON_SRC_DIR: Path = ENVVAR_REPO_DIR.joinpath(
         "mosplat_blender"
     )  # used in `.env` and argparse
+    envvar_addon_id = "mosplat_blender"
 
-    defaults = ArgparseDefaults(addon_src_dir=ENVVAR_addon_path)
+    defaults = ArgparseDefaults(
+        addon_src_dir=ENVVAR_ADDON_SRC_DIR, addon_id=envvar_addon_id
+    )
 
     args = get_args(defaults)  # get program args from argparse
 
-    if args.addon_src_dir != ENVVAR_addon_path:
-        print(
-            f"Overriding default addon source dir: \n{ENVVAR_addon_path=}\n{args.addon_src_dir=}"
-        )
-        ENVVAR_addon_path = args.addon_src_dir
+    ENVVAR_ADDON_SRC_DIR = args.addon_src_dir  # override defaults with new program args
+    envvar_addon_id = args.addon_id  # override defaults with new program args
 
     timestamp: datetime.datetime = datetime.datetime.now()
-    timestamp_str = f"# auto-generated in build: {timestamp} \n"
+    timestamp_str = f"# auto-generated in build: {timestamp} \n\n"
 
     wheels_dir: Path = Path(os.path.join(args.addon_src_dir, "wheels"))
     print(f"Wheels Directory Path: {wheels_dir}")
@@ -127,18 +144,7 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     print(f"Output `.env` File Path: {dotenv_file}")
 
     return (
-        BuildContext(
-            timestamp_str,
-            wheels_dir,
-            REQUIREMENTS_TXT_FILE,
-            MANIFEST_TOML_TXT_FILE,
-            manifest_toml_file,
-            DOTENV_TXT_FILE,
-            dotenv_file,
-            ENVVAR_REPO_DIR,
-            ENVVAR_addon_path,
-            envvar_cache_dir,
-        ),
+        buildcontext_factory(locals()),
         args,
     )
 
@@ -205,9 +211,11 @@ def generate_blender_manifest_toml(ctx: BuildContext):
         next(f)  # skip the comment on the first line
         template = f.read()
 
+    template = template.format(addon_id=ctx.envvar_addon_id, wheels_block=WHEELS_STR)
+
     with open(ctx.manifest_toml_file, "w", encoding="utf-8") as f:
         f.write(ctx.timestamp_str)
-        f.write(template.format(wheels_block=WHEELS_STR))
+        f.write(template)
 
     print(f"`{ctx.manifest_toml_file}` successfully generated.")
 
@@ -223,9 +231,9 @@ def generate_dotenv(ctx: BuildContext):
         template = f.read()
 
     template = template.format(
+        addon_id=ctx.envvar_addon_id,
         repo_dir=ctx.ENVVAR_REPO_DIR.as_posix(),
         addon_src_dir=ctx.ENVVAR_ADDON_SRC_DIR.as_posix(),
-        cache_dir=ctx.envvar_cache_dir.as_posix(),
     )
 
     with open(ctx.dotenv_file, "w", encoding="utf-8") as f:

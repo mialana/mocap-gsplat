@@ -10,7 +10,6 @@ class Main_PT(Mosplat_PT_Base):
 
     @classmethod
     def poll(cls, context):
-        cls.logger.debug("Polled")
         return True
 
     def draw(self, context):
@@ -24,7 +23,6 @@ class Child_PT(Mosplat_PT_Base):
 
     @classmethod
     def poll(cls, context):
-        cls.logger.debug("Polled")
         return True
 
     def draw(self, context):

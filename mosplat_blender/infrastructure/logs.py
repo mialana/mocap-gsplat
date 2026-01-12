@@ -132,8 +132,6 @@ class MosplatLoggingBase:
         logger.setLevel(logging.DEBUG)
         logger.propagate = True
 
-        logger.debug(f"Logging configured for `{name}`.")
-
         return logger
 
     @classmethod

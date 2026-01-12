@@ -3,9 +3,12 @@ from __future__ import annotations
 from typing import ClassVar, Type
 import logging
 import inspect
+import os
 
 from .logs import MosplatLoggingBase
 from .constants import _MISSING_
+from .utilities import load_dotenv_file
+
 
 class MosplatLogClassMixin:
     logger: ClassVar[logging.Logger] = _MISSING_

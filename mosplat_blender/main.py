@@ -1,11 +1,10 @@
 import bpy
 
-from os import environ
 from typing import Type, Sequence
 from pathlib import Path
-from dotenv import load_dotenv
 
-from .properties import MosplatProperties
+from .properties import Mosplat_Properties
+from .preferences import Mosplat_AddonPreferences
 from .operators import all_operators
 from .panels import all_panels
 from .infrastructure.logs import MosplatLoggingBase
@@ -14,19 +13,16 @@ from .infrastructure.mixins import MosplatBlMetaMixin
 
 
 classes: Sequence[
-    Type[bpy.types.PropertyGroup] | Type[Mosplat_OT_Base] | Type[Mosplat_PT_Base]
-] = ([MosplatProperties] + all_operators + all_panels)
+    Type[bpy.types.PropertyGroup]
+    | Type[bpy.types.AddonPreferences]
+    | Type[Mosplat_OT_Base]
+    | Type[Mosplat_PT_Base]
+] = ([Mosplat_Properties, Mosplat_AddonPreferences] + all_operators + all_panels)
 
 logger = MosplatLoggingBase.configure_logger_instance(__name__)
 
 
 def register_addon():
-    dotenv_path = Path(__file__).resolve().parent.joinpath(".env")
-    load_dotenv(
-        dotenv_path, verbose=True, override=True
-    )  # load all env variables from local `.env`
-    logger.info("Environment variables loaded.")
-
     for c in classes:
         try:
             if issubclass(c, MosplatBlMetaMixin):
@@ -38,7 +34,7 @@ def register_addon():
         setattr(
             bpy.types.Scene,
             "mosplat_properties",
-            bpy.props.PointerProperty(type=MosplatProperties),
+            bpy.props.PointerProperty(type=Mosplat_Properties),
         )
 
         logger.info("Mosplat Blender addon registration completed.")

@@ -9,14 +9,13 @@ from bpy.props import (
     IntProperty,
     StringProperty,
     CollectionProperty,
-    PointerProperty
-    
+    PointerProperty,
 )
 import os
 from .infrastructure.logs import MosplatLoggingBase
 
 logger = MosplatLoggingBase.configure_logger_instance(__name__)
 
-class MosplatProperties(PropertyGroup):
 
+class Mosplat_Properties(PropertyGroup):
     pass

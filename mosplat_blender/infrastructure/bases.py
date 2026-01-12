@@ -12,4 +12,3 @@ class Mosplat_PT_Base(MosplatBlMetaPanelMixin, bpy.types.Panel):
 
 class Mosplat_OT_Base(MosplatBlMetaMixin, bpy.types.Operator):
     prefix_suffix = "OT"
-
