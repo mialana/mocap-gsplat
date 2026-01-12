@@ -58,7 +58,7 @@ class MosplatLoggingBase:
             cls._root_logger.addHandler(cls.json_log_handler)
             cls._root_logger.addHandler(cls.stdout_log_handler)
 
-            cls._root_logger.debug(f"Root logger configured with name: `{name}`.")
+            cls._root_logger.info(f"Local root logger configured with name: `{name}`.")
 
         except Exception as e:
             # change default logger to the root logger as ours aren't setup properly
@@ -105,8 +105,8 @@ class MosplatLoggingBase:
         cls.json_log_handler = logging.FileHandler(json_log_outfile)
         cls.json_log_handler.setFormatter(json_log_formatter)
 
-    @classmethod
-    def configure_logger_instance(cls, name: str) -> logging.Logger:
+    @staticmethod
+    def configure_logger_instance(name: str) -> logging.Logger:
         logger: logging.Logger = logging.getLogger(name)
         # set logger to most verbose
         logger.setLevel(logging.DEBUG)

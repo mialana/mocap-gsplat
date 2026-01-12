@@ -1,5 +1,7 @@
 {
+    "files.autoSave": "off",
     "python.languageServer": "Pylance",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
     "[python]": {
         "editor.rulers": [
             {
@@ -8,9 +10,7 @@
             }
         ]
     },
+    "blender.addon.reloadOnSave": true,
     "blender.addon.logLevel": "info",
-    "blender.environmentVariables": {
-        "BLENDER_USER_RESOURCES": "${workspaceFolder}/.cache/",
-        "PYTHONNOUSERSITE": 1
-    },
+    "blender.addon.buildTaskName": "build"
 }
