@@ -177,9 +177,11 @@ def install_dev_pypi_packages(ctx: BuildContext):
         )
 
     except subprocess.CalledProcessError as e:
-        print(f"Error while installing PyPI wheels for development: {e}")
+        print(f"Error while installing PyPI wheels for development")
+        raise
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An unexpected error occurred")
+        raise
 
     print("Install complete")
 
@@ -203,9 +205,11 @@ def download_pypi_wheels(ctx: BuildContext, version, install):
         )
 
     except subprocess.CalledProcessError as e:
-        print(f"Error in call to download PyPI wheels: {e}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Error in call to download PyPI wheels")
+        raise
+    except Exception:
+        print(f"An unexpected error occurred")
+        raise
 
     print("All PyPI wheels successfully downloaded.")
 
@@ -272,8 +276,9 @@ def clean(wheels_dir):
         try:
             shutil.rmtree(wheels_dir)
             print(f"Wheels directory and all its contents have been removed.")
-        except OSError as e:
-            print(f"Error deleting wheels directory: : {e}")
+        except OSError:
+            print(f"Error deleting wheels directory")
+            raise
 
     print(f"Clean complete.")
 
