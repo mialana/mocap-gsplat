@@ -147,7 +147,8 @@ def get_version_tag_from_git() -> str:
         print(f"Processed version tag for Blender manifest: {version_tag}")
         return version_tag
     except subprocess.CalledProcessError:
-        raise RuntimeError("No git tags found.")
+        print("No git tags found. Falling back to 0.0.0")
+        return "0.0.0"
 
 
 def install_dev_pypi_packages(ctx: BuildContext):
