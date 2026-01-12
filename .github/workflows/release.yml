@@ -11,7 +11,7 @@ jobs:
 
         strategy:
             matrix:
-                blender_python_version: ["3.10", "3.11", "3.12"]
+                blender_python_version: ["3.10", "3.11"]
 
         steps:
             - name: Checkout
@@ -26,8 +26,11 @@ jobs:
               run: |
                   python scripts/build.py --clean  --blender_python_version ${{ matrix.blender_python_version }}
 
+            - name: List files
+              run: ls -la
+
             - name: Create release
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ github.ref_name }}-py${{ matrix.blender_python_version }}
-                  files: mosplat_blender.zip
+                  files: ${{ github.workspace }}/mosplat_blender.zip
