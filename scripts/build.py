@@ -143,7 +143,8 @@ def get_version_tag_from_git() -> str:
         )
         print(f"Retrieved git version tag: {git_version_tag}")
 
-        version_tag = git_version_tag.strip().removeprefix("v").split("-py")[0]
+        version_tag = git_version_tag.strip().removeprefix("v")
+        print(f"Processed version tag for Blender manifest: {version_tag}")
         return version_tag
     except subprocess.CalledProcessError:
         raise RuntimeError("No git tags found.")
