@@ -5,7 +5,7 @@ import logging
 import inspect
 import os
 
-from .logs import MosplatLoggingBase
+from .logs import MosplatLoggingManager
 from .constants import _MISSING_
 from .utilities import load_dotenv_file
 
@@ -15,15 +15,15 @@ class MosplatLogClassMixin:
 
     @classmethod
     def create_logger_for_class(cls):
-        cls.logger = MosplatLoggingBase.configure_logger_instance(
-            f"{cls.__module__}.{cls.__qualname__}"
+        cls.logger = MosplatLoggingManager.configure_logger_instance(
+            f"{cls.__module__}.logclass{cls.__qualname__}"
         )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
 
-        if self.logger is _MISSING_:
-            self.__class__.create_logger_for_class()
+        cls.create_logger_for_class()
 
 
 class MosplatBlMetaMixin(MosplatLogClassMixin):

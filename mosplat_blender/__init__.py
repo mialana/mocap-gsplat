@@ -1,9 +1,9 @@
 from .main import register_addon, unregister_addon
-from .infrastructure.logs import MosplatLoggingBase
+from .infrastructure.logs import MosplatLoggingManager
 
 
 def register():
-    MosplatLoggingBase.init_once(
+    MosplatLoggingManager.init_once(
         __name__
     )  # initialize handlers and local "root" logger
 
@@ -13,4 +13,4 @@ def register():
 def unregister():
     unregister_addon()
 
-    MosplatLoggingBase.cleanup()
+    MosplatLoggingManager.cleanup()

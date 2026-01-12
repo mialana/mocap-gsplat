@@ -12,9 +12,9 @@ from bpy.props import (
     PointerProperty,
 )
 import os
-from .infrastructure.logs import MosplatLoggingBase
+from .infrastructure.logs import MosplatLoggingManager
 
-logger = MosplatLoggingBase.configure_logger_instance(__name__)
+logger = MosplatLoggingManager.configure_logger_instance(__name__)
 
 
 class Mosplat_Properties(PropertyGroup):

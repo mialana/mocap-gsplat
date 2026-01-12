@@ -1,67 +1,98 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
 import bpy
-from bpy.types import AddonPreferences
+from bpy.types import AddonPreferences, Context
 from bpy.props import (
     StringProperty,
 )
 from typing import Final
 import os
+from pathlib import Path
 
-ADDON_ID: Final[str] = __package__ or __name__
+from .infrastructure.logs import MosplatLoggingManager
+from .infrastructure.mixins import MosplatLogClassMixin
+
+ADDON_PREFS_ID: Final[str] = __package__ or __name__
 
 
-class Mosplat_AddonPreferences(AddonPreferences):
-    bl_idname = ADDON_ID
+def update_stdout_logging(prefs: Mosplat_AddonPreferences, _: Context):
+    if MosplatLoggingManager.init_stdout_handler(
+        log_fmt=prefs.stdout_log_format,
+        log_date_fmt=prefs.stdout_date_log_format,
+    ):
+        prefs.logger.info("STDOUT logging updated.")
+    else:
+        raise TypeError()
+
+
+def update_json_logging(prefs: Mosplat_AddonPreferences, _: Context):
+    outdir: Path = Path(prefs.cache_dir).joinpath(prefs.json_log_subdir)
+    if MosplatLoggingManager.init_json_handler(
+        log_fmt=prefs.json_log_format,
+        log_date_fmt=prefs.json_date_log_format,
+        outdir=outdir,
+        file_fmt=prefs.json_log_filename_format,
+    ):
+        prefs.logger.info("JSON logging updated.")
+
+
+class Mosplat_AddonPreferences(AddonPreferences, MosplatLogClassMixin):
+    bl_idname = ADDON_PREFS_ID
 
     cache_dir: StringProperty(
         name="Cache Subdirectory",
         description="Cache directory used by the addon",
         default=bpy.utils.user_resource(
             "EXTENSIONS",
-            path=os.path.join(".cache", ADDON_ID),
+            path=os.path.join(".cache", ADDON_PREFS_ID),
         ),
         subtype="DIR_PATH",
+        update=update_json_logging,
     )
 
     json_log_subdir: StringProperty(
         name="JSON Log Subdirectory",
         description="Subdirectory (relative to cache) for JSON logs",
         default="log",
-        subtype="DIR_PATH",
+        update=update_json_logging,
     )
 
     json_log_filename_format: StringProperty(
         name="JSON Log Filename Format",
         description="strftime-compatible filename pattern",
         default="mosplat_%Y-%m-%d_%H-%M-%S.log",
+        update=update_json_logging,
     )
 
     json_date_log_format: StringProperty(
         name="JSON Date Format",
         description="strftime format for JSON log timestamps",
         default="%Y-%m-%d %H:%M:%S",
+        update=update_json_logging,
     )
 
     json_log_format: StringProperty(
         name="JSON Log Format",
-        description="logging.Formatter format string",
-        default="%(asctime)s %(levelname)s %(name)s %(filename)s %(funcName)s %(thread)d %(message)s",
+        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingManager.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        default="%(asctime)s %(levelname)s %(name)s %(pathname)s %(classname)s %(funcName)s %(lineno)s %(thread)d %(message)s",
+        update=update_json_logging,
     )
 
     stdout_date_log_format: StringProperty(
         name="STDOUT Date Format",
         description="strftime format for console log timestamps",
         default="%I:%M:%S %p",
+        update=update_stdout_logging,
     )
 
     stdout_log_format: StringProperty(
         name="STDOUT Log Format",
-        description="logging.Formatter format string",
-        default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(basename)s::%(funcName)s:%(lineno)s] %(message)s",
+        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingManager.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
+        update=update_stdout_logging,
     )
 
-    def draw(self, context):
+    def draw(self, _: Context):
         layout = self.layout
 
         layout.label(text="Output Configuration", icon="FILE_FOLDER")

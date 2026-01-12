@@ -4,10 +4,10 @@ from typing import Type, Sequence
 from pathlib import Path
 
 from .properties import Mosplat_Properties
-from .preferences import Mosplat_AddonPreferences
+from .preferences import Mosplat_AddonPreferences, ADDON_PREFS_ID
 from .operators import all_operators
 from .panels import all_panels
-from .infrastructure.logs import MosplatLoggingBase
+from .infrastructure.logs import MosplatLoggingManager
 from .infrastructure.bases import Mosplat_OT_Base, Mosplat_PT_Base
 from .infrastructure.mixins import MosplatBlMetaMixin
 
@@ -17,9 +17,9 @@ classes: Sequence[
     | Type[bpy.types.AddonPreferences]
     | Type[Mosplat_OT_Base]
     | Type[Mosplat_PT_Base]
-] = ([Mosplat_Properties, Mosplat_AddonPreferences] + all_operators + all_panels)
+] = ([Mosplat_AddonPreferences] + all_operators + all_panels)
 
-logger = MosplatLoggingBase.configure_logger_instance(__name__)
+logger = MosplatLoggingManager.configure_logger_instance(__name__)
 
 
 def register_addon():
@@ -36,8 +36,14 @@ def register_addon():
             "mosplat_properties",
             bpy.props.PointerProperty(type=Mosplat_Properties),
         )
+    try:
+        MosplatLoggingManager.init_handlers_from_addon_prefs(ADDON_PREFS_ID)
+    except Exception:
+        logger.exception(
+            "Something went wrong when initializing handlers. Continuing registration."
+        )  # just in case something goes wrong, this should not prevent registration
 
-        logger.info("Mosplat Blender addon registration completed.")
+    logger.info("Mosplat Blender addon registration completed.")
 
 
 def unregister_addon():
@@ -59,4 +65,4 @@ def unregister_addon():
 
     logger.info("Mosplat Blender addon unregistration completed.")
 
-    MosplatLoggingBase.cleanup()
+    MosplatLoggingManager.cleanup()
