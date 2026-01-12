@@ -180,7 +180,7 @@ def install_dev_pypi_packages(ctx: BuildContext):
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-    print("Install complete.")
+    print("Install complete")
 
 
 def download_pypi_wheels(ctx: BuildContext, version, install):
