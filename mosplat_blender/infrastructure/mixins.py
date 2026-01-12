@@ -7,7 +7,6 @@ import os
 
 from .logs import MosplatLoggingManager
 from .constants import _MISSING_
-from .utilities import load_dotenv_file
 
 
 class MosplatLogClassMixin:
