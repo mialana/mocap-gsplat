@@ -2,7 +2,7 @@
 schema_version = "1.0.0"
 
 id = "mosplat_blender"
-version = "0.0.1"
+version = "{version_tag}"
 name = "Mosplat Blender"
 tagline = "Generate 3D Gaussian Splats from Motion Capture data in Blender"
 maintainer = "Amy Liu"

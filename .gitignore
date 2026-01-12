@@ -1,8 +1,6 @@
-.cache
 .venv
 __pycache__
 
-.env
 blender_manifest.toml
 
 *.whl
