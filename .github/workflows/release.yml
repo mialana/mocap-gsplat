@@ -5,9 +5,12 @@ on:
         tags:
             - "v*"
 
+permissions:
+    contents: write
+
 jobs:
     release:
-        runs-on: ubuntu-latest
+        runs-on: windows-latest
 
         strategy:
             matrix:
@@ -26,11 +29,14 @@ jobs:
               run: |
                   python scripts/build.py --clean  --blender_python_version ${{ matrix.blender_python_version }}
 
-            - name: List files
-              run: ls -la
+            - name: Validate Zip Size
+              run: |
+                  python scripts/validate.py
 
             - name: Create release
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ github.ref_name }}-py${{ matrix.blender_python_version }}
                   files: ${{ github.workspace }}/mosplat_blender.zip
+                  fail_on_unmatched_files: true
+                  draft: true
