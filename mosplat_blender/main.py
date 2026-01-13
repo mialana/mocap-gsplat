@@ -1,24 +1,30 @@
+"""
+main entrypoint for addon.
+moves implementation logic and imports out of `__init__.py`.
+"""
+
 import bpy
 
-from typing import Type, Sequence
-from pathlib import Path
+from typing import Type, Sequence, cast
 
-from .properties import Mosplat_Properties
-from .preferences import Mosplat_AddonPreferences
-from .operators import all_operators
-from .panels import all_panels
-from .infrastructure.logs import MosplatLoggingManager
-from .infrastructure.bases import Mosplat_OT_Base, Mosplat_PT_Base
+from . import core
+from .interfaces import MosplatLoggingInterface
 from .infrastructure.mixins import MosplatBlMetaMixin
+from .infrastructure.checks import check_addonpreferences
+from .infrastructure.constants import ADDON_ID, ADDON_PROPERTIES_ATTRIBNAME
 
 classes: Sequence[
     Type[bpy.types.PropertyGroup]
     | Type[bpy.types.AddonPreferences]
-    | Type[Mosplat_OT_Base]
-    | Type[Mosplat_PT_Base]
-] = ([Mosplat_Properties, Mosplat_AddonPreferences] + all_operators + all_panels)
+    | Type[core.MosplatOperatorBase]
+    | Type[core.MosplatPanelBase]
+] = (
+    [core.Mosplat_PG_Global, core.Mosplat_AP_Global]
+    + core.all_operators
+    + core.all_panels
+)
 
-logger = MosplatLoggingManager.configure_logger_instance(__name__)
+logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 
 def register_addon():
@@ -32,15 +38,13 @@ def register_addon():
 
         setattr(
             bpy.types.Scene,
-            "mosplat_properties",
-            bpy.props.PointerProperty(type=Mosplat_Properties),
+            ADDON_PROPERTIES_ATTRIBNAME,
+            bpy.props.PointerProperty(type=core.Mosplat_PG_Global),
         )
-    try:
-        MosplatLoggingManager.init_handlers_from_addon_prefs()
-    except Exception:
-        logger.exception(
-            "Something went wrong when initializing handlers. Continuing registration."
-        )  # just in case something goes wrong, this should not prevent registration
+
+    # do not catch thrown exceptions as we should not successfully register without addon preferences
+    addon_preferences = check_addonpreferences(bpy.context.preferences)
+    MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
 
     logger.info("Mosplat Blender addon registration completed.")
 
@@ -54,10 +58,10 @@ def unregister_addon():
             logger.exception(f"Exception during unregistration of `{c.__name__=}`")
 
     try:
-        delattr(bpy.types.Scene, "mosplat_properties")
+        delattr(bpy.types.Scene, ADDON_PROPERTIES_ATTRIBNAME)
     except AttributeError:
         logger.exception(f"Error during unregistration of add-on properties")
 
     logger.info("Mosplat Blender addon unregistration completed.")
 
-    MosplatLoggingManager.cleanup()
+    MosplatLoggingInterface.cleanup()

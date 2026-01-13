@@ -1,32 +1,42 @@
+"""native mixin classes. note no import of `bpy`"""
+
 from __future__ import annotations
 
 from typing import ClassVar, Type
 import logging
 import inspect
-import os
 
-from .logs import MosplatLoggingManager
+from ..core.properties import Mosplat_PG_Global
+from ..interfaces.logging_interface import MosplatLoggingInterface
 from .constants import _MISSING_
 
 
 class MosplatLogClassMixin:
-    logger: ClassVar[logging.Logger] = _MISSING_
+    """
+    this mixin allows classes to have an easily accessible logger.
+    this was necessary as creating subclasses of bpy structs would mean that
+    all `funcName` logrecords would be the same (e.g. `poll()` or `draw()`, making
+    it impossible to distinguish which object class is logging the message,
+    and more importantly which is erroring out if it occurs.
+    """
+
+    _logger: ClassVar[logging.Logger] = _MISSING_
 
     @classmethod
-    def create_logger_for_class(cls):
-        cls.logger = MosplatLoggingManager.configure_logger_instance(
+    def _create_logger_for_class(cls):
+        cls._logger = MosplatLoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{cls.__qualname__}"
         )
 
     @classmethod
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        cls.create_logger_for_class()
+    def logger(cls) -> logging.Logger:
+        if not cls._logger:
+            cls._create_logger_for_class()
+        return cls._logger
 
 
 class MosplatBlMetaMixin(MosplatLogClassMixin):
-    """A mixin class that standardizes common metadata for Blender types."""
+    """a mixin class that standardizes common metadata for Blender types."""
 
     short_name: ClassVar[str] = _MISSING_
     prefix_suffix: ClassVar[str] = _MISSING_
@@ -46,8 +56,7 @@ class MosplatBlMetaMixin(MosplatLogClassMixin):
         ran at registration time of the class.
         useful for differentiating 'abstract' base class behavior from registered classes
         """
-
-        cls.create_logger_for_class()
+        cls._create_logger_for_class()
         cls._enforce_mixin_attributes()
 
     @classmethod
@@ -57,9 +66,12 @@ class MosplatBlMetaMixin(MosplatLogClassMixin):
         # `getmembers_static` with custom predicate
         if missing := inspect.getmembers_static(cls, lambda val: val is _MISSING_):
             for attr_name, _ in missing:
-                cls.logger.warning(
+                cls.logger().warning(
                     f"`{cls.__name__}` does not define required mixin variable: `{attr_name}`"
                 )
+
+    def props(self, context) -> Mosplat_PG_Global | None:
+        return getattr(context.scene, "mosplat_props", None)
 
 
 class MosplatBlMetaPanelMixin(MosplatBlMetaMixin):

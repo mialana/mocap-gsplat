@@ -1,31 +1,38 @@
-import bpy
+"""
+a static class to manage logging operations.
+it contains custom formatter classes, handles handler creation,
+sets the global `logging.LogRecordFactory`, and handles cleanup to not dirty the global namespace.
+prevents instance creation as this class is solely for the benefits of namespacing and grouping.
+"""
 
-import json
 import os
 import sys
 import logging
 import datetime
 from pathlib import Path
-from typing import ClassVar, cast
+from typing import ClassVar
 from pythonjsonlogger.json import JsonFormatter
 import coloredlogs
 from humanfriendly.compat import coerce_string
 from humanfriendly.terminal import ansi_wrap
-
-from .constants import (
+from ..infrastructure.constants import (
     COLORED_FORMATTER_FIELD_STYLES,
     COLORED_FORMATTER_LEVEL_STYLES,
-    ADDON_ID,
 )
-from .protocols import SupportsMosplat_AddonPreferences
-from .decorators import run_once
+from ..infrastructure.protocols import SupportsMosplat_AP_Global
+from ..infrastructure.decorators import run_once
 
 
-class MosplatLoggingManager:
+class MosplatLoggingInterface:
     stdout_log_handler: ClassVar[logging.StreamHandler]
     json_log_handler: ClassVar[logging.StreamHandler]
 
     _root_logger: ClassVar[logging.Logger]
+
+    def __new__(cls, *args, **kwargs):
+        raise TypeError(
+            f"{cls.__name__} is a static interface and cannot be instantiated."
+        )
 
     class MosplatStdoutFormatter(coloredlogs.ColoredFormatter):
         def __init__(self, **kwargs):
@@ -60,39 +67,25 @@ class MosplatLoggingManager:
         cls._root_logger.info(f"Local root logger configured with name: `{name}`.")
 
     @classmethod
-    @run_once
-    def init_handlers_from_addon_prefs(cls):
+    def init_handlers_from_addon_prefs(cls, addon_prefs: SupportsMosplat_AP_Global):
         if not hasattr(cls, "_root_logger"):
             return
 
-        if (
-            (prefs_ctx := bpy.context.preferences)
-            and (addons := prefs_ctx.addons.get(ADDON_ID))
-            and (prefs := addons.preferences)
+        if cls.init_stdout_handler(
+            addon_prefs.stdout_log_format,
+            addon_prefs.stdout_date_log_format,
         ):
-            prefs = cast(SupportsMosplat_AddonPreferences, prefs)  # appease pylance
-            if cls.init_stdout_handler(
-                prefs.stdout_log_format,
-                prefs.stdout_date_log_format,
-            ):
-                cls._root_logger.info(
-                    f"STDOUT handler initialized from addon preferences."
-                )
+            cls._root_logger.info(f"STDOUT handler initialized from addon preferences.")
 
-            if cls.init_json_handler(
-                log_fmt=prefs.json_log_format,
-                log_date_fmt=prefs.json_date_log_format,
-                outdir=Path(prefs.cache_dir) / prefs.json_log_subdir,
-                file_fmt=prefs.json_log_filename_format,
-            ):
-                cls._root_logger.info(
-                    f"JSON handler initialized from addon preferences."
-                )
+        if cls.init_json_handler(
+            log_fmt=addon_prefs.json_log_format,
+            log_date_fmt=addon_prefs.json_date_log_format,
+            outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
+            file_fmt=addon_prefs.json_log_filename_format,
+        ):
+            cls._root_logger.info(f"JSON handler initialized from addon preferences.")
 
-            return
-        cls._root_logger.warning(
-            "Custom handlers could not be created as addon preferences were never successfully registered."
-        )
+        return
 
     @classmethod
     def cleanup(cls):

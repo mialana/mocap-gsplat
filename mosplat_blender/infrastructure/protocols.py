@@ -1,19 +1,16 @@
-from typing import Protocol, TypeVar, Optional
+"""
+protocol classes for typing purposes.
+"""
 
-R = TypeVar("R")
-
-
-class SupportsRunOnce(Protocol[R]):
-    has_run: bool
-    result: Optional[R]
-
-    def __call__(self, *args, **kwargs) -> R: ...
+from typing import Protocol
 
 
-class SupportsMosplat_AddonPreferences(Protocol):
+class SupportsMosplat_AP_Global(Protocol):
+    """Prevents escape of blender concepts into logging interface."""
+
     cache_dir: str
-
     json_log_subdir: str
+
     json_log_filename_format: str
     json_log_format: str
     json_date_log_format: str

@@ -7,33 +7,33 @@ from bpy.props import (
 
 from pathlib import Path
 
-from .infrastructure.logs import MosplatLoggingManager
-from .infrastructure.mixins import MosplatLogClassMixin
-from .infrastructure.constants import ADDON_ID
+from ..interfaces.logging_interface import MosplatLoggingInterface
+from ..infrastructure.mixins import MosplatLogClassMixin
+from ..infrastructure.constants import ADDON_ID
 
 
-def update_stdout_logging(prefs: Mosplat_AddonPreferences, _: Context):
-    if MosplatLoggingManager.init_stdout_handler(
+def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
+    if MosplatLoggingInterface.init_stdout_handler(
         log_fmt=prefs.stdout_log_format,
         log_date_fmt=prefs.stdout_date_log_format,
     ):
-        prefs.logger.info("STDOUT logging updated.")
+        prefs.logger().info("STDOUT logging updated.")
     else:
         raise TypeError()
 
 
-def update_json_logging(prefs: Mosplat_AddonPreferences, _: Context):
+def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
     outdir: Path = Path(prefs.cache_dir).joinpath(prefs.json_log_subdir)
-    if MosplatLoggingManager.init_json_handler(
+    if MosplatLoggingInterface.init_json_handler(
         log_fmt=prefs.json_log_format,
         log_date_fmt=prefs.json_date_log_format,
         outdir=outdir,
         file_fmt=prefs.json_log_filename_format,
     ):
-        prefs.logger.info("JSON logging updated.")
+        prefs.logger().info("JSON logging updated.")
 
 
-class Mosplat_AddonPreferences(AddonPreferences, MosplatLogClassMixin):
+class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
     bl_idname = ADDON_ID
 
     cache_dir: StringProperty(
@@ -67,7 +67,7 @@ class Mosplat_AddonPreferences(AddonPreferences, MosplatLogClassMixin):
 
     json_log_format: StringProperty(
         name="JSON Log Format",
-        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingManager.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="%(asctime)s %(levelname)s %(name)s %(pathname)s %(classname)s %(funcName)s %(lineno)s %(thread)d %(message)s",
         update=update_json_logging,
     )
@@ -81,7 +81,7 @@ class Mosplat_AddonPreferences(AddonPreferences, MosplatLogClassMixin):
 
     stdout_log_format: StringProperty(
         name="STDOUT Log Format",
-        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingManager.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
         update=update_stdout_logging,
     )

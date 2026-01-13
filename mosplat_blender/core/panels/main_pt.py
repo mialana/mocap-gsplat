@@ -1,10 +1,9 @@
 import bpy
-import logging
 
-from ..infrastructure.bases import Mosplat_PT_Base
+from .base import MosplatPanelBase
 
 
-class Main_PT(Mosplat_PT_Base):
+class Mosplat_PT_Main(MosplatPanelBase):
     short_name = "Main"
     parent_class = None
 
@@ -17,9 +16,9 @@ class Main_PT(Mosplat_PT_Base):
             return
 
 
-class Child_PT(Mosplat_PT_Base):
+class Mosplat_PT_Child(MosplatPanelBase):
     short_name = "Child"
-    parent_class = Main_PT
+    parent_class = Mosplat_PT_Main
 
     @classmethod
     def poll(cls, context):
