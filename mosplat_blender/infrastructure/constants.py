@@ -23,7 +23,7 @@ runtime package, which includes the extension repository and the "bl_ext" prefix
 so if this addon is in the `user_default` repository, the id is expected to be:
 `bl_ext.user_default.mosplat_blender`.
 """
-ADDON_ID: Final[str] = (
+ADDON_PREFERENCES_ID: Final[str] = (
     __package__.rsplit(".", 1)[0]
     if __package__
     else Path(__file__).resolve().parent.parent.name

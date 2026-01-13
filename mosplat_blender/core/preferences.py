@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import MosplatLogClassMixin
-from ..infrastructure.constants import ADDON_ID
+from ..infrastructure.constants import ADDON_PREFERENCES_ID
 
 
 def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
@@ -34,12 +34,12 @@ def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
 
 
 class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
-    bl_idname = ADDON_ID
+    bl_idname = ADDON_PREFERENCES_ID
 
     cache_dir: StringProperty(
         name="Cache Directory",
         description="Cache directory used by the addon",
-        default=str(Path.home().joinpath(".cache", ADDON_ID)),
+        default=str(Path.home().joinpath(".cache", ADDON_PREFERENCES_ID)),
         subtype="DIR_PATH",
         update=update_json_logging,
     )

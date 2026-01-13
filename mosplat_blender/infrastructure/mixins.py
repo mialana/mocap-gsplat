@@ -51,8 +51,6 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
 
     short_name: ClassVar[str] = _MISSING_
 
-    bl_category = "MOSPLAT"
-
     @classmethod
     def at_registration(cls):
         """
@@ -75,19 +73,18 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
 
 
 class MosplatOperatorMixin(MosplatBlTypeMixin):
-    bl_options = {"REGISTER"}
-
     @classmethod
     def at_registration(cls):
         super().at_registration()
 
-        cls.bl_idname = f"{cls.bl_category.lower()}.{cls.short_name}"
+        cls.bl_idname = f"mosplat.{cls.short_name}"
         cls.bl_label = cls.bl_idname.replace(".", " ")
 
 
 class MosplatPanelMixin(MosplatBlTypeMixin):
     parent_class: ClassVar[Type[MosplatPanelMixin] | None] = _MISSING_
 
+    bl_category = "MOSPLAT"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
 

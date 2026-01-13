@@ -1,5 +1,6 @@
 import threading
 from typing import TYPE_CHECKING, Set, TypeAlias
+from pathlib import Path
 
 from .base import MosplatOperatorBase
 
@@ -14,11 +15,9 @@ class Mosplat_OT_install_model(MosplatOperatorBase):
 
     short_name = "install_model"
 
-    _timer = None
     _thread = None
 
     def execute(self, context) -> Set[OperatorReturnItems]:
-        # start installation in background thread
         self._thread = threading.Thread(
             target=self._install_model_thread, args=(context,), daemon=True
         )
@@ -26,7 +25,7 @@ class Mosplat_OT_install_model(MosplatOperatorBase):
 
         return {"RUNNING_MODAL"}
 
-    def _install_model_thread(self, context):
+    def _install_model_thread(self, installation_path: Path):
         pass
 
     def progress_bar(self, context):
