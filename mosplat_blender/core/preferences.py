@@ -23,11 +23,10 @@ def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
 
 
 def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
-    outdir: Path = Path(prefs.cache_dir).joinpath(prefs.json_log_subdir)
     if MosplatLoggingInterface.init_json_handler(
         log_fmt=prefs.json_log_format,
         log_date_fmt=prefs.json_date_log_format,
-        outdir=outdir,
+        outdir=prefs.json_log_dir,
         file_fmt=prefs.json_log_filename_format,
     ):
         prefs.logger().info("JSON logging updated.")
@@ -38,8 +37,10 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
 
     cache_dir: StringProperty(
         name="Cache Directory",
-        description="Cache directory used by the addon",
-        default=str(Path.home().joinpath(".cache", ADDON_PREFERENCES_ID)),
+        description="Cache directory on disk used by the addon",
+        default=str(
+            Path.home().joinpath(".cache", ADDON_PREFERENCES_ID.rpartition(".")[-1])
+        ),
         subtype="DIR_PATH",
         update=update_json_logging,
     )
@@ -49,6 +50,12 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
         description="Subdirectory (relative to cache) for JSON logs",
         default="log",
         update=update_json_logging,
+    )
+
+    vggt_model_subdir: StringProperty(
+        name="Model Cache Subdirectory",
+        description="Subdirectory where the VGGT model data will be stored",
+        default="vggt",
     )
 
     json_log_filename_format: StringProperty(
@@ -85,6 +92,20 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
         default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
         update=update_stdout_logging,
     )
+
+    vggt_hf_id: StringProperty(
+        name="VGGT Hugging Face ID",
+        description="ID of VGGT pre-trained model on Hugging Face",
+        default="facebook/VGGT-1B",
+    )
+
+    @property
+    def json_log_dir(self) -> Path:
+        return Path(self.cache_dir).joinpath(self.json_log_subdir)
+
+    @property
+    def vggt_model_dir(self) -> Path:
+        return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
 
     def draw(self, _: Context):
         layout = self.layout

@@ -14,8 +14,19 @@ are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logg
 from .main import register_addon, unregister_addon
 from .interfaces import MosplatLoggingInterface
 
+import os
+from time import sleep
+
+
+def clear_terminal():
+    os.system("cls" if os.name == "nt" else "clear")
+    sleep(1)
+    print("", flush=True)
+
 
 def register():
+    clear_terminal()  # for dev QOL
+
     # initialize handlers and local "root" logger
     MosplatLoggingInterface.init_once(__name__)
 

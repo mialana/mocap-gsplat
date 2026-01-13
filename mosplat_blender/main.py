@@ -8,7 +8,7 @@ import bpy
 from typing import Type, Sequence, Union
 
 from . import core
-from .interfaces import MosplatLoggingInterface
+from .interfaces import MosplatLoggingInterface, MosplatVGGTInterface
 from .infrastructure.mixins import MosplatBlTypeMixin
 from .core.checks import check_addonpreferences
 from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME
@@ -45,8 +45,18 @@ def register_addon():
         )
 
     # do not catch thrown exceptions as we should not successfully register without addon preferences
-    addon_preferences = check_addonpreferences(bpy.context.preferences)
+    addon_preferences: core.Mosplat_AP_Global = check_addonpreferences(
+        bpy.context.preferences
+    )
+
     MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
+
+    # try:
+    #     MosplatVGGTInterface.initialize_model(
+    #         addon_preferences.vggt_hf_id, addon_preferences.vggt_model_dir
+    #     )
+    # except Exception:
+    #     logger.exception()
 
     logger.info("Mosplat Blender addon registration completed.")
 
@@ -65,5 +75,3 @@ def unregister_addon():
         logger.exception(f"Error during unregistration of add-on properties")
 
     logger.info("Mosplat Blender addon unregistration completed.")
-
-    MosplatLoggingInterface.cleanup()

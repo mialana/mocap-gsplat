@@ -1,4 +1,3 @@
-import threading
 from typing import TYPE_CHECKING, Set, TypeAlias
 from pathlib import Path
 
@@ -18,10 +17,10 @@ class Mosplat_OT_install_model(MosplatOperatorBase):
     _thread = None
 
     def execute(self, context) -> Set[OperatorReturnItems]:
-        self._thread = threading.Thread(
-            target=self._install_model_thread, args=(context,), daemon=True
-        )
-        self._thread.start()
+        # self._thread = threading.Thread(
+        #     target=self._install_model_thread, args=(context,), daemon=True
+        # )
+        # self._thread.start()
 
         return {"RUNNING_MODAL"}
 

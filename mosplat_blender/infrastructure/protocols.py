@@ -10,6 +10,7 @@ class SupportsMosplat_AP_Global(Protocol):
 
     cache_dir: str
     json_log_subdir: str
+    vggt_model_subdir: str
 
     json_log_filename_format: str
     json_log_format: str

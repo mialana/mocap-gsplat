@@ -90,21 +90,26 @@ class MosplatLoggingInterface:
         return
 
     @classmethod
+    @run_once
     def cleanup(cls):
         """Remove handlers from the root logger."""
         if cls.stdout_log_handler:
             if cls._root_logger:
                 cls._root_logger.removeHandler(cls.stdout_log_handler)
             cls.stdout_log_handler.close()
+            cls.stdout_log_handler = None
         if cls.json_log_handler:
             if cls._root_logger:
                 cls._root_logger.removeHandler(cls.json_log_handler)
             cls.json_log_handler.close()
+            cls.json_log_handler = None
 
         if cls._old_factory:
             logging.setLogRecordFactory(
                 cls._old_factory
             )  # restore old logrecord factory
+            cls._old_factory = None
+        cls._root_logger = None
 
     @classmethod
     def init_stdout_handler(cls, log_fmt: str, log_date_fmt: str) -> bool:
