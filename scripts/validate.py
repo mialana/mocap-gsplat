@@ -3,6 +3,11 @@ from pathlib import Path
 
 def main():
     zip_path = Path(__file__).resolve().parent.parent.joinpath("mosplat_blender.zip")
+
+    if not zip_path.exists():
+        print(f"Zip created from build does not exist at path on system: {zip_path}")
+        return
+
     max_size = 2 * 1024 * 1024 * 1024  # 2GiB
 
     size = zip_path.stat().st_size

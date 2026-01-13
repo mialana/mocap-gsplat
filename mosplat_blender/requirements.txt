@@ -1,3 +1,7 @@
+### FULL COMMAND:
+# `pip download -r <addon_root>/requirements.txt  --dest <addon_root>/wheels/ --only-binary=:all: --python-version=<blender_python_version>`
+# refer to `<repo_root>/scripts/build.py` for more info
+
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 numpy
@@ -6,6 +10,11 @@ huggingface_hub
 einops
 safetensors
 plyfile
+
+# for vggt build deps
+setuptools
+wheel
+packaging
 
 # developer packages
 python-json-logger

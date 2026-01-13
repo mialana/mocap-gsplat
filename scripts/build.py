@@ -20,6 +20,17 @@ from pathlib import Path
 from typing import Tuple
 from dataclasses import dataclass, fields
 
+from functools import partial
+
+step_tracker: int = 1
+
+
+def _():
+    """macro like function to separate print logs"""
+    global step_tracker
+    print(f"----------------- STEP{step_tracker}")
+    step_tracker += 1
+
 
 @dataclass
 class BuildContext:
@@ -30,6 +41,7 @@ class BuildContext:
     wheels_dir: Path
     ADDON_SRC_DIR: Path
     ADDON_REQUIREMENTS_TXT_FILE: Path
+    ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path
     DEV_REQUIREMENTS_TXT_FILE: Path
     MANIFEST_TOML_TXT_FILE: Path
     manifest_toml_file: Path
@@ -116,6 +128,13 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     )
     print(f"Addon's `requirements.txt` File Path: {ADDON_REQUIREMENTS_TXT_FILE}")
 
+    ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path = Path(
+        os.path.join(args.addon_src_dir, "requirements.nobinary.txt")
+    )
+    print(
+        f"Addon's `requirements.nobinary.txt` File Path: {ADDON_NOBINARY_REQUIREMENTS_TXT_FILE}"
+    )
+
     DEV_REQUIREMENTS_TXT_FILE: Path = Path(os.path.join(repo_dir, "requirements.txt"))
     print(f"Developer's `requirements.txt` File Path: {DEV_REQUIREMENTS_TXT_FILE}")
 
@@ -154,15 +173,29 @@ def get_version_tag_from_git() -> str:
 def install_dev_pypi_packages(ctx: BuildContext):
     """install wheels for development"""
     print("Beginning install...")
+
+    pip_install_from_wheels_args_sublist = [  # shared between installation from wheels
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--no-index",
+        "--only-binary=:all:",
+        "--find-links",
+        str(ctx.wheels_dir),
+        "-r",
+    ]
     try:
         subprocess.check_call(
             [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "-r",
+                *pip_install_from_wheels_args_sublist,
                 str(ctx.ADDON_REQUIREMENTS_TXT_FILE),
+            ]
+        )
+        subprocess.check_call(
+            [
+                *pip_install_from_wheels_args_sublist,
+                str(ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE),
             ]
         )
         subprocess.check_call(
@@ -186,8 +219,8 @@ def install_dev_pypi_packages(ctx: BuildContext):
     print("Install complete")
 
 
-def download_pypi_wheels(ctx: BuildContext, version, install):
-    """use `subprocess` to invoke `pip download ...` on the addon's `requirements.txt`."""
+def download_pypi_wheels(ctx: BuildContext, blender_python_version, should_install):
+    """use `subprocess` to invoke `pip download ...` on the addon's PyPI requirements"""
     try:
         subprocess.check_call(
             [
@@ -200,21 +233,34 @@ def download_pypi_wheels(ctx: BuildContext, version, install):
                 "--dest",
                 str(ctx.wheels_dir),
                 "--only-binary=:all:",
-                f"--python-version={version}",
+                f"--python-version={blender_python_version}",
+            ]
+        )
+        # no-binary wheels
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "wheel",
+                "-r",
+                str(ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE),
+                "--wheel-dir",
+                str(ctx.wheels_dir),
             ]
         )
 
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         print(f"Error in call to download PyPI wheels")
-        raise
+        raise  # automatically includes stack trace
     except Exception:
         print(f"An unexpected error occurred")
         raise
 
     print("All PyPI wheels successfully downloaded.")
 
-    if install:
-        print()  # skip a line
+    if should_install:
+        _()  # skip a line
         install_dev_pypi_packages(ctx)
 
 
@@ -284,25 +330,27 @@ def clean(wheels_dir):
 
 
 def main():
+    _()  # skip a line
     ctx, args = prepare_context()
 
     for p in [
         ctx.ADDON_SRC_DIR,
         ctx.ADDON_REQUIREMENTS_TXT_FILE,
+        ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE,
         ctx.MANIFEST_TOML_TXT_FILE,
         *([ctx.DEV_REQUIREMENTS_TXT_FILE] if args.dev else []),
     ]:  # check that all required input resources are where they are supposed to be
         if not p.exists():
             raise RuntimeError(f"Expected {p!r} in file system, but was not found.")
 
-    print()  # skip a line
+    _()  # skip a line
 
     if args.clean:
         clean(ctx.wheels_dir)
-        print()  # skip a line
+        _()  # skip a line
 
-    download_pypi_wheels(ctx, args.blender_python_version, install=args.dev)
-    print()  # skip a line
+    download_pypi_wheels(ctx, args.blender_python_version, should_install=args.dev)
+    _()  # skip a line
 
     generate_blender_manifest_toml(ctx)
 

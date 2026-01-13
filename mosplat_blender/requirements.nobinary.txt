@@ -1,0 +1,10 @@
+# reserved for source-only python projects. not released on PyPI so do not have binary wheels
+# i.e. cannot be installed with `--only-binary=:all:`
+
+### FULL COMMAND:
+# `pip wheel -r <addon_root>/requirements.nobinary.txt --wheel-dir <addon_root>/wheels/`
+# you should also use an interpreter that is the same python version as your blender installation,
+# as `pip wheel` has no argument for specifying `python-version` like `pip download`
+# refer to `<repo_root>/scripts/build.py` for more info
+
+vggt @ git+https://github.com/facebookresearch/vggt.git
