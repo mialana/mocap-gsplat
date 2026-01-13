@@ -5,19 +5,21 @@ moves implementation logic and imports out of `__init__.py`.
 
 import bpy
 
-from typing import Type, Sequence, cast
+from typing import Type, Sequence, Union
 
 from . import core
 from .interfaces import MosplatLoggingInterface
-from .infrastructure.mixins import MosplatBlMetaMixin
-from .infrastructure.checks import check_addonpreferences
-from .infrastructure.constants import ADDON_ID, ADDON_PROPERTIES_ATTRIBNAME
+from .infrastructure.mixins import MosplatBlTypeMixin
+from .core.checks import check_addonpreferences
+from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME
 
 classes: Sequence[
-    Type[bpy.types.PropertyGroup]
-    | Type[bpy.types.AddonPreferences]
-    | Type[core.MosplatOperatorBase]
-    | Type[core.MosplatPanelBase]
+    Union[
+        Type[core.MosplatOperatorBase],
+        Type[core.Mosplat_PG_Global],
+        Type[core.Mosplat_AP_Global],
+        Type[core.Mosplat_PG_Global],
+    ]
 ] = (
     [core.Mosplat_PG_Global, core.Mosplat_AP_Global]
     + core.all_operators
@@ -30,11 +32,11 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 def register_addon():
     for c in classes:
         try:
-            if issubclass(c, MosplatBlMetaMixin):
+            if issubclass(c, MosplatBlTypeMixin):
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
-        except Exception:
-            logger.exception(f"Exception during registration: `{c.__name__=}`")
+        except RuntimeError:
+            logger.exception(f"Runtime exception during registration: `{c.__name__=}`")
 
         setattr(
             bpy.types.Scene,
@@ -54,7 +56,7 @@ def unregister_addon():
     for c in reversed(classes):
         try:
             bpy.utils.unregister_class(c)
-        except Exception:
+        except RuntimeError:
             logger.exception(f"Exception during unregistration of `{c.__name__=}`")
 
     try:

@@ -10,7 +10,7 @@
             }
         ]
     },
-    "blender.addon.reloadOnSave": false,
+    "blender.addon.reloadOnSave": true,
     "blender.addon.logLevel": "info",
     "blender.addon.buildTaskName": ""
 }

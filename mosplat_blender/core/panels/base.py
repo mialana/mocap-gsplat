@@ -1,10 +1,7 @@
 import bpy
 
-from ...infrastructure.mixins import MosplatBlMetaPanelMixin
+from ...infrastructure.mixins import MosplatPanelMixin
 
 
-class MosplatPanelBase(MosplatBlMetaPanelMixin, bpy.types.Panel):
-    prefix_suffix = "PT"
-
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+class MosplatPanelBase(MosplatPanelMixin, bpy.types.Panel):
+    pass

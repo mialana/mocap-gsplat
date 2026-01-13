@@ -6,8 +6,8 @@ from typing import ClassVar, Type
 import logging
 import inspect
 
-from ..core.properties import Mosplat_PG_Global
 from ..interfaces.logging_interface import MosplatLoggingInterface
+
 from .constants import _MISSING_
 
 
@@ -35,20 +35,23 @@ class MosplatLogClassMixin:
         return cls._logger
 
 
-class MosplatBlMetaMixin(MosplatLogClassMixin):
-    """a mixin class that standardizes common metadata for Blender types."""
+class MosplatBlTypeMixin(MosplatLogClassMixin):
+    """
+    a mixin base class that allows for standardization of common metadata between
+    multiple subclasses of a Blender type.
+
+    namely, panel classes have strict requirements for `bl_idname`,
+    and operators have requirements for `bl_label`.
+    but the definition is repetitive, hence the usefulness of a mixin.
+
+    specifically, with `at_registration`, the proper conventions for Blender types
+    can be enforced when registering the class, and does not have to be hardcoded
+    on each individual class instance.
+    """
 
     short_name: ClassVar[str] = _MISSING_
-    prefix_suffix: ClassVar[str] = _MISSING_
 
     bl_category = "MOSPLAT"
-
-    def __init_subclass__(cls, **kwargs):
-        """validate and set required attributes"""
-        super().__init_subclass__(**kwargs)
-
-        cls.bl_idname = f"{cls.bl_category}_{cls.prefix_suffix}_{cls.short_name}"
-        cls.bl_label = cls.bl_idname.replace("_", " ")
 
     @classmethod
     def at_registration(cls):
@@ -70,18 +73,32 @@ class MosplatBlMetaMixin(MosplatLogClassMixin):
                     f"`{cls.__name__}` does not define required mixin variable: `{attr_name}`"
                 )
 
-    def props(self, context) -> Mosplat_PG_Global | None:
-        return getattr(context.scene, "mosplat_props", None)
 
-
-class MosplatBlMetaPanelMixin(MosplatBlMetaMixin):
-    parent_class: ClassVar[Type[MosplatBlMetaPanelMixin] | None] = _MISSING_
+class MosplatOperatorMixin(MosplatBlTypeMixin):
+    bl_options = {"REGISTER"}
 
     @classmethod
     def at_registration(cls):
-        """automate creation of `bl_parent_id` for panels."""
+        super().at_registration()
+
+        cls.bl_idname = f"{cls.bl_category.lower()}.{cls.short_name}"
+        cls.bl_label = cls.bl_idname.replace(".", " ")
+
+
+class MosplatPanelMixin(MosplatBlTypeMixin):
+    parent_class: ClassVar[Type[MosplatPanelMixin] | None] = _MISSING_
+
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+
+    @classmethod
+    def at_registration(cls):
+        """additionally automates creation of `bl_parent_id` for panels."""
 
         super().at_registration()
+
+        cls.bl_idname = f"{cls.bl_category}_PT_{cls.short_name}"
+        cls.bl_label = cls.bl_idname.replace("_", " ")
 
         if (
             (

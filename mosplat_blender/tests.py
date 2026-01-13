@@ -1,4 +1,8 @@
-"""Some quick tests"""
+"""
+some quick tests.
+these defer from `.infrastructure.checks` as they are developer test that are not
+actually called within the add-on's runtime.
+"""
 
 from .interfaces.logging_interface import MosplatLoggingInterface
 

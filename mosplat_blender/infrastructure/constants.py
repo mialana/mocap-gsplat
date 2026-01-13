@@ -11,8 +11,8 @@ misspelled or renamed in one location and not in another.
 from typing import Any, Final, ParamSpec, TypeVar
 from pathlib import Path
 
-P = ParamSpec("P")  # maintains type-checking of original callable's signature
-R = TypeVar("R")  # maintain's type-checking of original callable's return type.
+P = ParamSpec("P")  # maintains original callable's signature for `run_once`
+R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
 
 _MISSING_: Any = object()  # sentinel variable
 

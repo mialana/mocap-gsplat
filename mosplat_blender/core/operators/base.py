@@ -1,6 +1,6 @@
 import bpy
-from ...infrastructure.mixins import MosplatBlMetaMixin
+from ...infrastructure.mixins import MosplatOperatorMixin
 
 
-class MosplatOperatorBase(MosplatBlMetaMixin, bpy.types.Operator):
-    prefix_suffix = "OT"
+class MosplatOperatorBase(MosplatOperatorMixin, bpy.types.Operator):
+    pass

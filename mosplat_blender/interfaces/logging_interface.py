@@ -10,7 +10,7 @@ import sys
 import logging
 import datetime
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Callable
 from pythonjsonlogger.json import JsonFormatter
 import coloredlogs
 from humanfriendly.compat import coerce_string
@@ -24,10 +24,12 @@ from ..infrastructure.decorators import run_once
 
 
 class MosplatLoggingInterface:
-    stdout_log_handler: ClassVar[logging.StreamHandler]
-    json_log_handler: ClassVar[logging.StreamHandler]
+    stdout_log_handler: ClassVar[logging.StreamHandler | None] = None
+    json_log_handler: ClassVar[logging.StreamHandler | None] = None
 
-    _root_logger: ClassVar[logging.Logger]
+    _root_logger: ClassVar[logging.Logger | None] = None
+
+    _old_factory: ClassVar[Callable[..., logging.LogRecord] | None] = None
 
     def __new__(cls, *args, **kwargs):
         raise TypeError(
@@ -68,7 +70,7 @@ class MosplatLoggingInterface:
 
     @classmethod
     def init_handlers_from_addon_prefs(cls, addon_prefs: SupportsMosplat_AP_Global):
-        if not hasattr(cls, "_root_logger"):
+        if not cls._root_logger:
             return
 
         if cls.init_stdout_handler(
@@ -90,17 +92,24 @@ class MosplatLoggingInterface:
     @classmethod
     def cleanup(cls):
         """Remove handlers from the root logger."""
-        if hasattr(cls, "stdout_log_handler"):
-            cls._root_logger.removeHandler(cls.stdout_log_handler)
+        if cls.stdout_log_handler:
+            if cls._root_logger:
+                cls._root_logger.removeHandler(cls.stdout_log_handler)
             cls.stdout_log_handler.close()
-        if hasattr(cls, "json_log_handler"):
-            cls._root_logger.removeHandler(cls.json_log_handler)
+        if cls.json_log_handler:
+            if cls._root_logger:
+                cls._root_logger.removeHandler(cls.json_log_handler)
             cls.json_log_handler.close()
+
+        if cls._old_factory:
+            logging.setLogRecordFactory(
+                cls._old_factory
+            )  # restore old logrecord factory
 
     @classmethod
     def init_stdout_handler(cls, log_fmt: str, log_date_fmt: str) -> bool:
         """set formatter of stdout logger and add as handler"""
-        if not hasattr(cls, "_root_logger"):
+        if not cls._root_logger:
             return False
 
         saved_handler = None
@@ -130,7 +139,7 @@ class MosplatLoggingInterface:
         cls, log_fmt: str, log_date_fmt: str, outdir: Path, file_fmt: str
     ) -> bool:
         """build path for json log output file, set formatter, and add as handler"""
-        if not hasattr(cls, "_root_logger"):
+        if not cls._root_logger:
             return False
 
         saved_handler = None
@@ -160,13 +169,19 @@ class MosplatLoggingInterface:
             cls._root_logger.exception("Configuration for JSON handler invalid.")
             return False
 
-    @staticmethod
-    def set_log_record_factory():
+    @classmethod
+    def set_log_record_factory(cls):
         """sets a custom log record factory"""
-        old_factory = logging.getLogRecordFactory()
+        if cls._old_factory:
+            return
+
+        cls._old_factory = logging.getLogRecordFactory()
 
         def mosplat_record_factory(*args, **kwargs):
-            record = old_factory(*args, **kwargs)
+            if not cls._old_factory:
+                return logging.getLogRecordFactory()(*args, **kwargs)
+
+            record = cls._old_factory(*args, **kwargs)
             record.levelletter = record.levelname[0]  # parse for just the first letter
             record.dirname = os.path.basename(os.path.dirname(record.pathname))
             record.classname = (
