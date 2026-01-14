@@ -61,23 +61,6 @@ ADDON_PROPERTIES_ATTRIBNAME: Final[str] = "mosplat_props"
 
 ADDON_PANEL_CATEGORY: Final[str] = "mosplat"
 
-
-class DotDict(dict):
-    """
-    a dictionary that supports dot notation access.
-    TODO: move this out of constants I believe
-    """
-
-    __getattr__ = dict.get  # read
-    __setattr__ = dict.__setitem__  # write
-    __delattr__ = dict.__delitem__  # delete
-
-    @classmethod
-    def from_keys_factory(cls, keys):
-        """convenience factory method to just make the value the same as the key"""
-        return cls({k: k for k in keys})
-
-
 """Enum Convenience Classes"""
 
 

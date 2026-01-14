@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Type
+from typing import ClassVar, Type, TypeGuard, TypeVar, TypeAlias
 from enum import StrEnum
 import logging
 import inspect
@@ -10,6 +10,8 @@ import inspect
 from ..interfaces.logging_interface import MosplatLoggingInterface
 
 from .constants import _MISSING_
+
+S = TypeVar("S")
 
 
 class MosplatLogClassMixin:
@@ -24,7 +26,7 @@ class MosplatLogClassMixin:
     _logger: ClassVar[logging.Logger] = _MISSING_
 
     @classmethod
-    def _create_logger_for_class(cls):
+    def create_logger_for_class(cls):
         cls._logger = MosplatLoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{cls.__qualname__}"
         )
@@ -32,7 +34,7 @@ class MosplatLogClassMixin:
     @classmethod
     def logger(cls) -> logging.Logger:
         if not cls._logger:
-            cls._create_logger_for_class()
+            cls.create_logger_for_class()
         return cls._logger
 
 
@@ -48,10 +50,14 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
     specifically, with `at_registration`, the proper conventions for Blender types
     can be enforced when registering the class, and does not have to be hardcoded
     on each individual class instance.
+
+    furthermore, these enforcements ensure that in development,
+    the defined variables are of the type and identity that they should be,
+    in the effort of increasing consistency in the codebase.
     """
 
     bl_idname: str = _MISSING_
-    id_enum_type: StrEnum = _MISSING_  # enforces enum usage so no literals
+    id_enum_type: ClassVar = _MISSING_  # no literals here!
 
     @classmethod
     def at_registration(cls):
@@ -59,13 +65,9 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         ran at registration time of the class.
         useful for differentiating 'abstract' base class behavior from registered classes
         """
-        cls._create_logger_for_class()
-        cls._enforce_mixin_attributes()
+        cls.create_logger_for_class()
 
-        if not isinstance(cls.bl_idname, Type(cls.id_enum_type)):
-            raise TypeError(
-                f"`{cls.__name__}` defines id_name with incorrect type.\nExpected: {Type[cls.id_enum_type]}, \nActual: {Type(cls.bl_idname)}"
-            )
+        cls._enforce_mixin_attributes()
 
     @classmethod
     def _enforce_mixin_attributes(cls):
@@ -77,3 +79,16 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
                 raise AttributeError(
                     f"`{cls.__name__}` does not define required mixin variable: `{attr_name}`"
                 )
+
+    @staticmethod
+    def check_bl_idname_type(bl_idname, id_enum_type: Type[S]) -> TypeGuard[S]:
+        """guards `bl_idname` with its narrowed type"""
+        if not issubclass(id_enum_type, StrEnum):
+            raise TypeError(
+                f"`{__name__}` defines `id_enum_type` with incorrect type.\nExpected: {Type[StrEnum]}, \nActual: {bl_idname}"
+            )
+        if not isinstance(bl_idname, id_enum_type):
+            raise TypeError(
+                f"`{__name__}` defines `bl_idname` with incorrect type.\nExpected: {Type[id_enum_type]}, \nActual: {bl_idname}"
+            )
+        return True

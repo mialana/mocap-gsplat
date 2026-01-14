@@ -15,6 +15,8 @@ These types have a hierarchal class tree like so:
 log class mixin <- native Pythonic mixin class <- base class w/ mixin and blender inheritance <- instance class
 ```
 
+For more information about the implementation and usefulness of the mixin classes, see [mixins.py](../infrastructure/mixins.py).
+
 ### Global Singleton Instance
 
 1.  [`bpy.types.PropertyGroup`](https://docs.blender.org/api/current/bpy.types.PropertyGroup.html#bpy.types.PropertyGroup)

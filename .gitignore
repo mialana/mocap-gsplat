@@ -2,6 +2,7 @@
 __pycache__
 
 blender_manifest.toml
+.env
 
 *.whl
 *.zip

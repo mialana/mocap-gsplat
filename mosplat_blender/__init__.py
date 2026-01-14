@@ -15,7 +15,6 @@ from .main import register_addon, unregister_addon
 from .interfaces import MosplatLoggingInterface
 
 import os
-from time import sleep
 
 
 def clear_terminal():

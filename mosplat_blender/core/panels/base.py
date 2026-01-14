@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import Panel, UILayout, Context
 
-from typing import ClassVar, Union
+from typing import Union
 
 from ..checks import check_props_safe, check_prefs_safe
 from ..properties import Mosplat_PG_Global
@@ -12,7 +12,7 @@ from ...infrastructure.constants import PanelIDEnum, ADDON_PANEL_CATEGORY
 
 
 class MosplatPanelBase(MosplatBlTypeMixin, Panel):
-    verified_idname: ClassVar[PanelIDEnum]
+    id_enum_type = PanelIDEnum
 
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -21,8 +21,8 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
     @classmethod
     def at_registration(cls):
         super().at_registration()
-
-        cls.bl_label = PanelIDEnum.label_factory(cls.verified_idname)
+        if cls.check_bl_idname_type(cls.bl_idname, cls.id_enum_type):
+            cls.bl_label = PanelIDEnum.label_factory(cls.bl_idname)
 
     def props(self, context: Context) -> Union[Mosplat_PG_Global, None]:
         return check_props_safe(context)

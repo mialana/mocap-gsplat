@@ -19,6 +19,7 @@ packaging
 # developer packages
 python-json-logger
 coloredlogs
+python-dotenv
 
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"

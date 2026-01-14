@@ -297,7 +297,7 @@ def package(ctx: BuildContext):
 
     ignore_dirs = {"__pycache__"}
     ignore_extensions = {".zip"}
-    ignore_filenames = {"blender_manifest.toml.txt"}
+    ignore_filenames = {"blender_manifest.toml.txt", ".env"}
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
         for root, dirs, files in os.walk(ctx.ADDON_SRC_DIR):

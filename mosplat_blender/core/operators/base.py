@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import Context, Event
 
-from typing import Union, Set, TYPE_CHECKING, TypeAlias, ClassVar
+from typing import Union, Set, TYPE_CHECKING, TypeAlias
 
 from ..checks import check_props_safe, check_prefs_safe
 from ..properties import Mosplat_PG_Global
@@ -21,8 +21,7 @@ OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
 
 
 class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
-    verified_idname: ClassVar[OperatorIDEnum]
-    bl_idname: str
+    id_enum_type = OperatorIDEnum
 
     @classmethod
     def at_registration(cls):
