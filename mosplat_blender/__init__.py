@@ -20,13 +20,9 @@ from time import sleep
 
 def clear_terminal():
     os.system("cls" if os.name == "nt" else "clear")
-    sleep(1)
-    print("", flush=True)
 
 
 def register():
-    clear_terminal()  # for dev QOL
-
     # initialize handlers and local "root" logger
     MosplatLoggingInterface.init_once(__name__)
 
@@ -37,3 +33,4 @@ def unregister():
     unregister_addon()
 
     MosplatLoggingInterface.cleanup()
+    clear_terminal()  # for dev QOL

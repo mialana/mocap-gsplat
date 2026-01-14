@@ -51,17 +51,11 @@ def register_addon():
 
     MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
 
-    # try:
-    #     MosplatVGGTInterface.initialize_model(
-    #         addon_preferences.vggt_hf_id, addon_preferences.vggt_model_dir
-    #     )
-    # except Exception:
-    #     logger.exception()
-
     logger.info("Mosplat Blender addon registration completed.")
 
 
 def unregister_addon():
+    """essentially all operations here should be guarded with try blocks"""
     # unregister all classes
     for c in reversed(classes):
         try:
@@ -73,5 +67,10 @@ def unregister_addon():
         delattr(bpy.types.Scene, ADDON_PROPERTIES_ATTRIBNAME)
     except AttributeError:
         logger.exception(f"Error during unregistration of add-on properties")
+
+    try:
+        MosplatVGGTInterface.cleanup()
+    except Exception:
+        logger.exception(f"Error while cleaning up VGGT interface")
 
     logger.info("Mosplat Blender addon unregistration completed.")

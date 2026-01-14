@@ -7,6 +7,8 @@ class Mosplat_PT_Main(MosplatPanelBase):
     short_name = "Main"
     parent_class = None
 
+    bl_options = {"HEADER_LAYOUT_EXPAND"}
+
     @classmethod
     def poll(cls, context):
         return True
@@ -27,3 +29,6 @@ class Mosplat_PT_Child(MosplatPanelBase):
     def draw(self, context):
         if not (layout := self.layout):
             return
+
+        row = layout.row()
+        row.operator("mosplat.install_model")

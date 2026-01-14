@@ -6,7 +6,8 @@ if they do successfuly pass though, they perform static casting so that
 we can operate with type-awareness in development.
 """
 
-from bpy.types import Preferences, Scene
+import bpy
+from bpy.types import Preferences, Scene, Context
 from typing import Union, cast
 
 from ..infrastructure.constants import ADDON_PREFERENCES_ID, ADDON_PROPERTIES_ATTRIBNAME
@@ -18,7 +19,7 @@ from ..interfaces import MosplatLoggingInterface
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 
-def check_properties(scene: Union[Scene, None]) -> Mosplat_PG_Global:
+def check_propertygroup(scene: Union[Scene, None]) -> Mosplat_PG_Global:
     if scene is None:
         raise RuntimeError("Blender scene unavailable in this context.")
     try:
@@ -27,10 +28,9 @@ def check_properties(scene: Union[Scene, None]) -> Mosplat_PG_Global:
         properties = cast(Mosplat_PG_Global, found_properties)
         return properties
     except KeyError:
-        logger.exception(
+        raise RuntimeError(
             "Registration of addon properties was never successful. Cannot continue."
         )
-        raise
 
 
 def check_addonpreferences(prefs_ctx: Union[Preferences, None]) -> Mosplat_AP_Global:
@@ -43,7 +43,22 @@ def check_addonpreferences(prefs_ctx: Union[Preferences, None]) -> Mosplat_AP_Gl
         preferences = cast(Mosplat_AP_Global, found_addon.preferences)
         return preferences
     except KeyError:
-        logger.exception(
+        raise RuntimeError(
             "Registration of addon preferences was never successful. Cannot continue."
         )
-        raise
+
+
+def check_props_safe(context: Context) -> Union[Mosplat_PG_Global, None]:
+    """provide a safe, non-throwing check that will log the stack trace but not raise"""
+    try:
+        return check_propertygroup(context.scene)
+    except RuntimeError:
+        return None  # log stack trace but do not raise
+
+
+def check_prefs_safe(context: Context) -> Union[Mosplat_AP_Global, None]:
+    """provide a safe, non-throwing check that will log the stack trace but not raise"""
+    try:
+        return check_addonpreferences(context.preferences)
+    except RuntimeError:
+        return None  # log stack trace but do not raise

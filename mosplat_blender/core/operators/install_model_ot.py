@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Set, TypeAlias
 from pathlib import Path
+import threading
+from ...interfaces.vggt_interface import MosplatVGGTInterface
 
 from .base import MosplatOperatorBase
 
@@ -17,15 +19,23 @@ class Mosplat_OT_install_model(MosplatOperatorBase):
     _thread = None
 
     def execute(self, context) -> Set[OperatorReturnItems]:
-        # self._thread = threading.Thread(
-        #     target=self._install_model_thread, args=(context,), daemon=True
-        # )
-        # self._thread.start()
+        if not (prefs := self.prefs(context)):
+            return {"CANCELLED"}
+
+        hf_id = prefs.vggt_hf_id
+        outdir = prefs.vggt_model_dir
+
+        self._thread = threading.Thread(
+            target=self._install_model_thread, args=(hf_id, outdir), daemon=True
+        )
+        self._thread.start()
 
         return {"RUNNING_MODAL"}
 
-    def _install_model_thread(self, installation_path: Path):
-        pass
+    def _install_model_thread(self, hf_id: str, outdir: Path):
+        MosplatVGGTInterface.initialize_model(hf_id, outdir)
+
+        self.logger().debug("Install model thread completed!")
 
     def progress_bar(self, context):
         if not self.layout:
