@@ -39,20 +39,20 @@ class MosplatVGGTInterface:
     @classmethod
     def cleanup(cls):
         """clean up expensive resources"""
+        if cls._initialized:  # skip all (especially imports) if not initialized
+            if cls._model:
+                cls._model.to(
+                    "cpu"
+                )  # force CUDA tensors to be released before we release our object
+                del cls._model
+                cls._model = None
 
-        if cls._model:
-            cls._model.to(
-                "cpu"
-            )  # force CUDA tensors to be released before we release our object
-            del cls._model
-            cls._model = None
+            import torch
 
-        import torch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()  # ensure all kernels finish
 
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()  # ensure all kernels finish
-
-        torch.cuda.empty_cache()  # only effective when all torch resources have been released
-        gc.collect()
+            torch.cuda.empty_cache()  # only effective when all torch resources have been released
+            gc.collect()
 
         logger.info("Cleaned up VGGT interface")

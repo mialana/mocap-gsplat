@@ -8,32 +8,13 @@ having this centralized location for these definitions avoids literals that can 
 misspelled or renamed in one location and not in another.
 """
 
-from typing import Any, Final, ParamSpec, TypeVar
-from pathlib import Path
+from __future__ import annotations
 
-P = ParamSpec("P")  # maintains original callable's signature for `run_once`
-R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
+from typing import Any, Final
+from pathlib import Path
+from enum import StrEnum, auto
 
 _MISSING_: Any = object()  # sentinel variable
-
-"""
-this is the `bl_idname` that blender expects our `AddonPreferences` to have.
-i.e. even though my addon is `mosplat_blender`, the id would be the evaluated
-runtime package, which includes the extension repository and the "bl_ext" prefix.
-so if this addon is in the `user_default` repository, the id is expected to be:
-`bl_ext.user_default.mosplat_blender`.
-"""
-ADDON_PREFERENCES_ID: Final[str] = (
-    __package__.rsplit(".", 1)[0]
-    if __package__
-    else Path(__file__).resolve().parent.parent.name
-)  # current package is one level down from the one blender expects
-
-"""
-the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
-`bpy.context.scene` object for convenient access in operators, panels, etc.
-"""
-ADDON_PROPERTIES_ATTRIBNAME = "mosplat_props"
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {
@@ -57,3 +38,70 @@ COLORED_FORMATTER_LEVEL_STYLES = {
         "bold": True,
     },
 }
+
+
+"""
+this is the `bl_idname` that blender expects our `AddonPreferences` to have.
+i.e. even though my addon is `mosplat_blender`, the id would be the evaluated
+runtime package, which includes the extension repository and the "bl_ext" prefix.
+so if this addon is in the `user_default` repository, the id is expected to be:
+`bl_ext.user_default.mosplat_blender`.
+"""
+ADDON_PREFERENCES_ID: Final[str] = (
+    __package__.rsplit(".", 1)[0]
+    if __package__
+    else Path(__file__).resolve().parent.parent.name
+)  # current package is one level down from the one blender expects
+
+"""
+the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
+`bpy.context.scene` object for convenient access in operators, panels, etc.
+"""
+ADDON_PROPERTIES_ATTRIBNAME: Final[str] = "mosplat_props"
+
+ADDON_PANEL_CATEGORY: Final[str] = "mosplat"
+
+
+class DotDict(dict):
+    """
+    a dictionary that supports dot notation access.
+    TODO: move this out of constants I believe
+    """
+
+    __getattr__ = dict.get  # read
+    __setattr__ = dict.__setitem__  # write
+    __delattr__ = dict.__delitem__  # delete
+
+    @classmethod
+    def from_keys_factory(cls, keys):
+        """convenience factory method to just make the value the same as the key"""
+        return cls({k: k for k in keys})
+
+
+"""Enum Convenience Classes"""
+
+
+class OperatorIDEnum(StrEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return f"mosplat.{name.lower()}"
+
+    INITIALIZE_MODEL = auto()
+    LOAD_IMAGES = auto()
+
+
+class PanelIDEnum(StrEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return f"{ADDON_PANEL_CATEGORY.upper()}_PT_{name.lower()}"
+
+    @staticmethod
+    def label_factory(member: PanelIDEnum):
+        """
+        creates the panel label from the id
+        keeping this here so this file can be a one-stop shop for metadata construction
+        """
+        return f"{member.value.replace('_PT_', ' ')} Panel"
+
+    MAIN = auto()
+    PREPROCESS = auto()

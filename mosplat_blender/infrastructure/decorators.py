@@ -1,9 +1,10 @@
 """decorator functions"""
 
 from functools import wraps
-from typing import Callable
+from typing import Callable, ParamSpec, TypeVar
 
-from .constants import P, R
+P = ParamSpec("P")  # maintains original callable's signature for `run_once`
+R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:

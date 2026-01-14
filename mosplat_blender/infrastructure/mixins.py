@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import ClassVar, Type
+from enum import StrEnum
 import logging
 import inspect
 
@@ -49,7 +50,8 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
     on each individual class instance.
     """
 
-    short_name: ClassVar[str] = _MISSING_
+    bl_idname: str = _MISSING_
+    id_enum_type: StrEnum = _MISSING_  # enforces enum usage so no literals
 
     @classmethod
     def at_registration(cls):
@@ -60,6 +62,11 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         cls._create_logger_for_class()
         cls._enforce_mixin_attributes()
 
+        if not isinstance(cls.bl_idname, Type(cls.id_enum_type)):
+            raise TypeError(
+                f"`{cls.__name__}` defines id_name with incorrect type.\nExpected: {Type[cls.id_enum_type]}, \nActual: {Type(cls.bl_idname)}"
+            )
+
     @classmethod
     def _enforce_mixin_attributes(cls):
         """enforce all required attributes are defined"""
@@ -67,45 +74,6 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         # `getmembers_static` with custom predicate
         if missing := inspect.getmembers_static(cls, lambda val: val is _MISSING_):
             for attr_name, _ in missing:
-                cls.logger().warning(
+                raise AttributeError(
                     f"`{cls.__name__}` does not define required mixin variable: `{attr_name}`"
                 )
-
-
-class MosplatOperatorMixin(MosplatBlTypeMixin):
-    @classmethod
-    def at_registration(cls):
-        super().at_registration()
-
-        cls.bl_idname = f"mosplat.{cls.short_name}"
-        cls.bl_label = cls.bl_idname.replace(".", " ")
-
-
-class MosplatPanelMixin(MosplatBlTypeMixin):
-    parent_class: ClassVar[Type[MosplatPanelMixin] | None] = _MISSING_
-
-    bl_category = "MOSPLAT"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-
-    @classmethod
-    def at_registration(cls):
-        """additionally automates creation of `bl_parent_id` for panels."""
-
-        super().at_registration()
-
-        cls.bl_idname = f"{cls.bl_category}_PT_{cls.short_name}"
-        cls.bl_label = cls.bl_idname.replace("_", " ")
-
-        if (
-            (
-                cls.parent_class is not None
-            )  # setting explicitly to `None` is distinct from sentinel `_MISSING_` value
-            and hasattr(
-                cls.parent_class, "bl_idname"
-            )  # this should never be false as it is set in `__init_subclass``
-            and not hasattr(
-                cls, "bl_parent_id"
-            )  # do not run if it already has the attribute
-        ):
-            cls.bl_parent_id = cls.parent_class.bl_idname
