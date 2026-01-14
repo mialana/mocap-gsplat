@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import ClassVar, Type, TypeGuard, TypeVar, TypeAlias
 from enum import StrEnum
 import logging
@@ -67,7 +68,11 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         """
         cls.create_logger_for_class()
 
-        cls._enforce_mixin_attributes()
+        value = os.getenv("MOSPLAT_TESTING")
+
+        if os.getenv("MOSPLAT_TESTING"):
+            cls._enforce_mixin_attributes()
+            cls.check_bl_idname_type(cls.bl_idname, cls.id_enum_type)
 
     @classmethod
     def _enforce_mixin_attributes(cls):

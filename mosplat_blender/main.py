@@ -6,6 +6,10 @@ moves implementation logic and imports out of `__init__.py`.
 import bpy
 
 from typing import Type, Sequence, Union
+from pathlib import Path
+
+from dotenv import load_dotenv
+import os
 
 from . import core
 from .interfaces import MosplatLoggingInterface, MosplatVGGTInterface

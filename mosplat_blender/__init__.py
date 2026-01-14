@@ -11,10 +11,12 @@ as well as subdirectories' `__init__.py`'s are `A.B`, files within subdirectorie
 are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logging.Logger.propagate)
 """
 
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
 from .main import register_addon, unregister_addon
 from .interfaces import MosplatLoggingInterface
-
-import os
 
 
 def clear_terminal():
@@ -22,6 +24,8 @@ def clear_terminal():
 
 
 def register():
+    load_dotenv(Path(__file__).resolve().parent.joinpath(".env"), verbose=True)
+
     # initialize handlers and local "root" logger
     MosplatLoggingInterface.init_once(__name__)
 
