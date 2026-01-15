@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Context, Event
+from bpy.types import Context, Event, WindowManager
 
 from typing import Union, Set, TYPE_CHECKING, TypeAlias
 
@@ -35,6 +35,39 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
     def prefs(self, context: Context) -> Union[Mosplat_AP_Global, None]:
         return check_prefs_safe(context)
 
-    def execute(self, context: Context) -> OperatorReturnItemsSet: ...
+    """
+    here we change the signature of overriden methods.
+    we also create convenience methods for having the window manager available.
+    they are opt-in, as if we do not need the window manager,
+    just override the normal method.
+    """
 
-    def invoke(self, context: Context, event: Event) -> OperatorReturnItemsSet: ...
+    def modal(self, context: Context, event: Event) -> OperatorReturnItemsSet:
+        if not (wm := context.window_manager):
+            return {"CANCELLED"}
+
+        return self.execute_with_window_manager(context, wm)
+
+    def invoke(self, context: Context, event: Event) -> OperatorReturnItemsSet:
+        if not (wm := context.window_manager):
+            return {"CANCELLED"}
+
+        return self.invoke_with_window_manager(context, event, wm)
+
+    def execute(self, context: Context) -> OperatorReturnItemsSet:
+        if not (wm := context.window_manager):
+            return {"CANCELLED"}
+
+        return self.execute_with_window_manager(context, wm)
+
+    def modal_with_window_manager(
+        self, context: Context, event: Event, wm: WindowManager
+    ) -> OperatorReturnItemsSet: ...
+
+    def invoke_with_window_manager(
+        self, context: Context, event: Event, wm: WindowManager
+    ) -> OperatorReturnItemsSet: ...
+
+    def execute_with_window_manager(
+        self, context: Context, wm: WindowManager
+    ) -> OperatorReturnItemsSet: ...

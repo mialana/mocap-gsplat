@@ -21,7 +21,7 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
     @classmethod
     def at_registration(cls):
         super().at_registration()
-        if cls.check_bl_idname_type(cls.bl_idname, cls.id_enum_type):
+        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type):
             cls.bl_label = PanelIDEnum.label_factory(cls.bl_idname)
 
     def props(self, context: Context) -> Union[Mosplat_PG_Global, None]:
@@ -34,8 +34,8 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
         if not (layout := self.layout):
             return
 
-        return self.draw_safe(context, layout)
+        return self.draw_with_layout(context, layout)
 
-    def draw_safe(self, context: Context, layout: UILayout):
+    def draw_with_layout(self, context: Context, layout: UILayout):
         """layout will always exist with this function"""
         ...

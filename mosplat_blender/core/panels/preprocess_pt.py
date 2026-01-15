@@ -12,7 +12,9 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
     def poll(cls, context):
         return True
 
-    def draw_safe(self, context, layout):
-        layout.row().operator(OperatorIDEnum.INITIALIZE_MODEL)
+    def draw_with_layout(self, context, layout):
+        column = layout.column()
+        # column.operator_context = "INVOKE_DEFAULT"  # all ops invoke before excecute
 
-        layout.row().operator(OperatorIDEnum.LOAD_IMAGES)
+        column.operator(OperatorIDEnum.INITIALIZE_MODEL)
+        column.operator(OperatorIDEnum.LOAD_IMAGES)

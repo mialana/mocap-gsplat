@@ -68,11 +68,9 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         """
         cls.create_logger_for_class()
 
-        value = os.getenv("MOSPLAT_TESTING")
-
         if os.getenv("MOSPLAT_TESTING"):
             cls._enforce_mixin_attributes()
-            cls.check_bl_idname_type(cls.bl_idname, cls.id_enum_type)
+            cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type)
 
     @classmethod
     def _enforce_mixin_attributes(cls):
@@ -86,7 +84,7 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
                 )
 
     @staticmethod
-    def check_bl_idname_type(bl_idname, id_enum_type: Type[S]) -> TypeGuard[S]:
+    def guard_type_of_bl_idname(bl_idname, id_enum_type: Type[S]) -> TypeGuard[S]:
         """guards `bl_idname` with its narrowed type"""
         if not issubclass(id_enum_type, StrEnum):
             raise TypeError(
