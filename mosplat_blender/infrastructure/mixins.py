@@ -27,15 +27,21 @@ class MosplatLogClassMixin:
     _logger: ClassVar[logging.Logger] = _MISSING_
 
     @classmethod
-    def create_logger_for_class(cls):
+    def _create_logger_for_class(cls):
         cls._logger = MosplatLoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{cls.__qualname__}"
         )
 
     @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        cls._create_logger_for_class()  # create logger for subclasses
+
+    @classmethod
     def logger(cls) -> logging.Logger:
         if not cls._logger:
-            cls.create_logger_for_class()
+            cls._create_logger_for_class()
         return cls._logger
 
 
@@ -66,8 +72,6 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         ran at registration time of the class.
         useful for differentiating 'abstract' base class behavior from registered classes
         """
-        cls.create_logger_for_class()
-
         if os.getenv("MOSPLAT_TESTING"):
             cls._enforce_mixin_attributes()
             cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type)
@@ -87,11 +91,11 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
     def guard_type_of_bl_idname(bl_idname, id_enum_type: Type[S]) -> TypeGuard[S]:
         """guards `bl_idname` with its narrowed type"""
         if not issubclass(id_enum_type, StrEnum):
-            raise TypeError(
+            raise AttributeError(
                 f"`{__name__}` defines `id_enum_type` with incorrect type.\nExpected: {Type[StrEnum]}, \nActual: {bl_idname}"
             )
         if not isinstance(bl_idname, id_enum_type):
-            raise TypeError(
+            raise AttributeError(
                 f"`{__name__}` defines `bl_idname` with incorrect type.\nExpected: {Type[id_enum_type]}, \nActual: {bl_idname}"
             )
         return True

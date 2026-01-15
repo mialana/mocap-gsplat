@@ -1,10 +1,11 @@
 """decorator functions"""
 
 from functools import wraps
-from typing import Callable, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar, Type, cast
 
 P = ParamSpec("P")  # maintains original callable's signature for `run_once`
 R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
+T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:
@@ -24,3 +25,16 @@ def run_once(f: Callable[P, R]) -> Callable[P, R]:
         return getattr(wrapper, "_result")
 
     return wrapper
+
+
+def no_instantiate(cls: T) -> T:
+    """
+    a decorater for classes that ensure they are never instantiated.
+    i.e. they are classes for namespacing-purposes (e.g. `interfaces.MosplatLoggingInterface`)
+    """
+
+    def __new__(cls_, *args, **kwargs):
+        raise RuntimeError(f"{cls_.__name__} cannot be instantiated")
+
+    cls.__new__ = staticmethod(__new__)
+    return cls

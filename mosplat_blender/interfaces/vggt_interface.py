@@ -6,7 +6,8 @@ from typing import ClassVar, TYPE_CHECKING, TypeAlias
 from pathlib import Path
 import gc
 
-from .logging_interface import MosplatLoggingInterface
+from ..infrastructure.mixins import MosplatLogClassMixin
+from ..infrastructure.decorators import no_instantiate
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     from vggt.models.vggt import VGGT
@@ -15,10 +16,9 @@ if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
 else:
     VGGTType: TypeAlias = object
 
-logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
-
-class MosplatVGGTInterface:
+@no_instantiate
+class MosplatVGGTInterface(MosplatLogClassMixin):
     _model: ClassVar[VGGTType | None] = None
     _initialized: ClassVar[bool] = False
 
@@ -32,7 +32,6 @@ class MosplatVGGTInterface:
         cls._model = VGGT.from_pretrained(hf_id, cache_dir=outdir)
 
         cls._initialized = True
-        logger.info("VGGT model successfully initialized")
 
         return cls._initialized
 
@@ -55,4 +54,4 @@ class MosplatVGGTInterface:
             torch.cuda.empty_cache()  # only effective when all torch resources have been released
             gc.collect()
 
-        logger.info("Cleaned up VGGT interface")
+        cls.logger().info("Cleaned up VGGT interface")

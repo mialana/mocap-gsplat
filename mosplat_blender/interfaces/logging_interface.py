@@ -2,7 +2,6 @@
 a static class to manage logging operations.
 it contains custom formatter classes, handles handler creation,
 sets the global `logging.LogRecordFactory`, and handles cleanup to not dirty the global namespace.
-prevents instance creation as this class is solely for the benefits of namespacing and grouping.
 """
 
 import os
@@ -10,7 +9,7 @@ import sys
 import logging
 import datetime
 from pathlib import Path
-from typing import ClassVar, Callable
+from typing import ClassVar, Callable, final
 from pythonjsonlogger.json import JsonFormatter
 import coloredlogs
 from humanfriendly.compat import coerce_string
@@ -20,9 +19,10 @@ from ..infrastructure.constants import (
     COLORED_FORMATTER_LEVEL_STYLES,
 )
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
-from ..infrastructure.decorators import run_once
+from ..infrastructure.decorators import run_once, no_instantiate
 
 
+@final
 class MosplatLoggingInterface:
     stdout_log_handler: ClassVar[logging.StreamHandler | None] = None
     json_log_handler: ClassVar[logging.StreamHandler | None] = None
@@ -30,11 +30,6 @@ class MosplatLoggingInterface:
     _root_logger: ClassVar[logging.Logger | None] = None
 
     _old_factory: ClassVar[Callable[..., logging.LogRecord] | None] = None
-
-    def __new__(cls, *args, **kwargs):
-        raise TypeError(
-            f"{cls.__name__} is a static interface and cannot be instantiated."
-        )
 
     class MosplatStdoutFormatter(coloredlogs.ColoredFormatter):
         def __init__(self, **kwargs):

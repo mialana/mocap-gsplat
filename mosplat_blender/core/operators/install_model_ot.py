@@ -1,3 +1,4 @@
+from bpy.types import Operator, Context
 from bpy.props import StringProperty
 
 from pathlib import Path
@@ -21,15 +22,30 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         subtype="DIR_PATH"
     )  # pyright: ignore[reportInvalidTypeForm]
 
-    def modal_with_window_manager(self, context, event, wm) -> OperatorReturnItemsSet:
+    def __init__(self, *args, **kwargs):
+        """
+        for modal operators, `__init__` is called before `invoke`
+        docs: https://docs.blender.org/api/current/bpy.types.Operator.html#modal-execution
+        """
+        Operator.__init__(self, *args, **kwargs)
+
+        self._queue = Queue()
+        self._thread = None
+        self._timer = None
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def modal(self, context, event) -> OperatorReturnItemsSet:
         if event.type != "TIMER":
-            return {"PASS_THROUGH"}
+            return {"RUNNING_MODAL", "PASS_THROUGH"}
 
-        self.logger().debug("Polled via event timer!")
+        if not self._queue.empty():
+            self._cleanup(context)
 
-        if hasattr(self, "_queue") and not self._queue.empty():
             _, payload = self._queue.get_nowait()
-            wm.event_timer_remove(self._timer)
+
             if payload:
                 self.logger().info("Successfully initialized VGGT model!")
                 return {"FINISHED"}
@@ -39,18 +55,20 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
 
         return {"RUNNING_MODAL"}
 
-    def invoke_with_window_manager(self, context, event, wm) -> OperatorReturnItemsSet:
+    def invoke(self, context, event) -> OperatorReturnItemsSet:
         if not (prefs := self.prefs(context)):
             return {"CANCELLED"}
 
         self.vggt_hf_id = prefs.vggt_hf_id
         self.vggt_outdir = prefs.vggt_model_dir
 
-        self._timer = wm.event_timer_add(time_step=0.1, window=context.window)
+        self._timer = self.wm(context).event_timer_add(
+            time_step=0.1, window=context.window
+        )
 
         return self.execute(context)
 
-    def execute_with_window_manager(self, context, wm) -> OperatorReturnItemsSet:
+    def execute(self, context) -> OperatorReturnItemsSet:
         if not self.vggt_hf_id or not self.vggt_outdir:
             self.logger().error(
                 "Call `invoke` to set up operator attributes before `execute`."
@@ -59,7 +77,6 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
 
         vggt_outdir_path: Path = Path(self.vggt_outdir)  # convert to path here
 
-        self._queue = Queue()
         self._thread = threading.Thread(
             target=self._install_model_thread,
             args=(self.vggt_hf_id, vggt_outdir_path),
@@ -67,14 +84,14 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         )
         self._thread.start()
 
-        wm.modal_handler_add(self)  # start timer polling here
+        self.wm(context).modal_handler_add(self)  # start timer polling here
 
         return {"RUNNING_MODAL"}
 
-    def _install_model_thread(self, hf_id: str, outdir: Path):
-        if not hasattr(self, "_queue"):
-            return
+    def cancel(self, context):
+        self._cleanup(context)
 
+    def _install_model_thread(self, hf_id: str, outdir: Path):
         # put true or false initialize result in queue
         MosplatVGGTInterface.initialize_model(hf_id, outdir)
 
@@ -83,4 +100,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         will return `False` if initialization status already occurred"""
         self._queue.put(("ok", MosplatVGGTInterface._initialized))
 
-        self.logger().debug("Install model thread completed!")
+    def _cleanup(self, context: Context):
+        if self._timer:
+            self.wm(context).event_timer_remove(self._timer)
+            self.logger().debug("Timer removed")
