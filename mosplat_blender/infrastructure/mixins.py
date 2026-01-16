@@ -64,6 +64,7 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
     """
 
     bl_idname: str = _MISSING_
+    bl_description: str = _MISSING_
     id_enum_type: ClassVar = _MISSING_  # no literals here!
 
     @classmethod
@@ -72,7 +73,7 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
         ran at registration time of the class.
         useful for differentiating 'abstract' base class behavior from registered classes
         """
-        if os.getenv("MOSPLAT_TESTING"):
+        if "MOSPLAT_TESTING" in os.environ:
             cls._enforce_mixin_attributes()
             cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type)
 

@@ -23,11 +23,11 @@ def check_propertygroup(scene: Union[Scene, None]) -> Mosplat_PG_Global:
     if scene is None:
         raise RuntimeError("Blender scene unavailable in this context.")
     try:
-        found_properties = scene[ADDON_PROPERTIES_ATTRIBNAME]
+        found_properties = getattr(scene, ADDON_PROPERTIES_ATTRIBNAME)
         # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
         properties = cast(Mosplat_PG_Global, found_properties)
         return properties
-    except KeyError:
+    except AttributeError:
         raise RuntimeError(
             "Registration of addon properties was never successful. Cannot continue."
         )

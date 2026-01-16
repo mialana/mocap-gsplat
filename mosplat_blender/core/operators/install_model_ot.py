@@ -9,13 +9,14 @@ from ...interfaces.vggt_interface import MosplatVGGTInterface
 
 from ...infrastructure.constants import OperatorIDEnum
 
-from .base import MosplatOperatorBase, OperatorReturnItemsSet
+from .base import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
 
 
 class Mosplat_OT_initialize_model(MosplatOperatorBase):
     bl_description = "Install VGGT model weights from Hugging Face."
-
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
+
+    poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
 
     vggt_hf_id: StringProperty()  # pyright: ignore[reportInvalidTypeForm]
     vggt_outdir = StringProperty(
@@ -32,10 +33,6 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         self._queue = Queue()
         self._thread = None
         self._timer = None
-
-    @classmethod
-    def poll(cls, context):
-        return True
 
     def modal(self, context, event) -> OperatorReturnItemsSet:
         if event.type != "TIMER":

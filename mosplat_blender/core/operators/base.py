@@ -1,7 +1,9 @@
 import bpy
 from bpy.types import Context, Event, WindowManager
 
-from typing import Set, TYPE_CHECKING, TypeAlias
+from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar, Callable
+from enum import Enum, auto
+from functools import partial
 
 from ..checks import (
     check_addonpreferences,
@@ -25,8 +27,21 @@ else:
 OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
 
 
+class OperatorPollReqs(Enum):
+    """Custom enum in case operator does not require use of one poll requirement"""
+
+    PREFS = partial(check_props_safe)
+    PROPS = partial(check_prefs_safe)
+    WINDOW_MANAGER = partial(lambda obj: getattr(obj, "window_manager"))
+
+
 class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
     id_enum_type = OperatorIDEnum
+    poll_reqs: ClassVar[Set[OperatorPollReqs]] = {
+        OperatorPollReqs.PREFS,
+        OperatorPollReqs.PROPS,
+        OperatorPollReqs.WINDOW_MANAGER,
+    }
 
     @classmethod
     def at_registration(cls):
@@ -36,20 +51,21 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
 
     @classmethod
     def poll(cls, context) -> bool:
-        return bool(
-            context.window_manager
-            and check_props_safe(context)
-            and check_prefs_safe(context)
-        )
+        does_pass: bool = True
+        for r in OperatorPollReqs:
+            if r in cls.poll_reqs:
+                does_pass &= bool(r.value(context))
 
-    def props(self, context: Context) -> Mosplat_PG_Global:
-        return check_propertygroup(
-            context.scene
-        )  # let real runtimeerror rise as we trust poll to guard this call
+        return does_pass
 
     def prefs(self, context: Context) -> Mosplat_AP_Global:
         return check_addonpreferences(
             context.preferences
+        )  # let real runtimeerror rise as we trust poll to guard this call
+
+    def props(self, context: Context) -> Mosplat_PG_Global:
+        return check_propertygroup(
+            context.scene
         )  # let real runtimeerror rise as we trust poll to guard this call
 
     def wm(self, context: Context) -> WindowManager:
@@ -61,8 +77,8 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
     explictly re-define interface of these method signatures using the designated `TypeAlias`
     """
 
-    def modal(self, context: Context, event: Event) -> OperatorReturnItemsSet: ...
-
     def invoke(self, context: Context, event: Event) -> OperatorReturnItemsSet: ...
 
     def execute(self, context: Context) -> OperatorReturnItemsSet: ...
+
+    def modal(self, context: Context, event: Event) -> OperatorReturnItemsSet: ...
