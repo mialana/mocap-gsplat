@@ -66,16 +66,16 @@ ADDON_PREFERENCES_ID: Final[str] = (
 ADDON_BASE_ID: Final[str] = ADDON_PREFERENCES_ID.rpartition(".")[-1]
 
 ADDON_HUMAN_READABLE: Final[str] = capwords(ADDON_BASE_ID.replace("_", " "))
+ADDON_SHORTNAME: Final[str] = ADDON_HUMAN_READABLE.partition(" ")[0]
 
 """
 the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
 `bpy.context.scene` object for convenient access in operators, panels, etc.
 """
-ADDON_PROPERTIES_ATTRIBNAME: Final[str] = "mosplat_props"
+ADDON_PROPERTIES_ATTRIBNAME: Final[str] = f"{ADDON_SHORTNAME.lower()}_props"
 
-ADDON_CATEGORY: Final[str] = "mosplat"
-OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_CATEGORY}."
-PANEL_ID_PREFIX: Final[str] = f"{ADDON_CATEGORY.upper()}_PT_"
+OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.lower()}."
+PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"
 
 """Enum Convenience Classes"""
 
@@ -87,7 +87,7 @@ class OperatorIDEnum(StrEnum):
 
     @staticmethod
     def _category():
-        return ADDON_CATEGORY
+        return ADDON_SHORTNAME
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
@@ -113,7 +113,7 @@ class PanelIDEnum(StrEnum):
 
     @staticmethod
     def _category():
-        return ADDON_CATEGORY
+        return ADDON_SHORTNAME
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:

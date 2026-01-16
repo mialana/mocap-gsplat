@@ -14,6 +14,7 @@ from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_BASE_ID,
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
+    ADDON_SHORTNAME,
 )
 
 
@@ -130,7 +131,7 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
     def draw(self, _: Context):
         layout = self.layout
 
-        layout.label(text="Mosplat Saved Preferences", icon="SETTINGS")
+        layout.label(text=f"{ADDON_SHORTNAME} Saved Preferences", icon="SETTINGS")
 
         col = layout.column(align=True)
 

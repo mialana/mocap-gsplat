@@ -76,13 +76,3 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
         if not (wm := context.window_manager):
             raise RuntimeError("Something went wrong with `poll`-guard.")
         return wm
-
-    """
-    explictly re-define interface of these method signatures using the designated `TypeAlias`
-    """
-
-    def invoke(self, context: Context, event: Event) -> OperatorReturnItemsSet: ...
-
-    def execute(self, context: Context) -> OperatorReturnItemsSet: ...
-
-    def modal(self, context: Context, event: Event) -> OperatorReturnItemsSet: ...

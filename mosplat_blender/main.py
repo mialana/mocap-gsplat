@@ -11,7 +11,7 @@ from . import core
 from .interfaces import MosplatLoggingInterface, MosplatVGGTInterface
 from .infrastructure.mixins import MosplatBlTypeMixin
 from .core.checks import check_addonpreferences
-from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME
+from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME, ADDON_SHORTNAME
 
 classes: Sequence[
     Union[
@@ -51,7 +51,7 @@ def register_addon():
 
     MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
 
-    logger.info("Mosplat Blender addon registration completed.")
+    logger.info(f"{ADDON_SHORTNAME} Blender addon registration completed.")
 
 
 def unregister_addon():
@@ -73,4 +73,4 @@ def unregister_addon():
     except Exception:
         logger.exception(f"Error while cleaning up VGGT interface")
 
-    logger.info("Mosplat Blender addon unregistration completed.")
+    logger.info(f"{ADDON_SHORTNAME} Blender addon unregistration completed.")

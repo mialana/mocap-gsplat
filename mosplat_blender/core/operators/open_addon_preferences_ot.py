@@ -8,7 +8,9 @@ from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollRe
 
 class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
     bl_idname = OperatorIDEnum.OPEN_ADDON_PREFERENCES
-    bl_description = "Quick goto navigation to addon preferences."
+    bl_description = (
+        f"Quick navigation to {ADDON_HUMAN_READABLE} saved addon preferences."
+    )
 
     poll_reqs = {OperatorPollReqs.WINDOW_MANAGER}
 
@@ -23,6 +25,3 @@ class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
             context.preferences.active_section = "ADDONS"
 
         return {"FINISHED"}
-
-    def invoke(self, context, event) -> OperatorReturnItemsSet:
-        return self.execute(context)
