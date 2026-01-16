@@ -2,7 +2,7 @@ from bpy.props import StringProperty
 
 from ...infrastructure.constants import OperatorIDEnum
 
-from .base import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
+from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
 
 
 class Mosplat_OT_load_images(MosplatOperatorBase):

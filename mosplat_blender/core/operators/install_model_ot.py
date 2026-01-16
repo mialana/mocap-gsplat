@@ -9,7 +9,7 @@ from ...interfaces.vggt_interface import MosplatVGGTInterface
 
 from ...infrastructure.constants import OperatorIDEnum
 
-from .base import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
+from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
 
 
 class Mosplat_OT_initialize_model(MosplatOperatorBase):

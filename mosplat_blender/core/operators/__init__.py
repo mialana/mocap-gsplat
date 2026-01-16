@@ -1,6 +1,6 @@
 from typing import List, Type
 
-from .base import MosplatOperatorBase
+from .base_ot import MosplatOperatorBase
 from . import install_model_ot, load_images_ot
 
 all_operators: List[Type[MosplatOperatorBase]] = [

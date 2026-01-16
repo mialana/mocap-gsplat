@@ -1,6 +1,6 @@
 from typing import List, Type
 
-from .base import MosplatPanelBase
+from .base_pt import MosplatPanelBase
 from . import main_pt, preprocess_pt
 
 all_panels: List[Type[MosplatPanelBase]] = [

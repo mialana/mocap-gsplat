@@ -1,6 +1,6 @@
 from ...infrastructure.constants import OperatorIDEnum, PanelIDEnum
 
-from .base import MosplatPanelBase
+from .base_pt import MosplatPanelBase
 
 
 class Mosplat_PT_Preprocess(MosplatPanelBase):
