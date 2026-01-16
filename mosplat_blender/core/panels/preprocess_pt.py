@@ -1,6 +1,6 @@
 from ...infrastructure.constants import OperatorIDEnum, PanelIDEnum
 
-from .base_pt import MosplatPanelBase
+from .base_pt import MosplatPanelBase, PanelPollReqs
 
 
 class Mosplat_PT_Preprocess(MosplatPanelBase):
@@ -9,9 +9,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
     bl_parent_id = PanelIDEnum.MAIN
 
-    @classmethod
-    def poll(cls, context):
-        return True
+    poll_reqs = {PanelPollReqs.PROPS}
 
     def draw_with_layout(self, context, layout):
         column = layout.column()
@@ -26,11 +24,3 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         box = column.box()
         box.row().label(text=props.bl_rna.properties["current_media_dir"].name)
         box.row().prop(props, "current_media_dir", text="")
-
-        box.row().label(text=prefs.bl_rna.properties["data_output_path"].name)
-        box.row().prop(prefs, "data_output_path", text="")
-
-        box.row().label(
-            text=prefs.bl_rna.properties["preprocess_media_script_file"].name
-        )
-        box.row().prop(prefs, "preprocess_media_script_file", text="")

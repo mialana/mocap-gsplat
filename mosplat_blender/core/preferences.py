@@ -10,7 +10,11 @@ import os
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import MosplatLogClassMixin
-from ..infrastructure.constants import ADDON_PREFERENCES_ID
+from ..infrastructure.constants import (
+    ADDON_PREFERENCES_ID,
+    ADDON_BASE_ID,
+    DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
+)
 
 
 def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
@@ -33,24 +37,13 @@ def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
         prefs.logger().info("JSON logging updated.")
 
 
-DEFAULT_DATA_OUTPUT_PATH = f"{os.curdir}{os.sep}{{{{media_directory_name}}}}_OUTPUT"
-DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE = str(
-    Path(__file__)
-    .resolve()
-    .parent.parent.joinpath("bin")
-    .joinpath("fix_mocap_video_rotations.py")
-)
-
-
 class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
     bl_idname = ADDON_PREFERENCES_ID
 
     cache_dir: StringProperty(
         name="Cache Directory",
         description="Cache directory on disk used by the addon",
-        default=str(
-            Path.home().joinpath(".cache", ADDON_PREFERENCES_ID.rpartition(".")[-1])
-        ),
+        default=str(Path.home().joinpath(".cache", ADDON_BASE_ID)),
         subtype="DIR_PATH",
         update=update_json_logging,
     )
@@ -73,7 +66,7 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
         description="Output directory for processed data generated from the selected media directory.\n"
         "Relative paths are resolved against the selected media directory.\n"
         "The token {{media_directory_name}} will be replaced with the base name of the selected media directory.",
-        default=DEFAULT_DATA_OUTPUT_PATH,
+        default=f"{os.curdir}{os.sep}{{{{media_directory_name}}}}_OUTPUT",
     )
 
     preprocess_media_script_file: StringProperty(

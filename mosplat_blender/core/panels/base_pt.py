@@ -1,6 +1,6 @@
 from bpy.types import Panel, UILayout, Context
 
-from typing import ClassVar, Set
+from typing import ClassVar, Set, Union
 from enum import Enum
 from functools import partial
 
@@ -31,7 +31,7 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
     bl_region_type = "UI"
     bl_category = PanelIDEnum._category()
 
-    poll_reqs: ClassVar[Set[PanelPollReqs]] = {
+    poll_reqs: ClassVar[Union[Set[PanelPollReqs], None]] = {
         PanelPollReqs.PREFS,
         PanelPollReqs.PROPS,
     }
@@ -44,7 +44,11 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
 
     @classmethod
     def poll(cls, context) -> bool:
-        return all(req.value(cls, context) for req in cls.poll_reqs)
+        return (
+            all(req.value(cls, context) for req in cls.poll_reqs)
+            if cls.poll_reqs
+            else True
+        )
 
     def prefs(self, context: Context) -> Mosplat_AP_Global:
         return check_addonpreferences(

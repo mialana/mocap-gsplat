@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import Context, Event, WindowManager
 
-from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar
+from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar, Union
 from enum import Enum
 from functools import partial
 
@@ -41,7 +41,7 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
     bl_category = OperatorIDEnum._category()
 
     id_enum_type = OperatorIDEnum
-    poll_reqs: ClassVar[Set[OperatorPollReqs]] = {
+    poll_reqs: ClassVar[Union[Set[OperatorPollReqs], None]] = {
         OperatorPollReqs.PREFS,
         OperatorPollReqs.PROPS,
         OperatorPollReqs.WINDOW_MANAGER,
@@ -56,7 +56,11 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
 
     @classmethod
     def poll(cls, context) -> bool:
-        return all(req.value(cls, context) for req in cls.poll_reqs)
+        return (
+            all(req.value(cls, context) for req in cls.poll_reqs)
+            if cls.poll_reqs
+            else True
+        )
 
     def prefs(self, context: Context) -> Mosplat_AP_Global:
         return check_addonpreferences(

@@ -40,19 +40,32 @@ COLORED_FORMATTER_LEVEL_STYLES = {
     },
 }
 
+# path location of the shipped preprocess script
+DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE = str(
+    Path(__file__)
+    .resolve()
+    .parent.parent.joinpath("bin")
+    .joinpath("fix_mocap_video_rotations.py")
+)
 
 """
 this is the `bl_idname` that blender expects our `AddonPreferences` to have.
-i.e. even though my addon is `mosplat_blender`, the id would be the evaluated
+i.e. even though our addon id is `mosplat_blender`, the id would be the evaluated
 runtime package, which includes the extension repository and the "bl_ext" prefix.
 so if this addon is in the `user_default` repository, the id is expected to be:
 `bl_ext.user_default.mosplat_blender`.
 """
 ADDON_PREFERENCES_ID: Final[str] = (
-    __package__.rsplit(".", 1)[0]
+    __package__.rpartition(".")[
+        0
+    ]  # remove last part of `__package__` since this file is in a subdirectory
     if __package__
     else Path(__file__).resolve().parent.parent.name
 )  # current package is one level down from the one blender expects
+
+ADDON_BASE_ID: Final[str] = ADDON_PREFERENCES_ID.rpartition(".")[-1]
+
+ADDON_HUMAN_READABLE: Final[str] = capwords(ADDON_BASE_ID.replace("_", " "))
 
 """
 the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
@@ -61,8 +74,8 @@ the name of the pointer to `Mosplat_PG_Global` that will be placed on the
 ADDON_PROPERTIES_ATTRIBNAME: Final[str] = "mosplat_props"
 
 ADDON_CATEGORY: Final[str] = "mosplat"
-OPERATOR_ID_PREFIX = f"{ADDON_CATEGORY}."
-PANEL_ID_PREFIX = f"{ADDON_CATEGORY.upper()}_PT_"
+OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_CATEGORY}."
+PANEL_ID_PREFIX: Final[str] = f"{ADDON_CATEGORY.upper()}_PT_"
 
 """Enum Convenience Classes"""
 
@@ -90,6 +103,7 @@ class OperatorIDEnum(StrEnum):
 
     INITIALIZE_MODEL = auto()
     SELECT_MEDIA_DIRECTORY = auto()
+    OPEN_ADDON_PREFERENCES = auto()
 
 
 class PanelIDEnum(StrEnum):

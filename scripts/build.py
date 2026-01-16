@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import datetime
 import zipfile
+from string import capwords
 from pathlib import Path
 from typing import Tuple
 from dataclasses import dataclass, fields
@@ -37,6 +38,8 @@ class BuildContext:
     """capitalized indicates it is an input resource (i.e. expected to exist)"""
 
     timestamp_str: str
+    addon_base_id: str
+    addon_human_readable: str
     version_tag: str
     wheels_dir: Path
     ADDON_SRC_DIR: Path
@@ -115,6 +118,8 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
 
     ADDON_SRC_DIR = args.addon_src_dir  # override defaults with new program args
 
+    addon_base_id = ADDON_SRC_DIR.name
+    addon_human_readable = capwords(addon_base_id.replace("_", " "))
     version_tag = get_version_tag_from_git()
 
     timestamp: datetime.datetime = datetime.datetime.now()
@@ -280,7 +285,12 @@ def generate_blender_manifest_toml(ctx: BuildContext):
         next(f)  # skip the comment on the first line
         template = f.read()
 
-    template = template.format(version_tag=ctx.version_tag, wheels_block=WHEELS_STR)
+    template = template.format(
+        addon_base_id=ctx.addon_base_id,
+        addon_human_readable=ctx.addon_human_readable,
+        version_tag=ctx.version_tag,
+        wheels_block=WHEELS_STR,
+    )
 
     with open(ctx.manifest_toml_file, "w", encoding="utf-8") as f:
         f.write(ctx.timestamp_str)
