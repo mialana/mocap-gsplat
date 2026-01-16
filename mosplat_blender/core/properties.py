@@ -11,7 +11,7 @@ from bpy.props import (
     CollectionProperty,
     PointerProperty,
 )
-import os
+
 from pathlib import Path
 from ..interfaces import MosplatLoggingInterface
 
@@ -19,18 +19,9 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 
 class Mosplat_PG_Global(PropertyGroup):
-    preset_enum: bpy.props.EnumProperty(
-        name="",
-        description="Select an option",
-        items=[
-            ("1", "AmbientCG", "https://ambientcg.com/"),
-            ("2", "Texturify", "https://texturify.com/"),
-            ("3", "BelderKit", "https://www.blenderkit.com/"),
-        ],
-    )
-
-    current_image_dir: StringProperty(
-        description="Filepath to directory of images that is currently being processsed",
+    current_media_dir: StringProperty(
+        name="Current Media Directory",
+        description="Filepath to directory containing media files to be processed.",
         default=str(Path.home()),
         subtype="DIR_PATH",
     )

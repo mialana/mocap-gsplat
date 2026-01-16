@@ -6,6 +6,7 @@ from bpy.props import (
 )
 
 from pathlib import Path
+import os
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import MosplatLogClassMixin
@@ -32,6 +33,15 @@ def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
         prefs.logger().info("JSON logging updated.")
 
 
+DEFAULT_DATA_OUTPUT_PATH = f"{os.curdir}{os.sep}{{{{media_directory_name}}}}_OUTPUT"
+DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE = str(
+    Path(__file__)
+    .resolve()
+    .parent.parent.joinpath("bin")
+    .joinpath("fix_mocap_video_rotations.py")
+)
+
+
 class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
     bl_idname = ADDON_PREFERENCES_ID
 
@@ -56,6 +66,23 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
         name="Model Cache Subdirectory",
         description="Subdirectory where the VGGT model data will be stored",
         default="vggt",
+    )
+
+    data_output_path: StringProperty(
+        name="Data Output Path",
+        description="Output directory for processed data generated from the selected media directory.\n"
+        "Relative paths are resolved against the selected media directory.\n"
+        "The token {{media_directory_name}} will be replaced with the base name of the selected media directory.",
+        default=DEFAULT_DATA_OUTPUT_PATH,
+    )
+
+    preprocess_media_script_file: StringProperty(
+        name="Preprocess Media Script File",
+        description=f"A file containing a Python script that will be applied to the contents of the selected media directory before individual frames are extracted.\n"
+        "See '{DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE}' for details on the expected format of the file.\n"
+        "If an empty path is entered no pre-processing will be performed.",
+        default=DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
+        subtype="FILE_PATH",
     )
 
     json_log_filename_format: StringProperty(
@@ -110,23 +137,34 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
     def draw(self, _: Context):
         layout = self.layout
 
-        layout.label(text="Output Configuration", icon="FILE_FOLDER")
+        layout.label(text="Mosplat Saved Preferences", icon="SETTINGS")
 
         col = layout.column(align=True)
-        col.prop(self, "cache_dir")
-        col.prop(self, "json_log_subdir")
+
+        gen_io_box = col.box()
+        gen_io_box.label(text="General I/O Configuration", icon="DISK_DRIVE_LARGE")
+        gen_io_box.prop(self, "cache_dir")
+        gen_io_box.prop(self, "json_log_subdir")
+        gen_io_box.prop(self, "vggt_model_subdir")
 
         layout.separator()
 
-        col = layout.column(align=True)
-        col.label(text="JSON Log Configuration", icon="TEXT")
-        col.prop(self, "json_log_filename_format")
-        col.prop(self, "json_date_log_format")
-        col.prop(self, "json_log_format")
+        data_proc_box = col.box()
+        data_proc_box.label(text="Data Processing Configuration", icon="MESH_CYLINDER")
+        data_proc_box.prop(self, "data_output_path")
+        data_proc_box.prop(self, "preprocess_media_script_file")
 
         layout.separator()
 
-        col = layout.column(align=True)
-        col.label(text="STDOUT Log Formatting", icon="TEXT")
-        col.prop(self, "stdout_date_log_format")
-        col.prop(self, "stdout_log_format")
+        json_box = col.box()
+        json_box.label(text="JSON Log Configuration", icon="FILE_TEXT")
+        json_box.prop(self, "json_log_filename_format")
+        json_box.prop(self, "json_date_log_format")
+        json_box.prop(self, "json_log_format")
+
+        layout.separator()
+
+        stdout_box = col.box()
+        stdout_box.label(text="STDOUT Log Formatting", icon="GREASEPENCIL")
+        stdout_box.prop(self, "stdout_date_log_format")
+        stdout_box.prop(self, "stdout_log_format")

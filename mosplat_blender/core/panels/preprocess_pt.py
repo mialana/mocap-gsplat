@@ -17,14 +17,20 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         column = layout.column()
 
         props = self.props(context)
+        prefs = self.prefs(context)
 
         column.operator(OperatorIDEnum.INITIALIZE_MODEL)
 
         column.separator()
 
         box = column.box()
-        box.label(text=OperatorIDEnum.label_factory(OperatorIDEnum.LOAD_IMAGES))
-        op_row = box.row()
-        op_row.operator(
-            OperatorIDEnum.LOAD_IMAGES, text=props.current_image_dir, icon="FILE_FOLDER"
+        box.row().label(text=props.bl_rna.properties["current_media_dir"].name)
+        box.row().prop(props, "current_media_dir", text="")
+
+        box.row().label(text=prefs.bl_rna.properties["data_output_path"].name)
+        box.row().prop(prefs, "data_output_path", text="")
+
+        box.row().label(
+            text=prefs.bl_rna.properties["preprocess_media_script_file"].name
         )
+        box.row().prop(prefs, "preprocess_media_script_file", text="")
