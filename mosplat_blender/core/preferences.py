@@ -1,9 +1,7 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
 from bpy.types import AddonPreferences, Context
-from bpy.props import (
-    StringProperty,
-)
+from bpy.props import StringProperty, IntProperty
 
 from pathlib import Path
 import os
@@ -18,7 +16,6 @@ from ..infrastructure.constants import (
     ADDON_BASE_ID,
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
     ADDON_SHORTNAME,
-    ADDON_PROPERTIES_ATTRIBNAME,
 )
 
 
@@ -81,6 +78,20 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
         "If an empty path is entered no pre-processing will be performed.",
         default=DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
         subtype="FILE_PATH",
+    )
+
+    media_extension_set: StringProperty(
+        name="Media Extension Set",
+        description="Comma separated string of all file extensions that should be considered as media files within the media directory",
+        default=".avi,.mp4,.mov",
+    )
+
+    max_frame_range: IntProperty(
+        name="Max Frame Range",
+        description="The max frame range that can be processed at once.\n"
+        "Set to '-1' for no limit.\n"
+        "WARNING: Change this preference with knowledge of the capabilities of your own machine.",
+        default=120,
     )
 
     json_log_filename_format: StringProperty(
@@ -162,6 +173,8 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
         data_proc_box.label(text="Data Processing Configuration", icon="MESH_CYLINDER")
         data_proc_box.prop(self, "data_output_path")
         data_proc_box.prop(self, "preprocess_media_script_file")
+        data_proc_box.prop(self, "media_extension_set")
+        data_proc_box.prop(self, "max_frame_range")
 
         layout.separator()
 

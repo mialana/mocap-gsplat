@@ -101,9 +101,14 @@ class OperatorIDEnum(StrEnum):
         """
         return capwords(member.value.removeprefix(OPERATOR_ID_PREFIX).replace("_", " "))
 
+    @staticmethod
+    def basename_factory(member: OperatorIDEnum):
+        return member.value.rpartition(".")[-1]
+
     INITIALIZE_MODEL = auto()
     RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
+    PREPARE_MEDIA_DIRECTORY = auto()
 
 
 class PanelIDEnum(StrEnum):
