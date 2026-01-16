@@ -50,12 +50,14 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
             else True
         )
 
-    def prefs(self, context: Context) -> Mosplat_AP_Global:
+    @staticmethod
+    def prefs(context: Context) -> Mosplat_AP_Global:
         return check_addonpreferences(
             context.preferences
         )  # let real runtimeerror rise as we trust poll to guard this call
 
-    def props(self, context: Context) -> Mosplat_PG_Global:
+    @staticmethod
+    def props(context: Context) -> Mosplat_PG_Global:
         return check_propertygroup(
             context.scene
         )  # let real runtimeerror rise as we trust poll to guard this call

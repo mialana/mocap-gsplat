@@ -8,12 +8,18 @@ we can operate with type-awareness in development.
 
 import bpy
 from bpy.types import Preferences, Scene, Context
-from typing import Union, cast
+
+from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias
 
 from ..infrastructure.constants import ADDON_PREFERENCES_ID, ADDON_PROPERTIES_ATTRIBNAME
-from .preferences import Mosplat_AP_Global
-from .properties import Mosplat_PG_Global
 from ..interfaces import MosplatLoggingInterface
+
+if TYPE_CHECKING:
+    from .preferences import Mosplat_AP_Global
+    from .properties import Mosplat_PG_Global
+else:
+    Mosplat_AP_Global: TypeAlias = Any
+    Mosplat_PG_Global: TypeAlias = Any
 
 # the only logs made here should be exceptions, which include the stack trace.
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)

@@ -7,6 +7,9 @@ from bpy.props import (
 
 from pathlib import Path
 import os
+from typing import Union
+
+from .checks import check_props_safe
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import MosplatLogClassMixin
@@ -15,6 +18,7 @@ from ..infrastructure.constants import (
     ADDON_BASE_ID,
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
     ADDON_SHORTNAME,
+    ADDON_PROPERTIES_ATTRIBNAME,
 )
 
 
@@ -127,6 +131,17 @@ class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
     @property
     def vggt_model_dir(self) -> Path:
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
+
+    def data_output_dir(self, context: Context) -> Union[Path, None]:
+        output_path = Path(self.data_output_path)
+        if output_path.is_absolute():
+            return self.data_output_path
+
+        props = check_props_safe(context)
+        if props and (media_dir_path := Path(props.current_media_dir)).is_dir():
+            return media_dir_path.joinpath(output_path)
+
+        return None
 
     def draw(self, _: Context):
         layout = self.layout

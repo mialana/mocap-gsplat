@@ -14,7 +14,9 @@ from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollRe
 
 class Mosplat_OT_initialize_model(MosplatOperatorBase):
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
-    bl_description = "Install VGGT model weights from Hugging Face."
+    bl_description = (
+        f"Install VGGT model weights from Hugging Face or load from cache if available."
+    )
 
     poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
 
@@ -25,9 +27,12 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
 
     @classmethod
     def poll(cls, context) -> bool:
-        return (
-            super().poll(context) and not MosplatVGGTInterface._initialized
-        )  # prevent re-initialization
+        if not super().poll(context):
+            return False
+        if MosplatVGGTInterface._initialized:
+            cls.poll_message_set("Model has already been initialized.")
+            return False  # prevent re-initialization
+        return True
 
     def __init__(self, *args, **kwargs):
         """

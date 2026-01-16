@@ -102,7 +102,7 @@ class OperatorIDEnum(StrEnum):
         return capwords(member.value.removeprefix(OPERATOR_ID_PREFIX).replace("_", " "))
 
     INITIALIZE_MODEL = auto()
-    SELECT_MEDIA_DIRECTORY = auto()
+    RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
 
 

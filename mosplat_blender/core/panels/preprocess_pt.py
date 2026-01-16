@@ -15,7 +15,6 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         column = layout.column()
 
         props = self.props(context)
-        prefs = self.prefs(context)
 
         column.operator(OperatorIDEnum.INITIALIZE_MODEL)
 
@@ -24,3 +23,6 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         box = column.box()
         box.row().label(text=props.bl_rna.properties["current_media_dir"].name)
         box.row().prop(props, "current_media_dir", text="")
+        box.row().prop(props, "current_frame_range")
+
+        column.row().operator(OperatorIDEnum.RUN_INFERENCE)
