@@ -13,8 +13,8 @@ from .base import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
 
 
 class Mosplat_OT_initialize_model(MosplatOperatorBase):
-    bl_description = "Install VGGT model weights from Hugging Face."
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
+    bl_description = "Install VGGT model weights from Hugging Face."
 
     poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
 
@@ -53,9 +53,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         return {"RUNNING_MODAL"}
 
     def invoke(self, context, event) -> OperatorReturnItemsSet:
-        if not (prefs := self.prefs(context)):
-            return {"CANCELLED"}
-
+        prefs = self.prefs(context)
         self.vggt_hf_id = prefs.vggt_hf_id
         self.vggt_outdir = prefs.vggt_model_dir
 

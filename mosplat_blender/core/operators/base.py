@@ -1,8 +1,8 @@
 import bpy
 from bpy.types import Context, Event, WindowManager
 
-from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar, Callable
-from enum import Enum, auto
+from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar
+from enum import Enum
 from functools import partial
 
 from ..checks import (
@@ -30,9 +30,11 @@ OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
 class OperatorPollReqs(Enum):
     """Custom enum in case operator does not require use of one poll requirement"""
 
-    PREFS = partial(check_props_safe)
-    PROPS = partial(check_prefs_safe)
-    WINDOW_MANAGER = partial(lambda obj: getattr(obj, "window_manager"))
+    PREFS = partial(lambda cls, context: check_prefs_safe(context))
+    PROPS = partial(lambda cls, context: check_props_safe(context))
+    WINDOW_MANAGER = partial(
+        lambda cls, context: getattr(context, "window_manager", None)
+    )
 
 
 class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
@@ -54,7 +56,7 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
         does_pass: bool = True
         for r in OperatorPollReqs:
             if r in cls.poll_reqs:
-                does_pass &= bool(r.value(context))
+                does_pass &= bool(r.value(cls, context))
 
         return does_pass
 

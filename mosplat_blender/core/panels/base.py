@@ -1,14 +1,27 @@
-import bpy
 from bpy.types import Panel, UILayout, Context
 
-from typing import Union
+from typing import ClassVar, Set
+from enum import Enum
+from functools import partial
 
-from ..checks import check_props_safe, check_prefs_safe
+from ..checks import (
+    check_addonpreferences,
+    check_propertygroup,
+    check_prefs_safe,
+    check_props_safe,
+)
 from ..properties import Mosplat_PG_Global
 from ..preferences import Mosplat_AP_Global
 
 from ...infrastructure.mixins import MosplatBlTypeMixin
 from ...infrastructure.constants import PanelIDEnum, ADDON_PANEL_CATEGORY
+
+
+class PanelPollReqs(Enum):
+    """Custom enum in case operator does not require use of one poll requirement"""
+
+    PREFS = partial(lambda cls, context: check_prefs_safe(context))
+    PROPS = partial(lambda cls, context: check_props_safe(context))
 
 
 class MosplatPanelBase(MosplatBlTypeMixin, Panel):
@@ -18,17 +31,30 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
     bl_region_type = "UI"
     bl_category = ADDON_PANEL_CATEGORY
 
+    poll_reqs: ClassVar[Set[PanelPollReqs]] = {
+        PanelPollReqs.PREFS,
+        PanelPollReqs.PROPS,
+    }
+
     @classmethod
     def at_registration(cls):
         super().at_registration()
         if cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type):
             cls.bl_label = PanelIDEnum.label_factory(cls.bl_idname)
 
-    def props(self, context: Context) -> Union[Mosplat_PG_Global, None]:
-        return check_props_safe(context)
+    @classmethod
+    def poll(cls, context) -> bool:
+        return all(req.value(cls, context) for req in cls.poll_reqs)
 
-    def prefs(self, context: Context) -> Union[Mosplat_AP_Global, None]:
-        return check_prefs_safe(context)
+    def prefs(self, context: Context) -> Mosplat_AP_Global:
+        return check_addonpreferences(
+            context.preferences
+        )  # let real runtimeerror rise as we trust poll to guard this call
+
+    def props(self, context: Context) -> Mosplat_PG_Global:
+        return check_propertygroup(
+            context.scene
+        )  # let real runtimeerror rise as we trust poll to guard this call
 
     def draw(self, context: Context):
         if not (layout := self.layout):

@@ -5,6 +5,7 @@ from .base import MosplatPanelBase
 
 class Mosplat_PT_Preprocess(MosplatPanelBase):
     bl_idname = PanelIDEnum.PREPROCESS
+    bl_description = "Holds operations for preprocessing Mosplat data"
 
     bl_parent_id = PanelIDEnum.MAIN
 
