@@ -23,6 +23,12 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         subtype="DIR_PATH"
     )  # pyright: ignore[reportInvalidTypeForm]
 
+    @classmethod
+    def poll(cls, context) -> bool:
+        return (
+            super().poll(context) and not MosplatVGGTInterface._initialized
+        )  # prevent re-initialization
+
     def __init__(self, *args, **kwargs):
         """
         for modal operators, `__init__` is called before `invoke`

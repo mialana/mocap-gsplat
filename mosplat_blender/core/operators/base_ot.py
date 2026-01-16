@@ -38,6 +38,8 @@ class OperatorPollReqs(Enum):
 
 
 class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
+    bl_category = OperatorIDEnum._category()
+
     id_enum_type = OperatorIDEnum
     poll_reqs: ClassVar[Set[OperatorPollReqs]] = {
         OperatorPollReqs.PREFS,
@@ -49,16 +51,12 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
     def at_registration(cls):
         super().at_registration()
 
-        cls.bl_label = cls.bl_idname.replace(".", " ")
+        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type):
+            cls.bl_label = OperatorIDEnum.label_factory(cls.bl_idname)
 
     @classmethod
     def poll(cls, context) -> bool:
-        does_pass: bool = True
-        for r in OperatorPollReqs:
-            if r in cls.poll_reqs:
-                does_pass &= bool(r.value(cls, context))
-
-        return does_pass
+        return all(req.value(cls, context) for req in cls.poll_reqs)
 
     def prefs(self, context: Context) -> Mosplat_AP_Global:
         return check_addonpreferences(

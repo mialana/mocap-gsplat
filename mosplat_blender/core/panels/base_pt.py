@@ -14,7 +14,7 @@ from ..properties import Mosplat_PG_Global
 from ..preferences import Mosplat_AP_Global
 
 from ...infrastructure.mixins import MosplatBlTypeMixin
-from ...infrastructure.constants import PanelIDEnum, ADDON_PANEL_CATEGORY
+from ...infrastructure.constants import PanelIDEnum
 
 
 class PanelPollReqs(Enum):
@@ -29,7 +29,7 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
 
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = ADDON_PANEL_CATEGORY
+    bl_category = PanelIDEnum._category()
 
     poll_reqs: ClassVar[Set[PanelPollReqs]] = {
         PanelPollReqs.PREFS,

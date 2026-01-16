@@ -12,6 +12,7 @@ from bpy.props import (
     PointerProperty,
 )
 import os
+from pathlib import Path
 from ..interfaces import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
@@ -26,4 +27,10 @@ class Mosplat_PG_Global(PropertyGroup):
             ("2", "Texturify", "https://texturify.com/"),
             ("3", "BelderKit", "https://www.blenderkit.com/"),
         ],
+    )
+
+    current_image_dir: StringProperty(
+        description="Filepath to directory of images that is currently being processsed",
+        default=str(Path.home()),
+        subtype="DIR_PATH",
     )

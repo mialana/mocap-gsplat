@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Final
 from pathlib import Path
 from enum import StrEnum, auto
+from string import capwords
 
 _MISSING_: Any = object()  # sentinel variable
 
@@ -59,15 +60,33 @@ the name of the pointer to `Mosplat_PG_Global` that will be placed on the
 """
 ADDON_PROPERTIES_ATTRIBNAME: Final[str] = "mosplat_props"
 
-ADDON_PANEL_CATEGORY: Final[str] = "mosplat"
+ADDON_CATEGORY: Final[str] = "mosplat"
+OPERATOR_ID_PREFIX = f"{ADDON_CATEGORY}."
+PANEL_ID_PREFIX = f"{ADDON_CATEGORY.upper()}_PT_"
 
 """Enum Convenience Classes"""
 
 
 class OperatorIDEnum(StrEnum):
     @staticmethod
+    def _prefix():
+        return OPERATOR_ID_PREFIX
+
+    @staticmethod
+    def _category():
+        return ADDON_CATEGORY
+
+    @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"mosplat.{name.lower()}"
+        return f"{OPERATOR_ID_PREFIX}{name.lower()}"
+
+    @staticmethod
+    def label_factory(member: OperatorIDEnum):
+        """
+        creates the operator label from the id
+        keeping this here so this file can be a one-stop shop for metadata construction
+        """
+        return capwords(member.value.removeprefix(OPERATOR_ID_PREFIX).replace("_", " "))
 
     INITIALIZE_MODEL = auto()
     LOAD_IMAGES = auto()
@@ -75,8 +94,16 @@ class OperatorIDEnum(StrEnum):
 
 class PanelIDEnum(StrEnum):
     @staticmethod
+    def _prefix():
+        return PANEL_ID_PREFIX
+
+    @staticmethod
+    def _category():
+        return ADDON_CATEGORY
+
+    @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{ADDON_PANEL_CATEGORY.upper()}_PT_{name.lower()}"
+        return f"{PANEL_ID_PREFIX}{name.lower()}"
 
     @staticmethod
     def label_factory(member: PanelIDEnum):
@@ -84,7 +111,7 @@ class PanelIDEnum(StrEnum):
         creates the panel label from the id
         keeping this here so this file can be a one-stop shop for metadata construction
         """
-        return f"{member.value.replace('_PT_', ' ')} Panel"
+        return capwords(member.value.removeprefix(PANEL_ID_PREFIX).replace("_", " "))
 
     MAIN = auto()
     PREPROCESS = auto()

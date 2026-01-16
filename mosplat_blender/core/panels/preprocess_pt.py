@@ -15,7 +15,16 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
     def draw_with_layout(self, context, layout):
         column = layout.column()
-        # column.operator_context = "INVOKE_DEFAULT"  # all ops invoke before excecute
+
+        props = self.props(context)
 
         column.operator(OperatorIDEnum.INITIALIZE_MODEL)
-        column.operator(OperatorIDEnum.LOAD_IMAGES)
+
+        column.separator()
+
+        box = column.box()
+        box.label(text=OperatorIDEnum.label_factory(OperatorIDEnum.LOAD_IMAGES))
+        op_row = box.row()
+        op_row.operator(
+            OperatorIDEnum.LOAD_IMAGES, text=props.current_image_dir, icon="FILE_FOLDER"
+        )
