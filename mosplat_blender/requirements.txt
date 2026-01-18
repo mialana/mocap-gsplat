@@ -11,6 +11,8 @@ einops
 safetensors
 plyfile
 
+opencv-python
+
 # for vggt build deps
 setuptools
 wheel

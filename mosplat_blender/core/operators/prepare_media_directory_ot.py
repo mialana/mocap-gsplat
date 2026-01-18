@@ -1,5 +1,4 @@
-import bpy
-
+import cv2
 from pathlib import Path
 from typing import ClassVar, List
 
@@ -26,7 +25,7 @@ class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
         extension_set = prefs.media_extension_set
         pref_name = prefs.bl_rna.properties["media_extension_set"].name
         try:
-            cls._extensions = [ext.trim() for ext in extension_set.split(",")]
+            cls._extensions = [ext.strip() for ext in extension_set.split(",")]
         except IndexError:
             cls.poll_message_set(
                 f"Extensions in '{pref_name}' should be separated by commas."
@@ -39,7 +38,7 @@ class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
         prefs = self.prefs(context)
 
         media_dir = Path(props.current_media_dir)
-        extensions = [prefs.media_extension_set.split(".")]
+        extensions = prefs.media_extension_set.split(",")
 
         files = [p for p in media_dir.iterdir() if p.suffix.lower() in extensions]
 
@@ -57,8 +56,15 @@ class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
 
     @classmethod
     def _get_media_duration(cls, filepath: Path) -> int:
-        clip = bpy.data.movieclips.load(str(filepath), check_existing=False)
-        duration = clip.frame_duration
-        cls.logger().info(f"Found a media file of length '{duration}'.")
-        bpy.data.movieclips.remove(clip)
-        return duration
+        cap = cv2.VideoCapture(str(filepath))
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open media file: {filepath}")
+
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        cls.logger().debug(
+            f"Read video file '{filepath}' with the duration '{frame_count}' frames."
+        )
+        cap.release()
+
+        return frame_count

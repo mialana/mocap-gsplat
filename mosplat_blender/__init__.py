@@ -24,7 +24,9 @@ def clear_terminal():
 
 
 def register():
-    load_dotenv(Path(__file__).resolve().parent.joinpath(".env"), verbose=True)
+    load_dotenv(
+        Path(__file__).resolve().parent.joinpath(".production.env"), verbose=True
+    )
 
     # initialize handlers and local "root" logger
     MosplatLoggingInterface.init_once(__name__)
