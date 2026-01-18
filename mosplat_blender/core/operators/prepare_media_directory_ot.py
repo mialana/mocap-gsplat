@@ -56,15 +56,37 @@ class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
 
     @classmethod
     def _get_media_duration(cls, filepath: Path) -> int:
+        def _cleanup(method: str):
+            cap.release()
+            cls.logger().debug(
+                f"Read video file '{filepath}' with the duration '{frame_count}' frames ({method})."
+            )
+            return frame_count
+
         cap = cv2.VideoCapture(str(filepath))
         if not cap.isOpened():
             raise RuntimeError(f"Could not open media file: {filepath}")
 
+        cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # seek to end
+        duration_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+
+        if fps > 0 and duration_ms > 0:
+            frame_count = int(round((duration_ms / 1000.0) * fps))
+            if frame_count > 0:
+                return _cleanup("fps + duration metadata")
+
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if 0 < frame_count < 2**32 - 1:
+            return _cleanup("frame count metadata")
 
-        cls.logger().debug(
-            f"Read video file '{filepath}' with the duration '{frame_count}' frames."
-        )
-        cap.release()
+        cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 0.0)  # return seek to start
 
-        return frame_count
+        frame_count = 0
+        while True:
+            ret, _ = cap.read()
+            if not ret:
+                break
+            frame_count += 1
+
+        return _cleanup("manual")
