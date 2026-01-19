@@ -21,7 +21,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         column.separator()
 
         box = column.box()
-        box.row().label(text=props.bl_rna.properties["current_media_dir"].name)
+        box.row().label(text=props.get_prop_name("current_media_dir"))
         box.row().prop(props, "current_media_dir", text="")
         box.row().prop(props, "current_frame_range")
 

@@ -54,7 +54,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
             )
 
         max_frame_range = prefs.max_frame_range
-        max_frame_range_name = prefs.bl_rna.properties["max_frame_range"].name
+        max_frame_range_name = prefs.get_prop_name("max_frame_range")
         if max_frame_range != -1 and end - start > prefs.max_frame_range:
             cls._poll_error_msg_list.append(
                 f"For best results, set '{prop_name}' to less than '{max_frame_range}'.\n"
@@ -66,7 +66,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
     def _validate_preferences(cls, prefs: Mosplat_AP_Global):
         # validate the current selected script file preference
         target_pref = Path(prefs.preprocess_media_script_file)
-        target_pref_name = prefs.bl_rna.properties["preprocess_media_script_file"].name
+        target_pref_name = prefs.get_prop_name("preprocess_media_script_file")
 
         if not target_pref.is_file():
             cls._poll_error_msg_list.append(f"'{target_pref_name}' is an invalid file.")
@@ -79,7 +79,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
         # validate the data output dir preference
         if not prefs.data_output_dir:
             cls._poll_error_msg_list.append(
-                f"'{prefs.bl_rna.properties['data_output_path'].name}' is invalid."
+                f"'{prefs.get_prop_name('data_output_path')}' is invalid."
             )
 
         return

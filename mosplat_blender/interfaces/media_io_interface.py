@@ -99,3 +99,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
     @classmethod
     def extract_frame_range(cls, frame_range):
         pass
+
+    @classmethod
+    def check_frame_counts(cls):
+        pass

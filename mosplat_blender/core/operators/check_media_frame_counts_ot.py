@@ -24,7 +24,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         prefs = cls.prefs(context)
 
         extension_set_str: str = prefs.media_extension_set
-        pref_name = prefs.bl_rna.properties["media_extension_set"].name
+        pref_name = prefs.get_prop_name("media_extension_set")
         try:
             cls._extensions = [
                 ext.strip().lower() for ext in extension_set_str.split(",")
@@ -58,7 +58,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         if not files:
             return _on_failure(
                 f"No files found in the media directory with the preferred extensions: `{media_extension_set_str}`\n"
-                f"Configure '{prefs.bl_rna.properties['media_extension_set'].name}' if needed."
+                f"Configure '{prefs.get_prop_name('media_extension_set')}' if needed."
             )
 
         self.logger().info(
