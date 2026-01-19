@@ -100,3 +100,23 @@ class MosplatBlTypeMixin(MosplatLogClassMixin):
                 f"`{__name__}` defines `bl_idname` with incorrect type.\nExpected: {Type[id_enum_type]}, \nActual: {bl_idname}"
             )
         return True
+
+
+class MosplatAPAccessorMixin:
+    """a mixin class for any class that has access to global preferences"""
+
+    @staticmethod
+    def prefs(context):
+        from ..core.checks import check_addonpreferences
+
+        return check_addonpreferences(context.preferences)
+
+
+class MosplatPGAccessorMixin:
+    """a mixin class for any class that has access to global properties"""
+
+    @staticmethod
+    def props(context):
+        from ..core.checks import check_propertygroup
+
+        return check_propertygroup(context.scene)

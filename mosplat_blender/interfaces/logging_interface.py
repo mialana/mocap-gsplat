@@ -23,6 +23,7 @@ from ..infrastructure.decorators import run_once, no_instantiate
 
 
 @final
+@no_instantiate
 class MosplatLoggingInterface:
     stdout_log_handler: ClassVar[logging.StreamHandler | None] = None
     json_log_handler: ClassVar[logging.StreamHandler | None] = None

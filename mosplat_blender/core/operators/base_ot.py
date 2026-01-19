@@ -13,7 +13,11 @@ from ..checks import (
 )
 from ..properties import Mosplat_PG_Global
 from ..preferences import Mosplat_AP_Global
-from ...infrastructure.mixins import MosplatBlTypeMixin
+from ...infrastructure.mixins import (
+    MosplatBlTypeMixin,
+    MosplatPGAccessorMixin,
+    MosplatAPAccessorMixin,
+)
 from ...infrastructure.constants import OperatorIDEnum
 
 
@@ -37,7 +41,12 @@ class OperatorPollReqs(Enum):
     )
 
 
-class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
+class MosplatOperatorBase(
+    MosplatBlTypeMixin,
+    MosplatPGAccessorMixin,
+    MosplatAPAccessorMixin,
+    bpy.types.Operator,
+):
     bl_category = OperatorIDEnum._category()
 
     id_enum_type = OperatorIDEnum
@@ -61,18 +70,6 @@ class MosplatOperatorBase(MosplatBlTypeMixin, bpy.types.Operator):
             if cls.poll_reqs
             else True
         )
-
-    @staticmethod
-    def prefs(context: Context) -> Mosplat_AP_Global:
-        return check_addonpreferences(
-            context.preferences
-        )  # let real runtimeerror rise as we trust poll to guard this call
-
-    @staticmethod
-    def props(context: Context) -> Mosplat_PG_Global:
-        return check_propertygroup(
-            context.scene
-        )  # let real runtimeerror rise as we trust poll to guard this call
 
     @staticmethod
     def wm(context: Context) -> WindowManager:

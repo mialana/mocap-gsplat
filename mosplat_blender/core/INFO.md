@@ -12,7 +12,7 @@ Specifically, it implements these `bpy_struct` classes (`bpy_struct` is the base
 These types have a hierarchal class tree like so:
 
 ```txt
-log class mixin <- native Pythonic mixin class <- base class w/ mixin and blender inheritance <- instance class
+log class mixin <- native Pythonic mixin class <- base class w/ both mixins and blender inheritance <- instance class
 ```
 
 For more information about the implementation and usefulness of the mixin classes, see [mixins.py](../infrastructure/mixins.py).

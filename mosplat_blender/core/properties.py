@@ -15,7 +15,6 @@ from bpy.props import (
 from pathlib import Path
 
 from ..interfaces import MosplatLoggingInterface
-from .checks import check_media_frame_counts
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
@@ -31,7 +30,6 @@ class Mosplat_PG_Global(PropertyGroup):
         description="Filepath to directory containing media files to be processed.",
         default=str(Path.home()),
         subtype="DIR_PATH",
-        update=check_media_frame_counts,
     )
 
     current_frame_range: IntVectorProperty(

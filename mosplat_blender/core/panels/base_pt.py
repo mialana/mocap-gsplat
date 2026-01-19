@@ -13,7 +13,11 @@ from ..checks import (
 from ..properties import Mosplat_PG_Global
 from ..preferences import Mosplat_AP_Global
 
-from ...infrastructure.mixins import MosplatBlTypeMixin
+from ...infrastructure.mixins import (
+    MosplatBlTypeMixin,
+    MosplatPGAccessorMixin,
+    MosplatAPAccessorMixin,
+)
 from ...infrastructure.constants import PanelIDEnum
 
 
@@ -24,7 +28,9 @@ class PanelPollReqs(Enum):
     PROPS = partial(lambda cls, context: check_props_safe(context))
 
 
-class MosplatPanelBase(MosplatBlTypeMixin, Panel):
+class MosplatPanelBase(
+    MosplatBlTypeMixin, MosplatPGAccessorMixin, MosplatAPAccessorMixin, Panel
+):
     id_enum_type = PanelIDEnum
 
     bl_space_type = "VIEW_3D"
@@ -49,18 +55,6 @@ class MosplatPanelBase(MosplatBlTypeMixin, Panel):
             if cls.poll_reqs
             else True
         )
-
-    @staticmethod
-    def prefs(context: Context) -> Mosplat_AP_Global:
-        return check_addonpreferences(
-            context.preferences
-        )  # let real runtimeerror rise as we trust poll to guard this call
-
-    @staticmethod
-    def props(context: Context) -> Mosplat_PG_Global:
-        return check_propertygroup(
-            context.scene
-        )  # let real runtimeerror rise as we trust poll to guard this call
 
     def draw(self, context: Context):
         if not (layout := self.layout):

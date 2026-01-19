@@ -2,7 +2,7 @@
 provides the interface between the add-on and the VGGT model.
 """
 
-from typing import ClassVar, TYPE_CHECKING, TypeAlias
+from typing import ClassVar, TYPE_CHECKING, TypeAlias, final
 from pathlib import Path
 import gc
 
@@ -17,6 +17,7 @@ else:
     VGGTType: TypeAlias = object
 
 
+@final
 @no_instantiate
 class MosplatVGGTInterface(MosplatLogClassMixin):
     _model: ClassVar[VGGTType | None] = None
