@@ -15,13 +15,13 @@ from bpy.props import (
 from pathlib import Path
 
 from ..infrastructure.mixins import MosplatBlPropertyAccessorMixin
-from ..interfaces import MosplatLoggingInterface, MosplatMediaIOInterface
+from ..interfaces import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 
 def update_current_media_dir(props: Mosplat_PG_Global, _: Context):
-    MosplatMediaIOInterface.set_metadata_base_directory(Path(props.current_media_dir))
+    pass
 
 
 class Mosplat_PG_MediaItem(PropertyGroup):

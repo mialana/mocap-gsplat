@@ -1,6 +1,16 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import final, TYPE_CHECKING, ClassVar, Union, Set
-from dataclasses import dataclass, asdict
+from typing import (
+    final,
+    ClassVar,
+    Union,
+    TypeAlias,
+    List,
+    Generator,
+    Tuple,
+)
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 import json
 
@@ -8,41 +18,48 @@ from ..infrastructure.decorators import no_instantiate
 from ..infrastructure.mixins import MosplatLogClassMixin
 from ..infrastructure.constants import MOSPLAT_MEDIA_METADATA_FILENAME
 
-if TYPE_CHECKING:
-    from ..core.preferences import Mosplat_AP_Global
-    from ..core.properties import Mosplat_PG_Global
-else:
-    Mosplat_AP_Global: TypeAlias = Any
-    Mosplat_PG_Global: TypeAlias = Any
+StrPath: TypeAlias = Union[str, Path]
 
 
 @dataclass(frozen=True)
 class MosplatAppliedPreprocessScript:
-    date_last_applied: str = datetime.now().isoformat()
-    script_path: str = ""
+    script_path: str
+    date_last_applied: str
 
     @staticmethod
-    def now(script_path: str) -> "MosplatAppliedPreprocessScript":
+    def now(script_path: str) -> MosplatAppliedPreprocessScript:
         return MosplatAppliedPreprocessScript(
             script_path=script_path,
             date_last_applied=datetime.now().isoformat(),
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class MosplatProcessedFrameRange:
     start_frame: int
     end_frame: int
-    applied_preprocess_scripts: Set[MosplatAppliedPreprocessScript]
+    applied_preprocess_scripts: List[MosplatAppliedPreprocessScript] = field(
+        default_factory=list
+    )
+
+
+@dataclass
+class MediaProcessEvent:
+    filepath: Path
+    ok: bool = False
+    frame_count: int = -1
+    message: str = ""
 
 
 @dataclass
 class MosplatMediaMetadata:
-    base_directory: str = ""
+    base_directory: str
     is_valid: bool = False
     collective_frame_count: int = -1
-    media_files: Set[str] = set()
-    processed_frame_ranges: Set[MosplatProcessedFrameRange] = set()
+    media_files: List[str] = field(default_factory=list)
+    processed_frame_ranges: List[MosplatProcessedFrameRange] = field(
+        default_factory=list
+    )
 
     def toJSON(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -59,38 +76,91 @@ class MosplatMediaMetadata:
     def try_normalize_frame_ranges(self):
         """combine overlapping frame ranges if they have had the same preprocess scripts applied to them"""
 
+    def apply_media_event(self, event: MediaProcessEvent):
+        if not event.ok:
+            self.is_valid = False
+            return
+
+        if self.collective_frame_count == -1:
+            self.collective_frame_count = event.frame_count
+
+        self.media_files.append(str(event.filepath))
+
 
 @final
 @no_instantiate
 class MosplatMediaIOInterface(MosplatLogClassMixin):
-    metadata: ClassVar[Union[MosplatMediaMetadata, None]] = None
-    data_output_dir: ClassVar[Union[Path, None]] = None
+    initialized: ClassVar[bool] = False
 
     @classmethod
-    def set_data_output_dir(cls, path: Path):
-        cls.data_output_dir = path
+    def initialize(cls, base_directory: Path, data_output_dir: Path):
+        cls.metadata = MosplatMediaMetadata(base_directory=str(base_directory))
+        cls.data_output_dir = data_output_dir
         cls._find_or_create_metadata_json()
 
-    @classmethod
-    def set_metadata_base_directory(cls, dirpath: Path):
-        cls.metadata = MosplatMediaMetadata(base_directory=str(dirpath))
-        cls._find_or_create_metadata_json()
-
-    @classmethod
-    def set_metadata_media_files(cls, files: Set[str]):
-        if not cls.metadata:
-            raise RuntimeError(f"Not set: `{cls.metadata=}`")
-        cls.metadata.media_files = files
-
-    @classmethod
-    def _metadata_path(cls) -> Path:
-        if not cls.data_output_dir:
-            raise RuntimeError(f"Not set: `{cls.data_output_dir=}`")
-        return cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
+        cls.initialized = True
 
     @classmethod
     def _find_or_create_metadata_json(cls):
-        pass
+        json_filepath = cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
+
+    @classmethod
+    def process_media_file(
+        cls, filepath: Path
+    ) -> Generator[MediaProcessEvent, None, None]:
+        if not cls.initialized:
+            raise RuntimeError(f"`{cls.__qualname__}` not initialized.")
+
+        event = MediaProcessEvent(filepath=filepath)
+
+        try:
+            event.frame_count, event.message = cls._get_media_frame_count(filepath)
+            event.ok = True
+        except RuntimeError as e:
+            event.ok = False
+            event.message = str(e)
+
+        yield event
+
+    @staticmethod
+    def _get_media_frame_count(filepath: Path) -> Tuple[int, str]:
+        """use opencv to get the frame count of media"""
+        import cv2
+
+        def _cleanup(method: str):
+            cap.release()
+            return (
+                frame_count,
+                f"Read video file '{filepath}' with the duration '{frame_count}' frames ({method}).",
+            )
+
+        cap = cv2.VideoCapture(str(filepath))
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open media file: {filepath}")
+
+        cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # seek to end
+        duration_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+
+        if fps > 0 and duration_ms > 0:
+            frame_count = int(round((duration_ms / 1000.0) * fps))
+            if frame_count > 0:
+                return _cleanup("fps + duration metadata")
+
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if 0 < frame_count < 2**32 - 1:
+            return _cleanup("frame count metadata")
+
+        cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 0.0)  # return seek to start
+
+        frame_count = 0
+        while True:
+            ret, _ = cap.read()
+            if not ret:
+                break
+            frame_count += 1
+
+        return _cleanup("manual")
 
     @classmethod
     def apply_preprocess_script(cls, script_path: Path) -> bool:
@@ -98,8 +168,4 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
 
     @classmethod
     def extract_frame_range(cls, frame_range):
-        pass
-
-    @classmethod
-    def check_frame_counts(cls):
         pass

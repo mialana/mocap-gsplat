@@ -6,11 +6,16 @@ if they do successfuly pass though, they perform static casting so that
 we can operate with type-awareness in development.
 """
 
-from bpy.types import Preferences, Scene, Context
+from bpy.types import Preferences, Scene, Context, BlenderRNA
 
-from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn
+from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn, TypeGuard
+from pathlib import Path
 
-from ..infrastructure.constants import ADDON_PREFERENCES_ID, ADDON_PROPERTIES_ATTRIBNAME
+from ..infrastructure.constants import (
+    ADDON_PREFERENCES_ID,
+    ADDON_PROPERTIES_ATTRIBNAME,
+    _MISSING_,
+)
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -70,3 +75,18 @@ def check_prefs_safe(context: Context) -> Union[Mosplat_AP_Global, None]:
         return check_addonpreferences(context.preferences)
     except RuntimeError:
         return None  # log stack trace but do not raise
+
+
+def check_data_output_dir(context: Context) -> Union[Path, NoReturn]:
+    prefs = check_addonpreferences(context.preferences)
+    props = check_propertygroup(context.scene)  # let errors rise
+
+    output_path = Path(prefs.data_output_path)
+    if output_path.is_absolute():
+        return prefs.data_output_path
+    if not (media_dir_path := Path(props.current_media_dir)).is_dir():
+        raise AttributeError(
+            f"'{props.get_prop_name('media_dir_path')}' is not a valid directory."
+        )
+
+    return media_dir_path.joinpath(output_path)

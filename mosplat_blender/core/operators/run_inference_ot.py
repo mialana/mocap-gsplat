@@ -28,7 +28,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
         props = cls.props(context)
 
         cls._validate_frame_range(prefs, props)
-        cls._validate_preferences(prefs)
+        cls._validate_preprocess_media_script(prefs)
 
         cls.poll_message_set("\n".join(cls._poll_error_msg_list))
 
@@ -63,7 +63,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
         return
 
     @classmethod
-    def _validate_preferences(cls, prefs: Mosplat_AP_Global):
+    def _validate_preprocess_media_script(cls, prefs: Mosplat_AP_Global):
         # validate the current selected script file preference
         target_pref = Path(prefs.preprocess_media_script_file)
         target_pref_name = prefs.get_prop_name("preprocess_media_script_file")
@@ -74,12 +74,6 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
         if not target_pref.suffix == ".py":
             cls._poll_error_msg_list.append(
                 f"'{target_pref_name}' is not a Python script."
-            )
-
-        # validate the data output dir preference
-        if not prefs.data_output_dir:
-            cls._poll_error_msg_list.append(
-                f"'{prefs.get_prop_name('data_output_path')}' is invalid."
             )
 
         return
