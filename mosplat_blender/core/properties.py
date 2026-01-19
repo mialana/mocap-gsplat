@@ -14,9 +14,14 @@ from bpy.props import (
 
 from pathlib import Path
 
-from ..interfaces import MosplatLoggingInterface
+from ..infrastructure.mixins import MosplatBlPropertyAccessorMixin
+from ..interfaces import MosplatLoggingInterface, MosplatMediaIOInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
+
+
+def update_current_media_dir(props: Mosplat_PG_Global, _: Context):
+    MosplatMediaIOInterface.set_metadata_base_directory(Path(props.current_media_dir))
 
 
 class Mosplat_PG_MediaItem(PropertyGroup):
@@ -24,12 +29,13 @@ class Mosplat_PG_MediaItem(PropertyGroup):
     frame_count: IntProperty(name="Frame Count", default=-1)
 
 
-class Mosplat_PG_Global(PropertyGroup):
+class Mosplat_PG_Global(PropertyGroup, MosplatBlPropertyAccessorMixin):
     current_media_dir: StringProperty(
         name="Media Directory",
         description="Filepath to directory containing media files to be processed.",
         default=str(Path.home()),
         subtype="DIR_PATH",
+        update=update_current_media_dir,
     )
 
     current_frame_range: IntVectorProperty(

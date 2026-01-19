@@ -40,14 +40,6 @@ COLORED_FORMATTER_LEVEL_STYLES = {
     },
 }
 
-# path location of the shipped preprocess script
-DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE = str(
-    Path(__file__)
-    .resolve()
-    .parent.parent.joinpath("bin")
-    .joinpath("fix_mocap_video_rotations.py")
-)
-
 """
 this is the `bl_idname` that blender expects our `AddonPreferences` to have.
 i.e. even though our addon id is `mosplat_blender`, the id would be the evaluated
@@ -108,7 +100,7 @@ class OperatorIDEnum(StrEnum):
     INITIALIZE_MODEL = auto()
     RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
-    PREPARE_MEDIA_DIRECTORY = auto()
+    CHECK_MEDIA_FRAME_COUNTS = auto()
 
 
 class PanelIDEnum(StrEnum):
@@ -134,3 +126,14 @@ class PanelIDEnum(StrEnum):
 
     MAIN = auto()
     PREPROCESS = auto()
+
+
+# path location of the shipped preprocess script
+DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(
+    Path(__file__)
+    .resolve()
+    .parent.parent.joinpath("bin")
+    .joinpath("fix_mocap_video_rotations.py")
+)
+
+MOSPLAT_MEDIA_METADATA_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_metadata.json"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Type, TypeGuard, TypeVar, TypeAlias
+from typing import ClassVar, Type, TypeGuard, TypeVar, Any
 from enum import StrEnum
 import logging
 import inspect
@@ -120,3 +120,26 @@ class MosplatPGAccessorMixin:
         from ..core.checks import check_propertygroup
 
         return check_propertygroup(context.scene)
+
+
+class MosplatBlPropertyAccessorMixin:
+    """a mixin class for easier access to Blender properties' RNA"""
+
+    bl_rna = _MISSING_
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        from bpy.types import BlenderRNA
+
+        if cls.bl_rna is _MISSING_ or not isinstance(BlenderRNA, cls.bl_rna):
+            raise AttributeError(f"Subclasses should define the `bl_rna` attribute.")
+
+    @classmethod
+    def get_prop_name(cls, prop_attrname: str) -> str:
+        if not hasattr(cls, prop_attrname):
+            raise AttributeError(
+                f"Tried to get the bl_rna of non-existing property '{prop_attrname}'."
+            )
+        return cls.bl_rna.properties[prop_attrname].name

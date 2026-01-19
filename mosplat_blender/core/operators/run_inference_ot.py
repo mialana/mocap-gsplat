@@ -38,7 +38,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
 
         result = getattr(
             getattr(bpy.ops, OperatorIDEnum._category()),
-            OperatorIDEnum.basename_factory(OperatorIDEnum.PREPARE_MEDIA_DIRECTORY),
+            OperatorIDEnum.basename_factory(OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS),
         )()
 
         return result
@@ -46,7 +46,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
     @classmethod
     def _validate_frame_range(cls, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
         start, end = props.current_frame_range
-        prop_name = props.bl_rna.properties["current_frame_range"].name
+        prop_name = props.get_prop_name("current_frame_range")
 
         if start >= end:
             cls._poll_error_msg_list.append(

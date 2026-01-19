@@ -10,7 +10,7 @@ from typing import Union
 from .checks import check_props_safe
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
-from ..infrastructure.mixins import MosplatLogClassMixin
+from ..infrastructure.mixins import MosplatLogClassMixin, MosplatBlPropertyAccessorMixin
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_BASE_ID,
@@ -39,7 +39,9 @@ def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
         prefs.logger().info("JSON logging updated.")
 
 
-class Mosplat_AP_Global(AddonPreferences, MosplatLogClassMixin):
+class Mosplat_AP_Global(
+    AddonPreferences, MosplatLogClassMixin, MosplatBlPropertyAccessorMixin
+):
     bl_idname = ADDON_PREFERENCES_ID
 
     cache_dir: StringProperty(

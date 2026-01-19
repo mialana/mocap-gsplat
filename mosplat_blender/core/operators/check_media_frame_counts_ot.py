@@ -1,4 +1,3 @@
-import cv2
 from pathlib import Path
 from typing import ClassVar, List
 
@@ -7,9 +6,11 @@ from ...infrastructure.constants import OperatorIDEnum
 from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
 
 
-class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
-    bl_idname = OperatorIDEnum.PREPARE_MEDIA_DIRECTORY
-    bl_description = "Prepare media directory for inference."
+class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
+    bl_idname = OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS
+    bl_description = (
+        "Check frame counts of all media files found in given media directory."
+    )
 
     poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
 
@@ -22,10 +23,12 @@ class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
 
         prefs = cls.prefs(context)
 
-        extension_set = prefs.media_extension_set
+        extension_set_str: str = prefs.media_extension_set
         pref_name = prefs.bl_rna.properties["media_extension_set"].name
         try:
-            cls._extensions = [ext.strip() for ext in extension_set.split(",")]
+            cls._extensions = [
+                ext.strip().lower() for ext in extension_set_str.split(",")
+            ]
         except IndexError:
             cls.poll_message_set(
                 f"Extensions in '{pref_name}' should be separated by commas."
@@ -37,30 +40,61 @@ class Mosplat_OT_prepare_media_directory(MosplatOperatorBase):
         props = self.props(context)
         prefs = self.prefs(context)
 
-        media_dir = Path(props.current_media_dir)
-        extensions = prefs.media_extension_set.split(",")
+        def _on_failure(msg: str) -> OperatorReturnItemsSet:
+            props.do_media_durations_all_match = False
+            props.computed_media_frame_count = -1
+            self.logger().error(msg)
+            return {"CANCELLED"}
 
-        files = [p for p in media_dir.iterdir() if p.suffix.lower() in extensions]
+        props.found_media_files.clear()
+
+        media_dir_path = Path(props.current_media_dir)
+        media_extension_set_str: str = prefs.media_extension_set
+
+        extensions = [ext.strip().lower() for ext in media_extension_set_str.split(",")]
+
+        files = [p for p in media_dir_path.iterdir() if p.suffix.lower() in extensions]
 
         if not files:
-            self.logger().error("No media files found with the selected extensions.")
-            return {"CANCELLED"}
+            return _on_failure(
+                f"No files found in the media directory with the preferred extensions: `{media_extension_set_str}`\n"
+                f"Configure '{prefs.bl_rna.properties['media_extension_set'].name}' if needed."
+            )
 
-        duration = [self._get_media_duration(p) for p in files]
+        self.logger().info(
+            f"Reading frame counts of files within '{media_dir_path}'. This might take a while..."
+        )
 
-        if len(set(duration)) != 1:
-            self.logger().error("Media files should have the same length.")
-            return {"CANCELLED"}
+        frame_counts = [
+            self._get_media_duration(p, props.found_media_files) for p in files
+        ]
+
+        if len(set(frame_counts)) != 1:
+            return _on_failure(
+                f"Media files within '{media_dir_path}' should all have the same frame count."
+            )
+
+        props.do_media_durations_all_match = True
+        props.computed_media_frame_count = frame_counts[0]
+        self.logger().info(f"'{media_dir_path}' is a valid media directory.")
 
         return {"FINISHED"}
 
     @classmethod
-    def _get_media_duration(cls, filepath: Path) -> int:
+    def _get_media_duration(cls, filepath: Path, found_media_files) -> int:
+        import cv2
+
         def _cleanup(method: str):
             cap.release()
+
             cls.logger().debug(
                 f"Read video file '{filepath}' with the duration '{frame_count}' frames ({method})."
             )
+
+            media = found_media_files.add()
+            media.filepath = str(filepath)
+            media.frame_count = frame_count
+
             return frame_count
 
         cap = cv2.VideoCapture(str(filepath))
