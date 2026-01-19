@@ -10,7 +10,11 @@ from typing import Union
 from .checks import check_props_safe
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
-from ..infrastructure.mixins import MosplatLogClassMixin, MosplatBlPropertyAccessorMixin
+from ..infrastructure.mixins import (
+    MosplatLogClassMixin,
+    MosplatBlPropertyAccessorMixin,
+    MosplatPGAccessorMixin,
+)
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_BASE_ID,
@@ -40,7 +44,9 @@ def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
 
 
 class Mosplat_AP_Global(
-    AddonPreferences, MosplatLogClassMixin, MosplatBlPropertyAccessorMixin
+    AddonPreferences,
+    MosplatPGAccessorMixin,
+    MosplatBlPropertyAccessorMixin,
 ):
     bl_idname = ADDON_PREFERENCES_ID
 
@@ -69,8 +75,8 @@ class Mosplat_AP_Global(
         name="Data Output Path",
         description="Output directory for processed data generated from the selected media directory.\n"
         "Relative paths are resolved against the selected media directory.\n"
-        "The token {{media_directory_name}} will be replaced with the base name of the selected media directory.",
-        default=f"{os.curdir}{os.sep}{{{{media_directory_name}}}}_OUTPUT",
+        "The token {media_directory_name} will be replaced with the base name of the selected media directory.",
+        default=f"{os.curdir}{os.sep}{{media_directory_name}}_OUTPUT",
     )
 
     preprocess_media_script_file: StringProperty(
@@ -145,21 +151,12 @@ class Mosplat_AP_Global(
     def vggt_model_dir(self) -> Path:
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
 
-    def data_output_dir(self, context: Context) -> Union[Path, None]:
-        output_path = Path(self.data_output_path)
-        if output_path.is_absolute():
-            return self.data_output_path
-
-        props = check_props_safe(context)
-        if props and (media_dir_path := Path(props.current_media_dir)).is_dir():
-            return media_dir_path.joinpath(output_path)
-
-        return None
-
     def draw(self, _: Context):
         layout = self.layout
 
-        layout.label(text=f"{ADDON_SHORTNAME} Saved Preferences", icon="SETTINGS")
+        layout.label(
+            text=f"{ADDON_SHORTNAME.capitalize()} Saved Preferences", icon="SETTINGS"
+        )
 
         col = layout.column(align=True)
 

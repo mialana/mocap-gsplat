@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Type, TypeGuard, TypeVar, Any
+from typing import ClassVar, Type, TypeGuard, TypeVar
 from enum import StrEnum
 import logging
 import inspect
-
-from ..interfaces.logging_interface import MosplatLoggingInterface
 
 from .constants import _MISSING_
 
@@ -28,6 +26,8 @@ class MosplatLogClassMixin:
 
     @classmethod
     def _create_logger_for_class(cls):
+        from ..interfaces import MosplatLoggingInterface
+
         cls._logger = MosplatLoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{cls.__qualname__}"
         )
@@ -111,6 +111,12 @@ class MosplatAPAccessorMixin:
 
         return check_addonpreferences(context.preferences)
 
+    @staticmethod
+    def prefs_safe(context):
+        from ..core.checks import check_prefs_safe
+
+        return check_prefs_safe(context.scene)
+
 
 class MosplatPGAccessorMixin:
     """a mixin class for any class that has access to global properties"""
@@ -121,25 +127,24 @@ class MosplatPGAccessorMixin:
 
         return check_propertygroup(context.scene)
 
+    @staticmethod
+    def props_safe(context):
+        from ..core.checks import check_props_safe
 
-class MosplatBlPropertyAccessorMixin:
+        return check_props_safe(context.scene)
+
+
+class MosplatBlPropertyAccessorMixin(MosplatLogClassMixin):
     """a mixin class for easier access to Blender properties' RNA"""
 
     bl_rna = _MISSING_
 
     @classmethod
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        from bpy.types import BlenderRNA
-
-        if cls.bl_rna is _MISSING_ or not isinstance(BlenderRNA, cls.bl_rna):
-            raise AttributeError(f"Subclasses should define the `bl_rna` attribute.")
-
-    @classmethod
     def get_prop_name(cls, prop_attrname: str) -> str:
-        if not hasattr(cls, prop_attrname):
-            raise AttributeError(
-                f"Tried to get the bl_rna of non-existing property '{prop_attrname}'."
+        try:
+            return cls.bl_rna.properties[prop_attrname].name
+        except KeyError:
+            cls.logger().exception(
+                f"Tried to retrieve RNA of non-existing property '{prop_attrname}'."
             )
-        return cls.bl_rna.properties[prop_attrname].name
+            return f"KEY ERROR. Class: {cls.__qualname__}. Property: {prop_attrname}."  # make error visible and traceable
