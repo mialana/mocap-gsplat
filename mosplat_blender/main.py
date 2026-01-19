@@ -21,7 +21,11 @@ classes: Sequence[
         Type[core.Mosplat_PG_Global],
     ]
 ] = (
-    [core.Mosplat_PG_Global, core.Mosplat_AP_Global]
+    [
+        core.Mosplat_PG_MediaItem,  # needs to be registered before property groups that use it
+        core.Mosplat_PG_Global,
+        core.Mosplat_AP_Global,
+    ]
     + core.all_operators
     + core.all_panels
 )
@@ -38,11 +42,11 @@ def register_addon():
         except RuntimeError:
             logger.exception(f"Runtime exception during registration: `{c.__name__=}`")
 
-        setattr(
-            bpy.types.Scene,
-            ADDON_PROPERTIES_ATTRIBNAME,
-            bpy.props.PointerProperty(type=core.Mosplat_PG_Global),
-        )
+    setattr(
+        bpy.types.Scene,
+        ADDON_PROPERTIES_ATTRIBNAME,
+        bpy.props.PointerProperty(type=core.Mosplat_PG_Global),
+    )
 
     # do not catch thrown exceptions as we should not successfully register without addon preferences
     addon_preferences: core.Mosplat_AP_Global = check_addonpreferences(

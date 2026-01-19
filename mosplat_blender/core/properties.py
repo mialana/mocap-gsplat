@@ -13,13 +13,16 @@ from bpy.props import (
 )
 
 from pathlib import Path
+
 from ..interfaces import MosplatLoggingInterface
+from .checks import check_media_frame_counts
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 
-def check_media_durations(props: Mosplat_PG_Global, _: Context):
-    pass
+class Mosplat_PG_MediaItem(PropertyGroup):
+    filepath: StringProperty(name="Filepath", subtype="FILE_PATH")
+    frame_count: IntProperty(name="Frame Count", default=-1)
 
 
 class Mosplat_PG_Global(PropertyGroup):
@@ -28,7 +31,7 @@ class Mosplat_PG_Global(PropertyGroup):
         description="Filepath to directory containing media files to be processed.",
         default=str(Path.home()),
         subtype="DIR_PATH",
-        update=check_media_durations,
+        update=check_media_frame_counts,
     )
 
     current_frame_range: IntVectorProperty(
@@ -39,8 +42,18 @@ class Mosplat_PG_Global(PropertyGroup):
         min=0,
     )
 
+    computed_media_frame_count: IntProperty(
+        name="Computed Media Frame Count",
+        description="Shared frame count for media within the selected media directory.",
+        default=-1,
+    )
+
     do_media_durations_all_match: BoolProperty(
         name="Do Media Durations All Match",
         description="Tracks whether the found media in the current media directory all have matching durations.",
         default=False,
+    )
+
+    found_media_files: CollectionProperty(
+        name="Found Media Files", type=Mosplat_PG_MediaItem
     )
