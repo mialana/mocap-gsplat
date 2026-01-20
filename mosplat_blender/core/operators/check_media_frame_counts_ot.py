@@ -14,9 +14,9 @@ from ...interfaces.media_io_interface import (
 )
 
 if TYPE_CHECKING:
-    from ..properties import Mosplat_PG_MediaItem
+    from ..properties import Mosplat_PG_MediaProcessStatus
 else:
-    Mosplat_PG_MediaItem: TypeAlias = Any
+    Mosplat_PG_MediaProcessStatus: TypeAlias = Any
 
 
 class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
@@ -83,7 +83,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                 self._media_dir_path, self._data_output_dir
             )
 
-        self.props(context).found_media_files.clear()
+        self.props(context).media_process_statuses.clear()
 
         self._queue = Queue()
 
@@ -104,7 +104,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         for fp in self._files:
             for status in MosplatMediaIOInterface.process_media_file(fp):
                 self._queue.put(("status", status))
-                if not status.ok:
+                if not status.is_valid:
                     self._queue.put(("done", False))
                     return  # stop processing
         self._queue.put(("done", True))
@@ -124,11 +124,13 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
             if tag == "status":
                 status: MediaProcessStatus = payload
 
-                media: Mosplat_PG_MediaItem = props.found_media_files.add()
+                media: Mosplat_PG_MediaProcessStatus = (
+                    props.media_process_statuses.add()
+                )
                 media.filepath = str(status.filepath)
                 media.frame_count = status.frame_count
 
-                if status.ok:
+                if status.is_valid:
                     self.logger().info(status.message)
                 else:
                     self.logger().error(status.message)
@@ -142,7 +144,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                 if payload:
                     props.do_media_durations_all_match = True
                     props.collective_media_frame_count = (
-                        MosplatMediaIOInterface.metadata.collective_frame_count
+                        MosplatMediaIOInterface.metadata.collective_media_frame_count
                     )
                     self.logger().info(
                         f"Frame count of media files in '{self._media_dir_path}' all match."

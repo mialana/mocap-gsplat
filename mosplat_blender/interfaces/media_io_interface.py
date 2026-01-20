@@ -14,23 +14,23 @@ StrPath: TypeAlias = Union[str, Path]
 
 
 @dataclass(frozen=True)
-class MosplatAppliedPreprocessScript:
+class PreprocessScriptApplication:
     script_path: str
-    date_last_applied: str
+    application_time: float = -1.0
 
     @staticmethod
-    def now(script_path: str) -> MosplatAppliedPreprocessScript:
-        return MosplatAppliedPreprocessScript(
+    def now(script_path: str) -> PreprocessScriptApplication:
+        return PreprocessScriptApplication(
             script_path=script_path,
-            date_last_applied=datetime.now().isoformat(),
+            application_time=datetime.now().timestamp(),
         )
 
 
 @dataclass(frozen=True)
-class MosplatProcessedFrameRange:
+class ProcessedFrameRange:
     start_frame: int
     end_frame: int
-    applied_preprocess_scripts: List[MosplatAppliedPreprocessScript] = field(
+    applied_preprocess_scripts: List[PreprocessScriptApplication] = field(
         default_factory=list
     )
 
@@ -44,11 +44,11 @@ class MosplatProcessedFrameRange:
 @dataclass
 class MediaProcessStatus:
     filepath: str
-    ok: bool = False
+    is_valid: bool = False
     frame_count: int = -1
     message: str = ""
-    mtime: float = -1.0
-    size: int = -1
+    mod_time: float = -1.0
+    file_size: int = -1
 
     @classmethod
     def from_dict(cls, d):
@@ -58,14 +58,12 @@ class MediaProcessStatus:
 
 
 @dataclass
-class MosplatMediaMetadata:
+class MediaIOMetadata:
     base_directory: str
-    is_valid: bool = False
-    collective_frame_count: int = -1
-    media_statuses: List[MediaProcessStatus] = field(default_factory=list)
-    processed_frame_ranges: List[MosplatProcessedFrameRange] = field(
-        default_factory=list
-    )
+    do_media_durations_all_match: bool = False
+    collective_media_frame_count: int = -1
+    media_process_statuses: List[MediaProcessStatus] = field(default_factory=list)
+    processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)
 
     def to_JSON(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -83,11 +81,11 @@ class MosplatMediaMetadata:
                 self.__init__(**data)
 
                 # restore nested dataclasses that were converted to dictionary objects
-                self.media_statuses = [
-                    MediaProcessStatus.from_dict(s) for s in self.media_statuses
+                self.media_process_statuses = [
+                    MediaProcessStatus.from_dict(s) for s in self.media_process_statuses
                 ]
                 self.processed_frame_ranges = [
-                    MosplatProcessedFrameRange.from_dict(s)
+                    ProcessedFrameRange.from_dict(s)
                     for s in self.processed_frame_ranges
                 ]
                 return True
@@ -100,36 +98,36 @@ class MosplatMediaMetadata:
         """combine overlapping frame ranges if they have had the same preprocess scripts applied to them"""
 
     def handle_media_status(self, status: MediaProcessStatus):
-        if self.collective_frame_count == -1:
-            self.collective_frame_count = status.frame_count
+        if self.collective_media_frame_count == -1:
+            self.collective_media_frame_count = status.frame_count
 
-        if status.frame_count != self.collective_frame_count:
-            status.ok = False
-            status.message = f"Found frame count '{status.frame_count}' for '{status.filepath}' but it does not match the collective frame count of '{self.collective_frame_count}'."
+        if status.frame_count != self.collective_media_frame_count:
+            status.is_valid = False
+            status.message = f"Found frame count '{status.frame_count}' for '{status.filepath}' but it does not match the collective frame count of '{self.collective_media_frame_count}'."
 
-            self.is_valid = False
+            self.do_media_durations_all_match = False
         else:
-            status.ok = True
-            self.is_valid = True
+            status.is_valid = True
+            self.do_media_durations_all_match = True
 
-        for idx, s in enumerate(self.media_statuses):
+        for idx, s in enumerate(self.media_process_statuses):
             if s.filepath == status.filepath:
-                self.media_statuses.pop(idx)
+                self.media_process_statuses.pop(idx)
 
-        self.media_statuses.append(status)
+        self.media_process_statuses.append(status)
 
     def get_cached_media_status(
         self, filepath: Path
     ) -> Union[MediaProcessStatus, None]:
         fp = str(filepath)
-        for status in self.media_statuses:
+        for status in self.media_process_statuses:
             if status.filepath == fp:
                 stat = filepath.stat()
                 if (
-                    status.ok
+                    status.is_valid
                     and status.frame_count > 0
-                    and status.mtime == stat.st_mtime
-                    and status.size == stat.st_size
+                    and status.mod_time == stat.st_mtime
+                    and status.file_size == stat.st_size
                 ):  # ensure the cached status is still valid
                     status.message = f"Loaded cached status video file '{status.filepath}' with the frame count '{status.frame_count}'."
                     return status
@@ -143,7 +141,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
 
     @classmethod
     def initialize(cls, base_directory: Path, data_output_dir: Path):
-        cls.metadata = MosplatMediaMetadata(base_directory=str(base_directory))
+        cls.metadata = MediaIOMetadata(base_directory=str(base_directory))
         cls.data_output_dir = data_output_dir
         json_filepath = cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
 
@@ -177,12 +175,12 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
                     filepath
                 )
                 stat = filepath.stat()
-                status.mtime = stat.st_mtime
-                status.size = stat.st_size
+                status.mod_time = stat.st_mtime
+                status.file_size = stat.st_size
                 cls.metadata.handle_media_status(status)
             except RuntimeError as e:
                 status.message = str(e)
-                status.ok = False
+                status.is_valid = False
 
         yield status
 
