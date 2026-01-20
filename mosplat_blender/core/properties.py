@@ -46,6 +46,36 @@ class Mosplat_PG_ProcessedFrameRange(PropertyGroup):
     )
 
 
+class Mosplat_PG_MediaIOMetadata(PropertyGroup):
+    base_directory: StringProperty(
+        name="Base Directory",
+        description="Filepath to directory containing media files being processed.",
+        default=str(Path.home()),
+        subtype="DIR_PATH",
+        update=update_current_media_dir,
+    )
+
+    do_media_durations_all_match: BoolProperty(
+        name="Do Media Durations All Match",
+        description="Tracks whether the found media in the current media directory all have matching durations.",
+        default=False,
+    )
+
+    collective_media_frame_count: IntProperty(
+        name="Collective Media Frame Count",
+        description="Shared frame count for media within the selected media directory.",
+        default=-1,
+    )
+
+    media_process_statuses: CollectionProperty(
+        name="Found Media Files", type=Mosplat_PG_MediaProcessStatus
+    )
+
+    processed_frame_ranges: CollectionProperty(
+        name="Processed Frame Ranges", type=Mosplat_PG_ProcessedFrameRange
+    )
+
+
 class Mosplat_PG_Global(PropertyGroup, MosplatBlPropertyAccessorMixin):
     current_media_dir: StringProperty(
         name="Media Directory",
