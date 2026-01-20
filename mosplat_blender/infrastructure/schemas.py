@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, cast
+from typing import Dict, List, cast, Tuple
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import json
@@ -10,7 +10,7 @@ import json
 @dataclass(frozen=True)
 class PreprocessScriptApplication:
     script_path: str
-    application_time: float = -1.0
+    application_time: float
 
     @staticmethod
     def now(script_path: str) -> PreprocessScriptApplication:
@@ -98,3 +98,12 @@ class MediaIOMetadata:
                 src_path.unlink()  # delete the corrupted JSON
 
         return False
+
+
+@dataclass
+class GlobalData:
+    current_media_dir: str = str(Path.home())
+    current_frame_range: Tuple[int, int] = field(default_factory=tuple[0, 6])
+    current_media_io_metadata: MediaIOMetadata = field(
+        default_factory=lambda: MediaIOMetadata(base_directory=str(Path.home()))
+    )

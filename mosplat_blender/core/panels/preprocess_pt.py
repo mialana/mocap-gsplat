@@ -17,7 +17,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
     bl_parent_id = PanelIDEnum.MAIN
 
-    poll_reqs = {PanelPollReqs.PROPS}
+    __poll_reqs__ = {PanelPollReqs.PROPS}
 
     def draw_with_layout(self, context, layout):
         column = layout.column()
@@ -32,11 +32,13 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         box.row().label(text=props.get_prop_name("current_media_dir"))
         box.row().prop(props, "current_media_dir", text="")
 
-        if props.media_process_statuses:
+        if props.current_media_io_metadata.media_process_statuses:
             media_box = box.box()
             media_box.label(text=props.get_prop_name("media_statuses"))
-            media_box.alert = not props.do_media_durations_all_match
-            for item in props.media_process_statuses:
+            media_box.alert = (
+                not props.current_media_io_metadata.do_media_durations_all_match
+            )
+            for item in props.current_media_io_metadata.media_process_statuses:
                 media: Mosplat_PG_MediaProcessStatus = item
                 item_basename = Path(media.filepath).name
                 row = media_box.row()

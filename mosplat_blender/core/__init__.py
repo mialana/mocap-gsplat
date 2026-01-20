@@ -6,7 +6,26 @@ for addon registration.
 This is opposed to `infrastructure`, where `__init__.py` is empty, and individual modules files should be imported as needed.
 """
 
-from .properties import Mosplat_PG_MediaProcessStatus, Mosplat_PG_Global
+from bpy.types import PropertyGroup
+from typing import List, Type, Union
+
+from .properties import (
+    MosplatPropertyGroupBase,
+    Mosplat_PG_PreprocessScriptApplication,
+    Mosplat_PG_ProcessedFrameRange,
+    Mosplat_PG_MediaProcessStatus,
+    Mosplat_PG_MediaIOMetadata,
+    Mosplat_PG_Global,
+)
 from .preferences import Mosplat_AP_Global
 from .operators import MosplatOperatorBase, all_operators
 from .panels import MosplatPanelBase, all_panels
+
+# property groups need to be registered in a bottom-to-top "owning" class order
+all_properties: List[Type[MosplatPropertyGroupBase]] = [
+    Mosplat_PG_PreprocessScriptApplication,
+    Mosplat_PG_ProcessedFrameRange,
+    Mosplat_PG_MediaProcessStatus,
+    Mosplat_PG_MediaIOMetadata,
+    Mosplat_PG_Global,
+]

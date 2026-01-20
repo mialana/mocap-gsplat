@@ -18,7 +18,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         f"Install VGGT model weights from Hugging Face or load from cache if available."
     )
 
-    poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
+    __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
 
     vggt_hf_id: StringProperty()  # pyright: ignore[reportInvalidTypeForm]
     vggt_outdir = StringProperty(

@@ -12,7 +12,7 @@ class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
         f"Quick navigation to {ADDON_HUMAN_READABLE} saved addon preferences."
     )
 
-    poll_reqs = {OperatorPollReqs.WINDOW_MANAGER}
+    __poll_reqs__ = {OperatorPollReqs.WINDOW_MANAGER}
 
     def execute(self, context) -> OperatorReturnItemsSet:
         bpy.ops.screen.userpref_show()
