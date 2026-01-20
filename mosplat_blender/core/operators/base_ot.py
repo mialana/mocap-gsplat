@@ -47,8 +47,8 @@ class MosplatOperatorBase(
 ):
     bl_category = OperatorIDEnum._category()
 
-    id_enum_type = OperatorIDEnum
-    poll_reqs: ClassVar[Union[Set[OperatorPollReqs], None]] = {
+    __id_enum_type__ = OperatorIDEnum
+    __poll_reqs__: ClassVar[Union[Set[OperatorPollReqs], None]] = {
         OperatorPollReqs.PREFS,
         OperatorPollReqs.PROPS,
         OperatorPollReqs.WINDOW_MANAGER,
@@ -58,14 +58,14 @@ class MosplatOperatorBase(
     def at_registration(cls):
         super().at_registration()
 
-        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type):
+        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.__id_enum_type__):
             cls.bl_label = OperatorIDEnum.label_factory(cls.bl_idname)
 
     @classmethod
     def poll(cls, context) -> bool:
         return (
-            all(req.value(cls, context) for req in cls.poll_reqs)
-            if cls.poll_reqs
+            all(req.value(cls, context) for req in cls.__poll_reqs__)
+            if cls.__poll_reqs__
             else True
         )
 

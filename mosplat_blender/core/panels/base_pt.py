@@ -31,13 +31,13 @@ class PanelPollReqs(Enum):
 class MosplatPanelBase(
     MosplatBlTypeMixin, MosplatPGAccessorMixin, MosplatAPAccessorMixin, Panel
 ):
-    id_enum_type = PanelIDEnum
+    __id_enum_type__ = PanelIDEnum
 
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = PanelIDEnum._category()
 
-    poll_reqs: ClassVar[Union[Set[PanelPollReqs], None]] = {
+    __poll_reqs__: ClassVar[Union[Set[PanelPollReqs], None]] = {
         PanelPollReqs.PREFS,
         PanelPollReqs.PROPS,
     }
@@ -45,14 +45,14 @@ class MosplatPanelBase(
     @classmethod
     def at_registration(cls):
         super().at_registration()
-        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.id_enum_type):
+        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.__id_enum_type__):
             cls.bl_label = PanelIDEnum.label_factory(cls.bl_idname)
 
     @classmethod
     def poll(cls, context) -> bool:
         return (
-            all(req.value(cls, context) for req in cls.poll_reqs)
-            if cls.poll_reqs
+            all(req.value(cls, context) for req in cls.__poll_reqs__)
+            if cls.__poll_reqs__
             else True
         )
 

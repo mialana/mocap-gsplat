@@ -25,7 +25,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         "Check frame counts of all media files found in given media directory."
     )
 
-    poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
+    __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
 
     _extensions: ClassVar[Set[str]]
 
@@ -125,7 +125,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                 status: MediaProcessStatus = payload
 
                 media: Mosplat_PG_MediaProcessStatus = (
-                    props.media_process_statuses.add()
+                    props.current_media_io_metadata.media_process_statuses.add()
                 )
                 media.filepath = str(status.filepath)
                 media.frame_count = status.frame_count
@@ -142,8 +142,8 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                 self._cleanup(context)
                 MosplatMediaIOInterface.update_metadata_json()
                 if payload:
-                    props.do_media_durations_all_match = True
-                    props.collective_media_frame_count = (
+                    props.current_media_io_metadata.do_media_durations_all_match = True
+                    props.current_media_io_metadata.collective_media_frame_count = (
                         MosplatMediaIOInterface.metadata.collective_media_frame_count
                     )
                     self.logger().info(
@@ -151,8 +151,8 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                     )
                     return {"FINISHED"}
                 else:
-                    props.do_media_durations_all_match = False
-                    props.collective_media_frame_count = -1
+                    props.current_media_io_metadata.do_media_durations_all_match = False
+                    props.current_media_io_metadata.collective_media_frame_count = -1
                     self.logger().warning(
                         f"'{self._media_dir_path}' contains media files of different frame counts."
                     )

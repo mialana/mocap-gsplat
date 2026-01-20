@@ -13,7 +13,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
     bl_idname = OperatorIDEnum.RUN_INFERENCE
     bl_description = "Run inference on selected media directory."
 
-    poll_reqs = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
+    __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
 
     _poll_error_msg_list: ClassVar[List[str]] = []
 
