@@ -27,9 +27,7 @@ class ProcessedFrameRange:
     )
 
     @classmethod
-    def from_dict(cls, d):
-        if not isinstance(d, Dict):
-            raise TypeError("Use this method with dictionary objects.")
+    def from_dict(cls, d: Dict):
         return cls(**d)
 
 
@@ -43,9 +41,7 @@ class MediaProcessStatus:
     file_size: int = -1
 
     @classmethod
-    def from_dict(cls, d):
-        if not isinstance(d, Dict):
-            raise TypeError("Use this method with dictionary objects.")
+    def from_dict(cls, d: Dict):
         return cls(**d)
 
 
@@ -56,3 +52,10 @@ class MediaIOMetadata:
     collective_media_frame_count: int = -1
     media_process_statuses: List[MediaProcessStatus] = field(default_factory=list)
     processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: Dict):
+        instance = cls(**d)
+        instance.media_process_statuses = [
+            MediaProcessStatus.from_dict(m) for m in instance.media_process_statuses
+        ]
