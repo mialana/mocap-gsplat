@@ -1,12 +1,22 @@
 from pathlib import Path
-from typing import ClassVar, Set, List
+from typing import ClassVar, Set, Iterable, TYPE_CHECKING, TypeAlias, Any
 
+import threading
+from queue import Queue
 
 from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
 from ..checks import check_data_output_dir
 
 from ...infrastructure.constants import OperatorIDEnum
-from ...interfaces import MosplatMediaIOInterface
+from ...interfaces.media_io_interface import (
+    MosplatMediaIOInterface,
+    MediaProcessStatus,
+)
+
+if TYPE_CHECKING:
+    from ..properties import Mosplat_PG_MediaItem
+else:
+    Mosplat_PG_MediaItem: TypeAlias = Any
 
 
 class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
@@ -22,7 +32,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
     _media_dir_path: ClassVar[Path]
     _data_output_dir: ClassVar[Path]
 
-    _files: ClassVar[List[Path]]
+    _files: ClassVar[Iterable[Path]]
 
     @classmethod
     def poll(cls, context) -> bool:
@@ -48,7 +58,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
 
         # validate the data output dir preference
         try:
-            cls._media_dir_path = check_data_output_dir(context)
+            cls._data_output_dir = check_data_output_dir(context)
         except AttributeError as e:
             cls.poll_message_set(str(e))
             return False
@@ -68,42 +78,82 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         return True
 
     def execute(self, context) -> OperatorReturnItemsSet:
-        props = self.props(context)
-        prefs = self.prefs(context)
-
-        def _on_failure(msg: str) -> OperatorReturnItemsSet:
-            props.do_media_durations_all_match = False
-            props.computed_media_frame_count = -1
-            self.logger().error(msg)
-            return {"CANCELLED"}
-
-        props.found_media_files.clear()
-
-        self.logger().info(
-            f"Reading frame counts of files within '{self._media_dir_path}'. This might take a while..."
-        )
-
         if not MosplatMediaIOInterface.initialized:
             MosplatMediaIOInterface.initialize(
                 self._media_dir_path, self._data_output_dir
             )
 
-        frame_counts = []
+        self.props(context).found_media_files.clear()
 
-        # media = found_media_files.add()
-        # media.filepath = str(filepath)
-        # media.frame_count = frame_count
-        #             cls.logger().debug(
-        #     f"Read video file '{filepath}' with the duration '{frame_count}' frames ({method})."
-        # )
+        self._queue = Queue()
 
-        if len(set(frame_counts)) != 1:
-            return _on_failure(
-                f"Media files within '{self._media_dir_path}' should all have the same frame count."
-            )
+        self._thread = threading.Thread(target=self._process_files_thread, daemon=True)
+        self._thread.start()
 
-        props.do_media_durations_all_match = True
-        props.computed_media_frame_count = frame_counts[0]
-        self.logger().info(f"'{self._media_dir_path}' is a valid media directory.")
+        self._timer = self.wm(context).event_timer_add(
+            time_step=0.1, window=context.window
+        )
+        self.wm(context).modal_handler_add(self)  # start timer polling here
 
-        return {"FINISHED"}
+        return {"RUNNING_MODAL"}
+
+    def _process_files_thread(self):
+        self.logger().info(
+            f"Reading frame counts of files within '{self._media_dir_path}'. This might take a while..."
+        )
+        for fp in self._files:
+            for status in MosplatMediaIOInterface.process_media_file(fp):
+                self._queue.put(("status", status))
+                if not status.ok:
+                    self._queue.put(("done", False))
+                    return  # stop processing
+        self._queue.put(("done", True))
+
+    def modal(self, context, event) -> OperatorReturnItemsSet:
+        if event.type in {"RIGHTMOUSE", "ESC"}:
+            self._cleanup(context)
+            return {"CANCELLED"}
+        elif event.type != "TIMER":
+            return {"PASS_THROUGH"}
+
+        props = self.props(context)
+
+        while not self._queue.empty():
+            tag, payload = self._queue.get_nowait()
+
+            if tag == "status":
+                status: MediaProcessStatus = payload
+
+                media: Mosplat_PG_MediaItem = props.found_media_files.add()
+                media.filepath = str(status.filepath)
+                media.frame_count = status.frame_count
+
+                if status.ok:
+                    self.logger().info(status.message)
+                else:
+                    self.logger().error(status.message)
+
+                if context.area:
+                    context.area.tag_redraw()
+
+            elif tag == "done":
+                self._cleanup(context)
+                MosplatMediaIOInterface.update_metadata_json()
+                if payload:
+                    props.do_media_durations_all_match = True
+                    props.collective_media_frame_count = (
+                        MosplatMediaIOInterface.metadata.collective_frame_count
+                    )
+                    self.logger().info(
+                        f"Frame count of media files in '{self._media_dir_path}' all match."
+                    )
+                    return {"FINISHED"}
+                else:
+                    props.do_media_durations_all_match = False
+                    props.collective_media_frame_count = -1
+                    self.logger().warning(
+                        f"'{self._media_dir_path}' contains media files of different frame counts."
+                    )
+                    return {"CANCELLED"}
+
+        return {"RUNNING_MODAL", "PASS_THROUGH"}

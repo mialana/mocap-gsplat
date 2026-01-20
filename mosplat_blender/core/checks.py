@@ -6,16 +6,12 @@ if they do successfuly pass though, they perform static casting so that
 we can operate with type-awareness in development.
 """
 
-from bpy.types import Preferences, Scene, Context, BlenderRNA
+from bpy.types import Preferences, Scene, Context
 
-from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn, TypeGuard
+from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn
 from pathlib import Path
 
-from ..infrastructure.constants import (
-    ADDON_PREFERENCES_ID,
-    ADDON_PROPERTIES_ATTRIBNAME,
-    _MISSING_,
-)
+from ..infrastructure.constants import ADDON_PREFERENCES_ID, ADDON_PROPERTIES_ATTRIBNAME
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -81,12 +77,17 @@ def check_data_output_dir(context: Context) -> Union[Path, NoReturn]:
     prefs = check_addonpreferences(context.preferences)
     props = check_propertygroup(context.scene)  # let errors rise
 
-    output_path = Path(prefs.data_output_path)
-    if output_path.is_absolute():
-        return prefs.data_output_path
     if not (media_dir_path := Path(props.current_media_dir)).is_dir():
         raise AttributeError(
             f"'{props.get_prop_name('media_dir_path')}' is not a valid directory."
         )
 
-    return media_dir_path.joinpath(output_path)
+    media_directory_name = media_dir_path.name
+
+    formatted_output_path = Path(
+        str(prefs.data_output_path).format(media_directory_name=media_directory_name)
+    )
+    if formatted_output_path.is_absolute():
+        return formatted_output_path
+    else:
+        return media_dir_path.joinpath(formatted_output_path)

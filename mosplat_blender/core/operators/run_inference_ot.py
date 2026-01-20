@@ -35,13 +35,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
         return not cls._poll_error_msg_list
 
     def execute(self, context) -> OperatorReturnItemsSet:
-
-        result = getattr(
-            getattr(bpy.ops, OperatorIDEnum._category()),
-            OperatorIDEnum.basename_factory(OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS),
-        )()
-
-        return result
+        return {"FINISHED"}
 
     @classmethod
     def _validate_frame_range(cls, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):

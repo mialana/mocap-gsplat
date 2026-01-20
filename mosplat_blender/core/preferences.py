@@ -75,8 +75,8 @@ class Mosplat_AP_Global(
         name="Data Output Path",
         description="Output directory for processed data generated from the selected media directory.\n"
         "Relative paths are resolved against the selected media directory.\n"
-        "The token {{media_directory_name}} will be replaced with the base name of the selected media directory.",
-        default=f"{os.curdir}{os.sep}{{{{media_directory_name}}}}_OUTPUT",
+        "The token {media_directory_name} will be replaced with the base name of the selected media directory.",
+        default=f"{os.curdir}{os.sep}{{media_directory_name}}_OUTPUT",
     )
 
     preprocess_media_script_file: StringProperty(
@@ -154,7 +154,9 @@ class Mosplat_AP_Global(
     def draw(self, _: Context):
         layout = self.layout
 
-        layout.label(text=f"{ADDON_SHORTNAME} Saved Preferences", icon="SETTINGS")
+        layout.label(
+            text=f"{ADDON_SHORTNAME.capitalize()} Saved Preferences", icon="SETTINGS"
+        )
 
         col = layout.column(align=True)
 

@@ -1,6 +1,14 @@
+from pathlib import Path
+from typing import TYPE_CHECKING, TypeAlias, Any
+
 from ...infrastructure.constants import OperatorIDEnum, PanelIDEnum
 
 from .base_pt import MosplatPanelBase, PanelPollReqs
+
+if TYPE_CHECKING:
+    from ..properties import Mosplat_PG_MediaItem
+else:
+    Mosplat_PG_MediaItem: TypeAlias = Any
 
 
 class Mosplat_PT_Preprocess(MosplatPanelBase):
@@ -23,6 +31,20 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         box = column.box()
         box.row().label(text=props.get_prop_name("current_media_dir"))
         box.row().prop(props, "current_media_dir", text="")
+
+        if props.found_media_files:
+            media_box = box.box()
+            media_box.label(text=props.get_prop_name("found_media_files"))
+            media_box.alert = not props.do_media_durations_all_match
+            for item in props.found_media_files:
+                media: Mosplat_PG_MediaItem = item
+                item_basename = Path(media.filepath).name
+                row = media_box.row()
+                row.label(text=item_basename, icon="FILE_MOVIE")
+                sub = row.row()
+                sub.alignment = "RIGHT"
+                sub.label(text=str(media.frame_count))
+
         box.row().prop(props, "current_frame_range")
 
         column.row().operator(OperatorIDEnum.RUN_INFERENCE)

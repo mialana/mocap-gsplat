@@ -1,15 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import (
-    final,
-    ClassVar,
-    Union,
-    TypeAlias,
-    List,
-    Generator,
-    Tuple,
-)
+from typing import final, ClassVar, Union, TypeAlias, List, Generator, Tuple, Dict
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 import json
@@ -42,13 +34,27 @@ class MosplatProcessedFrameRange:
         default_factory=list
     )
 
+    @classmethod
+    def from_dict(cls, d):
+        if not isinstance(d, Dict):
+            raise TypeError("Use this method with dictionary objects.")
+        return cls(**d)
+
 
 @dataclass
-class MediaProcessEvent:
-    filepath: Path
+class MediaProcessStatus:
+    filepath: str
     ok: bool = False
     frame_count: int = -1
     message: str = ""
+    mtime: float = -1.0
+    size: int = -1
+
+    @classmethod
+    def from_dict(cls, d):
+        if not isinstance(d, Dict):
+            raise TypeError("Use this method with dictionary objects.")
+        return cls(**d)
 
 
 @dataclass
@@ -56,35 +62,78 @@ class MosplatMediaMetadata:
     base_directory: str
     is_valid: bool = False
     collective_frame_count: int = -1
-    media_files: List[str] = field(default_factory=list)
+    media_statuses: List[MediaProcessStatus] = field(default_factory=list)
     processed_frame_ranges: List[MosplatProcessedFrameRange] = field(
         default_factory=list
     )
 
-    def toJSON(self, path: Path):
+    def to_JSON(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         as_dict = asdict(self)
 
         with path.open("w", encoding="utf-8") as f:
             json.dump(as_dict, f, sort_keys=True, indent=4)
 
-    def fromJSON(self, path: Path):
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.__init__(**data)
+    def from_JSON(self, path: Path) -> bool:
+        if path.exists():
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    data: Dict = json.load(f)
+
+                self.__init__(**data)
+
+                # restore nested dataclasses that were converted to dictionary objects
+                self.media_statuses = [
+                    MediaProcessStatus.from_dict(s) for s in self.media_statuses
+                ]
+                self.processed_frame_ranges = [
+                    MosplatProcessedFrameRange.from_dict(s)
+                    for s in self.processed_frame_ranges
+                ]
+                return True
+            except (TypeError, json.JSONDecodeError):
+                path.unlink()  # delete the corrupted JSON
+
+        return False
 
     def try_normalize_frame_ranges(self):
         """combine overlapping frame ranges if they have had the same preprocess scripts applied to them"""
 
-    def apply_media_event(self, event: MediaProcessEvent):
-        if not event.ok:
-            self.is_valid = False
-            return
-
+    def handle_media_status(self, status: MediaProcessStatus):
         if self.collective_frame_count == -1:
-            self.collective_frame_count = event.frame_count
+            self.collective_frame_count = status.frame_count
 
-        self.media_files.append(str(event.filepath))
+        if status.frame_count != self.collective_frame_count:
+            status.ok = False
+            status.message = f"Found frame count '{status.frame_count}' for '{status.filepath}' but it does not match the collective frame count of '{self.collective_frame_count}'."
+
+            self.is_valid = False
+        else:
+            status.ok = True
+            self.is_valid = True
+
+        for idx, s in enumerate(self.media_statuses):
+            if s.filepath == status.filepath:
+                self.media_statuses.pop(idx)
+
+        self.media_statuses.append(status)
+
+    def get_cached_media_status(
+        self, filepath: Path
+    ) -> Union[MediaProcessStatus, None]:
+        fp = str(filepath)
+        for status in self.media_statuses:
+            if status.filepath == fp:
+                stat = filepath.stat()
+                if (
+                    status.ok
+                    and status.frame_count > 0
+                    and status.mtime == stat.st_mtime
+                    and status.size == stat.st_size
+                ):  # ensure the cached status is still valid
+                    status.message = f"Loaded cached status video file '{status.filepath}' with the frame count '{status.frame_count}'."
+                    return status
+        return None
 
 
 @final
@@ -96,31 +145,46 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
     def initialize(cls, base_directory: Path, data_output_dir: Path):
         cls.metadata = MosplatMediaMetadata(base_directory=str(base_directory))
         cls.data_output_dir = data_output_dir
-        cls._find_or_create_metadata_json()
+        json_filepath = cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
+
+        if cls.metadata.from_JSON(json_filepath):
+            cls.logger().info(f"Loaded existing metadata frm '{json_filepath}'.")
 
         cls.initialized = True
 
     @classmethod
-    def _find_or_create_metadata_json(cls):
+    def update_metadata_json(cls):
+        if not cls.initialized:
+            raise RuntimeError(f"`{cls.__qualname__}` not initialized.")
+
         json_filepath = cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
+        cls.metadata.to_JSON(json_filepath)
 
     @classmethod
     def process_media_file(
         cls, filepath: Path
-    ) -> Generator[MediaProcessEvent, None, None]:
+    ) -> Generator[MediaProcessStatus, None, None]:
         if not cls.initialized:
             raise RuntimeError(f"`{cls.__qualname__}` not initialized.")
 
-        event = MediaProcessEvent(filepath=filepath)
+        status = cls.metadata.get_cached_media_status(filepath)
+        if not status:
+            # cache could not be used
+            status = MediaProcessStatus(filepath=str(filepath))
 
-        try:
-            event.frame_count, event.message = cls._get_media_frame_count(filepath)
-            event.ok = True
-        except RuntimeError as e:
-            event.ok = False
-            event.message = str(e)
+            try:
+                status.frame_count, status.message = cls._get_media_frame_count(
+                    filepath
+                )
+                stat = filepath.stat()
+                status.mtime = stat.st_mtime
+                status.size = stat.st_size
+                cls.metadata.handle_media_status(status)
+            except RuntimeError as e:
+                status.message = str(e)
+                status.ok = False
 
-        yield event
+        yield status
 
     @staticmethod
     def _get_media_frame_count(filepath: Path) -> Tuple[int, str]:
@@ -131,7 +195,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
             cap.release()
             return (
                 frame_count,
-                f"Read video file '{filepath}' with the duration '{frame_count}' frames ({method}).",
+                f"Read media file '{filepath}' with the frame count '{frame_count}' ({method}).",
             )
 
         cap = cv2.VideoCapture(str(filepath))

@@ -1,18 +1,16 @@
 import bpy
-from bpy.types import Context, Event, WindowManager
+from bpy.types import Context, WindowManager
 
 from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar, Union
 from enum import Enum
 from functools import partial
+from queue import Queue
+from threading import Thread
 
 from ..checks import (
-    check_addonpreferences,
-    check_propertygroup,
     check_prefs_safe,
     check_props_safe,
 )
-from ..properties import Mosplat_PG_Global
-from ..preferences import Mosplat_AP_Global
 from ...infrastructure.mixins import (
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
@@ -76,3 +74,26 @@ class MosplatOperatorBase(
         if not (wm := context.window_manager):
             raise RuntimeError("Something went wrong with `poll`-guard.")
         return wm
+
+    def cancel(self, context):
+        self._cleanup(context)
+
+    def _cleanup(self, context: Context):
+        if hasattr(self, "_timer"):
+            if self._timer:
+                self.wm(context).event_timer_remove(self._timer)
+            self._timer = None
+            self.logger().debug("Timer cleaned up")
+
+        if hasattr(self, "_thread"):
+            self._thread = None
+            self.logger().debug("Thread cleaned up")
+
+        if hasattr(self, "_queue"):
+            queue = getattr(self, "_queue")
+            if isinstance(queue, Queue):
+                # drain queue
+                while not queue.empty():
+                    queue.get_nowait()
+
+            self.logger().debug("Queue cleaned up")

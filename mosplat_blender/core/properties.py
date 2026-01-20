@@ -1,5 +1,7 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
+
+import bpy
 from bpy.types import PropertyGroup, Context
 from bpy.props import (
     BoolProperty,
@@ -15,13 +17,11 @@ from bpy.props import (
 from pathlib import Path
 
 from ..infrastructure.mixins import MosplatBlPropertyAccessorMixin
-from ..interfaces import MosplatLoggingInterface
-
-logger = MosplatLoggingInterface.configure_logger_instance(__name__)
+from ..infrastructure.constants import OperatorIDEnum
 
 
 def update_current_media_dir(props: Mosplat_PG_Global, _: Context):
-    pass
+    OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
 
 class Mosplat_PG_MediaItem(PropertyGroup):
@@ -46,8 +46,8 @@ class Mosplat_PG_Global(PropertyGroup, MosplatBlPropertyAccessorMixin):
         min=0,
     )
 
-    computed_media_frame_count: IntProperty(
-        name="Computed Media Frame Count",
+    collective_media_frame_count: IntProperty(
+        name="Collective Media Frame Count",
         description="Shared frame count for media within the selected media directory.",
         default=-1,
     )
