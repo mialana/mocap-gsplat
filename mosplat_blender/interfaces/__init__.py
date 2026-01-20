@@ -6,3 +6,4 @@ is is simply because "interfaces" is too long of a word for my liking? possibly
 from .logging_interface import MosplatLoggingInterface
 from .vggt_interface import MosplatVGGTInterface
 from .media_io_interface import MosplatMediaIOInterface
+from .worker_interface import MosplatWorkerInterface, OperatorWorker

@@ -22,7 +22,7 @@ classes: Sequence[
     ]
 ] = (
     [
-        core.Mosplat_PG_MediaItem,  # needs to be registered before property groups that use it
+        core.Mosplat_PG_MediaProcessStatus,  # needs to be registered before property groups that use it
         core.Mosplat_PG_Global,
         core.Mosplat_AP_Global,
     ]
