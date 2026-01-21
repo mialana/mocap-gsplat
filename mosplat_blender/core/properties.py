@@ -123,24 +123,13 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         name="Media IO Metadata",
         description="Metadata for all media I/O operations",
         type=Mosplat_PG_MediaIOMetadata,
+        options={"SKIP_SAVE"},
     )
 
-    collective_media_frame_count: IntProperty(
-        name="Collective Media Frame Count",
-        description="Shared frame count for media within the selected media directory.",
-        default=-1,
-    )
-
-    do_media_durations_all_match: BoolProperty(
-        name="Do Media Durations All Match",
-        description="Tracks whether the found media in the current media directory all have matching durations.",
+    was_restored_from_json: BoolProperty(
+        name="Was Restored From JSON",
+        description="Checked during all `poll()` methods of operators.\n"
+        "When false at the beginning of the session, property data will be restored from JSON.",
         default=False,
-    )
-
-    media_process_statuses: CollectionProperty(
-        name="Found Media Files", type=Mosplat_PG_MediaProcessStatus
-    )
-
-    processed_frame_ranges: CollectionProperty(
-        name="Processed Frame Ranges", type=Mosplat_PG_ProcessedFrameRange
+        options={"SKIP_SAVE"},
     )
