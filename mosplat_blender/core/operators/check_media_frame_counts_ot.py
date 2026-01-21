@@ -83,7 +83,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                 self._media_dir_path, self._data_output_dir
             )
 
-        self.props(context).media_process_statuses.clear()
+        self.props(context).current_media_io_metadata.media_process_statuses.clear()
 
         self._queue = Queue()
 

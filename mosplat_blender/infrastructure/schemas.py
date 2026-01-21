@@ -107,3 +107,4 @@ class GlobalData:
     current_media_io_metadata: MediaIOMetadata = field(
         default_factory=lambda: MediaIOMetadata(base_directory=str(Path.home()))
     )
+    was_restored_from_json: bool = False

@@ -20,9 +20,11 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
 
     __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
 
-    vggt_hf_id: StringProperty()  # pyright: ignore[reportInvalidTypeForm]
+    vggt_hf_id: StringProperty(
+        options={"SKIP_SAVE"}
+    )  # pyright: ignore[reportInvalidTypeForm]
     vggt_outdir = StringProperty(
-        subtype="DIR_PATH"
+        subtype="DIR_PATH", options={"SKIP_SAVE"}
     )  # pyright: ignore[reportInvalidTypeForm]
 
     @classmethod
