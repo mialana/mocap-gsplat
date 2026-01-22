@@ -11,7 +11,11 @@ from bpy.types import Preferences, Scene, Context
 from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn
 from pathlib import Path
 
-from ..infrastructure.constants import ADDON_PREFERENCES_ID, ADDON_PROPERTIES_ATTRIBNAME
+from ..infrastructure.constants import (
+    ADDON_PREFERENCES_ID,
+    ADDON_PROPERTIES_ATTRIBNAME,
+    MEDIA_IO_METADATA_JSON_FILENAME,
+)
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -73,10 +77,9 @@ def check_prefs_safe(context: Context) -> Union[Mosplat_AP_Global, None]:
         return None  # log stack trace but do not raise
 
 
-def check_data_output_dir(context: Context) -> Union[Path, NoReturn]:
-    prefs = check_addonpreferences(context.preferences)
-    props = check_propertygroup(context.scene)  # let errors rise
-
+def check_data_output_dir(
+    prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
+) -> Union[Path, NoReturn]:
     if not (media_dir_path := Path(props.current_media_dir)).is_dir():
         raise AttributeError(
             f"'{props.get_prop_name('media_dir_path')}' is not a valid directory."
@@ -91,3 +94,9 @@ def check_data_output_dir(context: Context) -> Union[Path, NoReturn]:
         return formatted_output_path
     else:
         return media_dir_path.joinpath(formatted_output_path)
+
+
+def check_json_filepath(
+    prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
+) -> Union[Path, NoReturn]:
+    return check_data_output_dir(prefs, props).joinpath(MEDIA_IO_METADATA_JSON_FILENAME)

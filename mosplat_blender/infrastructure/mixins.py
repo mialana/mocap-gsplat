@@ -3,15 +3,25 @@
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Type, TypeGuard, TypeVar
+from typing import (
+    ClassVar,
+    Type,
+    TypeGuard,
+    TypeVar,
+    Generic,
+    TYPE_CHECKING,
+    TypeAlias,
+    Any,
+)
 from enum import StrEnum
 from dataclasses import fields
 import logging
 import inspect
 
-from .constants import _MISSING_
+from .constants import _MISSING_, DataclassInstance
 
 S = TypeVar("S")
+D = TypeVar("D", bound=DataclassInstance)
 
 
 class MosplatLogClassMixin:
@@ -162,14 +172,14 @@ class MosplatBlPropertyAccessorMixin(
             return f"KEY ERROR. Class: {cls.__qualname__}. Property: {prop_attrname}."  # make error visible and traceable
 
 
-class MosplatDataclassInteropMixin(MosplatEnforceAttributesMixin):
+class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):
     """
     a mixin that automates the transformation to/from a dataclass.
     used for Blender `PropertyGroup` classes."""
 
-    __dataclass_type__: Type = _MISSING_
+    __dataclass_type__: Type[D] = _MISSING_
 
-    def to_dataclass(self):
+    def to_dataclass(self) -> D:
         cls = self.__dataclass_type__
 
         kwargs = {}
@@ -185,10 +195,19 @@ class MosplatDataclassInteropMixin(MosplatEnforceAttributesMixin):
 
         return cls(**kwargs)
 
-    def from_dataclass(self, dc) -> None:
+    def from_dataclass(self, dc: D) -> None:
         for f in fields(dc):
             value = getattr(dc, f.name)
-            if hasattr(getattr(self, f.name, None), "from_dataclass"):
-                getattr(self, f.name).from_dataclass(value)
+            target = getattr(self, f.name, None)
+            if hasattr(target, "from_dataclass"):
+                getattr(target, "from_dataclass")(value)  # nested `PropertyGroup`
+            elif hasattr(target, "clear") and hasattr(target, "add"):
+                getattr(target, "clear")()  # `CollectionProperty`
+                for item_dc in value:
+                    item_pg = getattr(target, "add")()
+                    if hasattr(item_pg, "from_dataclass"):
+                        item_pg.from_dataclass(item_dc)
+                    else:
+                        item_pg = item_dc
             else:
                 setattr(self, f.name, value)
