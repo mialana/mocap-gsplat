@@ -34,7 +34,11 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
         if props.current_media_io_metadata.media_process_statuses:
             media_box = box.box()
-            media_box.label(text=props.get_prop_name("media_statuses"))
+            media_box.label(
+                text=props.current_media_io_metadata.get_prop_name(
+                    "media_process_statuses"
+                )
+            )
             media_box.alert = (
                 not props.current_media_io_metadata.do_media_durations_all_match
             )

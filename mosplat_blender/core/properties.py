@@ -13,9 +13,11 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar, TYPE_CHECKING, Any
+from typing import Generic, TypeVar
 
 from pathlib import Path
+
+from .handlers import restore_metadata_from_json
 
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
@@ -34,6 +36,8 @@ D = TypeVar("D", bound=DataclassInstance)
 
 
 def update_current_media_dir(props: Mosplat_PG_Global, _: Context):
+    restore_metadata_from_json(props)  # try to restore from local JSON
+
     OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
 
