@@ -6,11 +6,16 @@ moves implementation logic and imports out of `__init__.py`.
 import bpy
 
 from typing import Type, Sequence, Union
+from functools import partial
 
 from . import core
 from .interfaces import MosplatLoggingInterface, MosplatVGGTInterface
 from .infrastructure.mixins import MosplatEnforceAttributesMixin
 from .core.checks import check_addonpreferences
+from .core.handlers import (
+    handle_restore_from_json,
+    handle_restore_from_json_timer_entrypoint,
+)
 from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME, ADDON_HUMAN_READABLE
 
 classes: Sequence[
@@ -54,6 +59,10 @@ def register_addon():
 
     MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
 
+    # load from JSON both every file load and
+    bpy.app.handlers.load_post.append(handle_restore_from_json)
+    bpy.app.timers.register(handle_restore_from_json_timer_entrypoint, first_interval=0)
+
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon registration completed.")
 
 
@@ -75,5 +84,7 @@ def unregister_addon():
         MosplatVGGTInterface.cleanup()
     except Exception:
         logger.exception(f"Error while cleaning up VGGT interface")
+
+    bpy.app.handlers.load_post.remove(handle_restore_from_json)
 
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon unregistration completed.")

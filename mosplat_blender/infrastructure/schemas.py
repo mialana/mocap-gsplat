@@ -58,7 +58,7 @@ class MediaProcessStatus:
 
 @dataclass
 class MediaIOMetadata:
-    base_directory: str
+    base_directory: str = str(Path.home())
     do_media_durations_all_match: bool = False
     collective_media_frame_count: int = -1
     media_process_statuses: List[MediaProcessStatus] = field(default_factory=list)
@@ -86,25 +86,23 @@ class MediaIOMetadata:
         with dest_path.open("w", encoding="utf-8") as f:
             json.dump(as_dict, f, sort_keys=True, indent=4)
 
-    def from_JSON(self, src_path: Path) -> bool:
+    @classmethod
+    def from_JSON(cls, src_path: Path) -> MediaIOMetadata:
         if src_path.exists():
             try:
                 with src_path.open("r", encoding="utf-8") as f:
                     data: Dict = json.load(f)
 
-                self.from_dict(data)
-                return True
+                return cls.from_dict(data)
             except (TypeError, json.JSONDecodeError):
                 src_path.unlink()  # delete the corrupted JSON
 
-        return False
+        return cls()
 
 
 @dataclass
 class GlobalData:
     current_media_dir: str = str(Path.home())
     current_frame_range: Tuple[int, int] = field(default_factory=tuple[0, 6])
-    current_media_io_metadata: MediaIOMetadata = field(
-        default_factory=lambda: MediaIOMetadata(base_directory=str(Path.home()))
-    )
+    current_media_io_metadata: MediaIOMetadata = field(default_factory=MediaIOMetadata)
     was_restored_from_json: bool = False

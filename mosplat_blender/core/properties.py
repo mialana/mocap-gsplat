@@ -5,7 +5,6 @@ import bpy
 from bpy.types import PropertyGroup, Context
 from bpy.props import (
     BoolProperty,
-    EnumProperty,
     FloatProperty,
     IntProperty,
     StringProperty,
@@ -14,13 +13,15 @@ from bpy.props import (
     IntVectorProperty,
 )
 
+from typing import Generic, TypeVar, TYPE_CHECKING, Any
+
 from pathlib import Path
 
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
     MosplatDataclassInteropMixin,
 )
-from ..infrastructure.constants import OperatorIDEnum
+from ..infrastructure.constants import OperatorIDEnum, DataclassInstance
 from ..infrastructure.schemas import (
     GlobalData,
     MediaIOMetadata,
@@ -29,25 +30,32 @@ from ..infrastructure.schemas import (
     PreprocessScriptApplication,
 )
 
+D = TypeVar("D", bound=DataclassInstance)
+
 
 def update_current_media_dir(props: Mosplat_PG_Global, _: Context):
     OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
 
 class MosplatPropertyGroupBase(
-    PropertyGroup, MosplatBlPropertyAccessorMixin, MosplatDataclassInteropMixin
+    Generic[D],
+    PropertyGroup,
+    MosplatBlPropertyAccessorMixin,
+    MosplatDataclassInteropMixin[D],
 ):
     pass
 
 
-class Mosplat_PG_PreprocessScriptApplication(MosplatPropertyGroupBase):
+class Mosplat_PG_PreprocessScriptApplication(
+    MosplatPropertyGroupBase[PreprocessScriptApplication]
+):
     __dataclass_type__ = PreprocessScriptApplication
 
     script_path: StringProperty(name="Script Path", subtype="FILE_PATH")
     application_time: FloatProperty(name="Application Time", default=-1.0)
 
 
-class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase):
+class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
     __dataclass_type__ = ProcessedFrameRange
 
     start_frame: IntProperty(name="Start Frame", default=0, min=0)
@@ -57,7 +65,7 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase):
     )
 
 
-class Mosplat_PG_MediaProcessStatus(MosplatPropertyGroupBase):
+class Mosplat_PG_MediaProcessStatus(MosplatPropertyGroupBase[MediaProcessStatus]):
     __dataclass_type__ = MediaProcessStatus
 
     filepath: StringProperty(name="Filepath", subtype="FILE_PATH")
@@ -68,7 +76,7 @@ class Mosplat_PG_MediaProcessStatus(MosplatPropertyGroupBase):
     file_size: IntProperty(name="File Size", default=-1)
 
 
-class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase):
+class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
     __dataclass_type__ = MediaIOMetadata
 
     base_directory: StringProperty(
@@ -76,7 +84,6 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase):
         description="Filepath to directory containing media files being processed.",
         default=str(Path.home()),
         subtype="DIR_PATH",
-        update=update_current_media_dir,
     )
 
     do_media_durations_all_match: BoolProperty(
@@ -100,7 +107,7 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase):
     )
 
 
-class Mosplat_PG_Global(MosplatPropertyGroupBase):
+class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     __dataclass_type__ = GlobalData
 
     current_media_dir: StringProperty(
@@ -123,13 +130,5 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         name="Media IO Metadata",
         description="Metadata for all media I/O operations",
         type=Mosplat_PG_MediaIOMetadata,
-        options={"SKIP_SAVE"},
-    )
-
-    was_restored_from_json: BoolProperty(
-        name="Was Restored From JSON",
-        description="Checked during all `poll()` methods of operators.\n"
-        "When false at the beginning of the session, property data will be restored from JSON.",
-        default=False,
         options={"SKIP_SAVE"},
     )

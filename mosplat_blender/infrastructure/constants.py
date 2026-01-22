@@ -10,7 +10,7 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Any, Final, TYPE_CHECKING
 from pathlib import Path
 from enum import StrEnum, auto
 from string import capwords
@@ -68,6 +68,13 @@ ADDON_PROPERTIES_ATTRIBNAME: Final[str] = f"{ADDON_SHORTNAME}_props"
 
 OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME}."
 PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"
+
+# static typecheck-only abstraction
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+else:
+    DataclassInstance: TypeAlias = Any
+
 
 """Enum Convenience Classes"""
 
@@ -140,4 +147,4 @@ DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(
     .joinpath("fix_mocap_video_rotations.py")
 )
 
-MOSPLAT_MEDIA_METADATA_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_metadata.json"
+MEDIA_IO_METADATA_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_metadata.json"

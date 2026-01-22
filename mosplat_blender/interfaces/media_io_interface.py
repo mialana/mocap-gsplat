@@ -8,7 +8,7 @@ import json
 
 from ..infrastructure.decorators import no_instantiate
 from ..infrastructure.mixins import MosplatLogClassMixin
-from ..infrastructure.constants import MOSPLAT_MEDIA_METADATA_FILENAME
+from ..infrastructure.constants import MEDIA_IO_METADATA_JSON_FILENAME
 
 StrPath: TypeAlias = Union[str, Path]
 
@@ -143,7 +143,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
     def initialize(cls, base_directory: Path, data_output_dir: Path):
         cls.metadata = MediaIOMetadata(base_directory=str(base_directory))
         cls.data_output_dir = data_output_dir
-        json_filepath = cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
+        json_filepath = cls.data_output_dir.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
 
         if cls.metadata.from_JSON(json_filepath):
             cls.logger().info(f"Loaded existing metadata frm '{json_filepath}'.")
@@ -155,7 +155,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
         if not cls.initialized:
             raise RuntimeError(f"`{cls.__qualname__}` not initialized.")
 
-        json_filepath = cls.data_output_dir.joinpath(MOSPLAT_MEDIA_METADATA_FILENAME)
+        json_filepath = cls.data_output_dir.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
         cls.metadata.to_JSON(json_filepath)
 
     @classmethod

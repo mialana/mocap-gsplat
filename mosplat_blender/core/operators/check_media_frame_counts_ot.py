@@ -58,7 +58,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
 
         # validate the data output dir preference
         try:
-            cls._data_output_dir = check_data_output_dir(context)
+            cls._data_output_dir = check_data_output_dir(prefs, props)
         except AttributeError as e:
             cls.poll_message_set(str(e))
             return False
