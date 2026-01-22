@@ -59,7 +59,7 @@ def register_addon():
 
     MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
 
-    # load from JSON both every file load and
+    # try load from JSON every file load and after registration occurs
     bpy.app.handlers.load_post.append(handle_restore_from_json)
     bpy.app.timers.register(handle_restore_from_json_timer_entrypoint, first_interval=0)
 
