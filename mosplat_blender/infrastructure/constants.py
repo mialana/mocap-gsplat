@@ -10,7 +10,7 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-from typing import Any, Final, TYPE_CHECKING
+from typing import Any, Final, TYPE_CHECKING, TypeAlias, Set
 from pathlib import Path
 from enum import StrEnum, auto
 from string import capwords
@@ -72,8 +72,14 @@ PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"
 # static typecheck-only abstraction
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
+    from bpy.stub_internal.rna_enums import (
+        OperatorReturnItems as _OperatorReturnItemsSafe,
+    )
 else:
     DataclassInstance: TypeAlias = Any
+    _OperatorReturnItemsSafe: TypeAlias = str
+
+OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
 
 
 """Enum Convenience Classes"""
