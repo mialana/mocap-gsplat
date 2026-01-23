@@ -39,7 +39,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
             return False  # prevent re-initialization
         return True
 
-    def timed_callback_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
+    def contexted_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
         while self._worker and (next := self._worker.dequeue()) is not None:
             status, payload = next
 

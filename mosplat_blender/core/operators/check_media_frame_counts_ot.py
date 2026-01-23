@@ -90,7 +90,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                     return  # stop processing
         self._queue.put(("done", True))
 
-    def timed_callback_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
+    def contexted_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
         props = self._props
 
         while not self._queue.empty():

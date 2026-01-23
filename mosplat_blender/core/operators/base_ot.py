@@ -64,8 +64,8 @@ class MosplatOperatorBase(
         ):
             return False
         return (
-            (subclass_result)
-            if (subclass_result := cls.contexted_poll(context, prefs, props)) is not ...
+            ((((overrideable_return))))
+            if ((((overrideable_return))) := cls.contexted_poll(context, prefs, props)) is not ...
             else True
         )
 
@@ -133,11 +133,11 @@ class MosplatOperatorBase(
 
             return (
                 optional_return
-                if (optional_return := self.timed_callback_modal(context, event))
+                if (optional_return := self.contexted_modal(context, event))
                 else {"RUNNING_MODAL", "PASS_THROUGH"}
             )
 
-    def timed_callback_modal(
+    def contexted_modal(
         self, context: Context, event: Event
     ) -> OptionalOperatorReturnItemsSet:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
