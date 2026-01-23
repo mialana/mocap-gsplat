@@ -66,15 +66,15 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                 self._media_dir_path, self._data_output_dir
             )
 
-        self._props.metadata.media_process_statuses.clear()
+        self.props.metadata.media_process_statuses.clear()
 
         self._queue = Queue()
 
         self._thread = threading.Thread(target=self._process_files_thread, daemon=True)
         self._thread.start()
 
-        self._timer = self._wm.event_timer_add(time_step=0.1, window=context.window)
-        self._wm.modal_handler_add(self)  # start timer polling here
+        self.timer = self.wm.event_timer_add(time_step=0.1, window=context.window)
+        self.wm.modal_handler_add(self)  # start timer polling here
 
         return {"RUNNING_MODAL"}
 
@@ -91,7 +91,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         self._queue.put(("done", True))
 
     def contexted_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
-        props = self._props
+        props = self.props
 
         while not self._queue.empty():
             tag, payload = self._queue.get_nowait()

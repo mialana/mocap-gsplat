@@ -18,6 +18,13 @@ class PollGuardError(RuntimeError):
         return "Something went wrong with `poll`-guard."
 
 
+class PropertyUpdateError(AttributeError):
+    """Create a custom `AttributeError` for errors when Blender properties are updated."""
+
+    def __str__(self) -> str:
+        return "The entered property value is invalid"
+
+
 """Enum Convenience Classes"""
 
 

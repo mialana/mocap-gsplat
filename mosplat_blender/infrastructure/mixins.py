@@ -126,22 +126,22 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
 
 class MosplatEncapsulatedContextMixin:
     """a mixin that, paired with decorators, allows for an accessible and updated
-    `_context` property within desired class methods."""
+    `context` property within desired class methods."""
 
     from bpy.types import Context  # local import
 
-    _context_internal: Optional[Context] = None
+    __context: Optional[Context] = None
 
     @property
-    def _context(self) -> Context:
-        if self._context_internal is None:  # protect against incorrect usage
+    def context(self) -> Context:
+        if self.__context is None:  # protect against incorrect usage
             raise AttributeError("Context has not yet been set yet in this scope.")
         else:
-            return self._context_internal
+            return self.__context
 
-    @_context.setter
-    def _context(self, context: Optional[Context]):
-        self._context_internal = context
+    @context.setter
+    def context(self, context: Optional[Context]):
+        self.__context = context
 
 
 class MosplatAPAccessorMixin(MosplatEncapsulatedContextMixin):
@@ -155,11 +155,11 @@ class MosplatAPAccessorMixin(MosplatEncapsulatedContextMixin):
         Mosplat_AP_Global: TypeAlias = Any
 
     @property
-    def _prefs(self) -> Mosplat_AP_Global:
+    def prefs(self) -> Mosplat_AP_Global:
         from ..core.checks import check_addonpreferences
 
         try:
-            return check_addonpreferences(self._context.preferences)
+            return check_addonpreferences(self.context.preferences)
         except RuntimeError:
             raise PollGuardError
 
@@ -175,11 +175,11 @@ class MosplatPGAccessorMixin(MosplatEncapsulatedContextMixin):
         Mosplat_PG_Global: TypeAlias = Any
 
     @property
-    def _props(self) -> Mosplat_PG_Global:
+    def props(self) -> Mosplat_PG_Global:
         from ..core.checks import check_propertygroup
 
         try:
-            return check_propertygroup(self._context.scene)
+            return check_propertygroup(self.context.scene)
         except RuntimeError:
             raise PollGuardError
 
