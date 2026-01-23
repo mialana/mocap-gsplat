@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Type, TypeGuard, TypeVar, Generic
+from typing import (
+    ClassVar,
+    Type,
+    TypeGuard,
+    TypeVar,
+    Generic,
+    Optional,
+    TYPE_CHECKING,
+    Any,
+    TypeAlias,
+)
 from enum import StrEnum
 from dataclasses import fields
 import logging
 import inspect
 
 from .constants import _MISSING_, DataclassInstance
+from .schemas import PollGuardError
 
 S = TypeVar("S")
 D = TypeVar("D", bound=DataclassInstance)
@@ -113,36 +124,64 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
         return True
 
 
-class MosplatAPAccessorMixin:
+class MosplatEncapsulatedContextMixin:
+    """a mixin that, paired with decorators, allows for an accessible and updated
+    `_context` property within desired class methods."""
+
+    from bpy.types import Context  # local import
+
+    _context_internal: Optional[Context] = None
+
+    @property
+    def _context(self) -> Context:
+        if self._context_internal is None:  # protect against incorrect usage
+            raise AttributeError("Context has not yet been set yet in this scope.")
+        else:
+            return self._context_internal
+
+    @_context.setter
+    def _context(self, context: Optional[Context]):
+        self._context_internal = context
+
+
+class MosplatAPAccessorMixin(MosplatEncapsulatedContextMixin):
     """a mixin class for any class that has access to global preferences"""
 
-    @staticmethod
-    def prefs(context):
+    from bpy.types import Context  # local import
+
+    if TYPE_CHECKING:
+        from ..core.preferences import Mosplat_AP_Global
+    else:
+        Mosplat_AP_Global: TypeAlias = Any
+
+    @property
+    def _prefs(self) -> Mosplat_AP_Global:
         from ..core.checks import check_addonpreferences
 
-        return check_addonpreferences(context.preferences)
-
-    @staticmethod
-    def prefs_safe(context):
-        from ..core.checks import check_prefs_safe
-
-        return check_prefs_safe(context.scene)
+        try:
+            return check_addonpreferences(self._context.preferences)
+        except RuntimeError:
+            raise PollGuardError
 
 
-class MosplatPGAccessorMixin:
+class MosplatPGAccessorMixin(MosplatEncapsulatedContextMixin):
     """a mixin class for any class that has access to global properties"""
 
-    @staticmethod
-    def props(context):
+    from bpy.types import Context  # local import
+
+    if TYPE_CHECKING:
+        from ..core.properties import Mosplat_PG_Global
+    else:
+        Mosplat_PG_Global: TypeAlias = Any
+
+    @property
+    def _props(self) -> Mosplat_PG_Global:
         from ..core.checks import check_propertygroup
 
-        return check_propertygroup(context.scene)
-
-    @staticmethod
-    def props_safe(context):
-        from ..core.checks import check_props_safe
-
-        return check_props_safe(context.scene)
+        try:
+            return check_propertygroup(self._context.scene)
+        except RuntimeError:
+            raise PollGuardError
 
 
 class MosplatBlPropertyAccessorMixin(

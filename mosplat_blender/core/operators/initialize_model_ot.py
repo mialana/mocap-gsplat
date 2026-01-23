@@ -7,12 +7,11 @@ from typing import Tuple
 
 from ...interfaces import MosplatVGGTInterface
 
-from ...infrastructure.constants import OperatorIDEnum
+from ...infrastructure.schemas import OperatorIDEnum
 from ...infrastructure.decorators import worker_fn_auto
 
 from .base_ot import (
     MosplatOperatorBase,
-    OperatorPollReqs,
     OperatorReturnItemsSet,
     OptionalOperatorReturnItemsSet,
 )
@@ -23,8 +22,6 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
     bl_description = (
         f"Install VGGT model weights from Hugging Face or load from cache if available."
     )
-
-    __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.WINDOW_MANAGER}
 
     vggt_hf_id: StringProperty(
         options={"SKIP_SAVE"}
@@ -55,14 +52,14 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
                 self.logger().error("VGGT model could not be initialized")
                 return {"CANCELLED"}
 
-    def execute(self, context) -> OperatorReturnItemsSet:
-        prefs = self.prefs(context)
+    def contexted_execute(self, context) -> OperatorReturnItemsSet:
+        prefs = self._prefs
         self.vggt_hf_id = prefs.vggt_hf_id
         self.vggt_outdir = prefs.vggt_model_dir
 
         vggt_outdir_path: Path = Path(self.vggt_outdir)  # convert to path here
 
-        self._install_model_thread(context, self.vggt_hf_id, vggt_outdir_path)
+        self._install_model_thread(self.vggt_hf_id, vggt_outdir_path)
 
         return {"RUNNING_MODAL"}
 

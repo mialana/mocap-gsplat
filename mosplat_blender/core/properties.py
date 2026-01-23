@@ -13,15 +13,17 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Optional
 
 from pathlib import Path
 
 from .handlers import restore_metadata_from_json
+from .checks import check_addonpreferences, check_media_directory, check_data_output_dir
 
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
     MosplatDataclassInteropMixin,
+    MosplatAPAccessorMixin,
 )
 from ..infrastructure.constants import OperatorIDEnum, DataclassInstance
 from ..infrastructure.schemas import (
@@ -35,8 +37,15 @@ from ..infrastructure.schemas import (
 D = TypeVar("D", bound=DataclassInstance)
 
 
-def update_current_media_dir(props: Mosplat_PG_Global, _: Context):
-    restore_metadata_from_json(props)  # try to restore from local JSON
+def update_current_media_dir(props: Mosplat_PG_Global, context: Context):
+    prefs = check_addonpreferences(context.preferences)
+    restore_metadata_from_json(props, prefs)  # try to restore from local JSON
+
+    check_media_directory(props, prefs)  # let errors rise
+
+    props.metadata.base_directory = (
+        props.current_media_dir
+    )  # sync directories on success
 
     OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
@@ -111,7 +120,7 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
     )
 
 
-class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
+class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorMixin):
     __dataclass_type__ = GlobalData
 
     current_media_dir: StringProperty(
@@ -136,3 +145,26 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         type=Mosplat_PG_MediaIOMetadata,
         options={"SKIP_SAVE"},
     )
+
+    @property
+    def metadata(self) -> Mosplat_PG_MediaIOMetadata:
+        return self.current_media_io_metadata
+
+    @property
+    def data_output_dir(self) -> Path:
+        if not (media_dir_path := Path(self.current_media_dir)).is_dir():
+            raise AttributeError(
+                f"'{self.get_prop_name('media_dir_path')}' is not a valid directory."
+            )
+
+        media_directory_name = media_dir_path.name
+
+        formatted_output_path = Path(
+            str(self._prefs.data_output_path).format(
+                media_directory_name=media_directory_name
+            )
+        )
+        if formatted_output_path.is_absolute():
+            return formatted_output_path
+        else:
+            return media_dir_path.joinpath(formatted_output_path)

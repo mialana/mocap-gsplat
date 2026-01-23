@@ -1,31 +1,15 @@
 from bpy.types import Panel, UILayout, Context
 
-from typing import ClassVar, Set, Union
 from enum import Enum
 from functools import partial
 
-from ..checks import (
-    check_addonpreferences,
-    check_propertygroup,
-    check_prefs_safe,
-    check_props_safe,
-)
-from ..properties import Mosplat_PG_Global
-from ..preferences import Mosplat_AP_Global
-
+from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
     MosplatAPAccessorMixin,
 )
-from ...infrastructure.constants import PanelIDEnum
-
-
-class PanelPollReqs(Enum):
-    """Custom enum in case operator does not require use of one poll requirement"""
-
-    PREFS = partial(lambda cls, context: check_prefs_safe(context))
-    PROPS = partial(lambda cls, context: check_props_safe(context))
+from ...infrastructure.schemas import PanelIDEnum
 
 
 class MosplatPanelBase(
@@ -37,11 +21,6 @@ class MosplatPanelBase(
     bl_region_type = "UI"
     bl_category = PanelIDEnum._category()
 
-    __poll_reqs__: ClassVar[Union[Set[PanelPollReqs], None]] = {
-        PanelPollReqs.PREFS,
-        PanelPollReqs.PROPS,
-    }
-
     @classmethod
     def at_registration(cls):
         super().at_registration()
@@ -51,9 +30,8 @@ class MosplatPanelBase(
     @classmethod
     def poll(cls, context) -> bool:
         return (
-            all(req.value(cls, context) for req in cls.__poll_reqs__)
-            if cls.__poll_reqs__
-            else True
+            check_prefs_safe(context) is not None
+            and check_props_safe(context) is not None
         )
 
     def draw(self, context: Context):

@@ -4,7 +4,7 @@ import bpy
 from bpy.types import Scene
 from bpy.app.handlers import persistent
 
-from typing import TYPE_CHECKING, TypeAlias, TypeAlias, Any
+from typing import TYPE_CHECKING, TypeAlias, TypeAlias, Any, Optional
 
 from .checks import check_propertygroup, check_addonpreferences, check_json_filepath
 
@@ -12,10 +12,11 @@ from ..infrastructure.schemas import MediaIOMetadata
 from ..interfaces.logging_interface import MosplatLoggingInterface
 
 if TYPE_CHECKING:
-    from .properties import Mosplat_PG_Global, Mosplat_PG_MediaIOMetadata
+    from .properties import Mosplat_PG_Global
+    from .preferences import Mosplat_AP_Global
 else:
     Mosplat_PG_Global: TypeAlias = Any
-    Mosplat_PG_MediaIOMetadata: TypeAlias = Any
+    Mosplat_AP_Global: TypeAlias = Any
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
@@ -33,17 +34,19 @@ def handle_restore_from_json_timer_entrypoint():
     return handle_restore_from_json(bpy.context.scene)
 
 
-def restore_metadata_from_json(props: Mosplat_PG_Global):
+def restore_metadata_from_json(
+    props: Mosplat_PG_Global, prefs: Optional[Mosplat_AP_Global] = None
+):
     """base entrypoint"""
-    prefs = check_addonpreferences(bpy.context.preferences)
-    metadata_prop: Mosplat_PG_MediaIOMetadata = props.current_media_io_metadata
+    prefs = prefs or check_addonpreferences(bpy.context.preferences)
+    metadata_prop = props.metadata
 
     json_filepath = check_json_filepath(prefs, props)
 
     if not json_filepath.exists:
         logger.info("No JSON file needed to be restored.")
 
-    data = MediaIOMetadata.from_JSON(json_filepath)
-    metadata_prop.from_dataclass(data)
+    dc = MediaIOMetadata.from_JSON(json_filepath)
+    metadata_prop.from_dataclass(dc)
 
     logger.info("Metadata JSON file successfully restored.")

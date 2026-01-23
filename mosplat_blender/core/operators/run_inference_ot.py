@@ -2,9 +2,9 @@ import bpy
 from typing import List, ClassVar
 from pathlib import Path
 
-from ...infrastructure.constants import OperatorIDEnum
+from ...infrastructure.schemas import OperatorIDEnum
 
-from .base_ot import MosplatOperatorBase, OperatorPollReqs, OperatorReturnItemsSet
+from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet
 from ..preferences import Mosplat_AP_Global
 from ..properties import Mosplat_PG_Global
 
@@ -13,19 +13,11 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
     bl_idname = OperatorIDEnum.RUN_INFERENCE
     bl_description = "Run inference on selected media directory."
 
-    __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
-
     _poll_error_msg_list: ClassVar[List[str]] = []
 
     @classmethod
-    def poll(cls, context) -> bool:
-        if not super().poll(context):
-            return False
-
+    def contexted_poll(cls, context, prefs, props) -> bool:
         cls._poll_error_msg_list.clear()
-
-        prefs = cls.prefs(context)
-        props = cls.props(context)
 
         cls._validate_frame_range(prefs, props)
         cls._validate_preprocess_media_script(prefs)
@@ -34,7 +26,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
 
         return not cls._poll_error_msg_list
 
-    def execute(self, context) -> OperatorReturnItemsSet:
+    def contexted_execute(self, context) -> OperatorReturnItemsSet:
         return {"FINISHED"}
 
     @classmethod
