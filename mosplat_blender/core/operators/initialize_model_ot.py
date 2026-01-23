@@ -1,18 +1,19 @@
-from bpy.types import Operator
 from bpy.props import StringProperty
 
 from pathlib import Path
 import threading
 from queue import Queue
+from typing import Tuple
 
-from ...interfaces.vggt_interface import MosplatVGGTInterface
+from ...interfaces import MosplatVGGTInterface
 
-from ...infrastructure.constants import OperatorIDEnum
+from ...infrastructure.constants import OperatorIDEnum, OperatorReturnItemsSet
+from ...infrastructure.decorators import worker_fn_auto
 
-from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
+from .base_ot import MosplatOperatorBase, OperatorPollReqs
 
 
-class Mosplat_OT_initialize_model(MosplatOperatorBase):
+class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
     bl_description = (
         f"Install VGGT model weights from Hugging Face or load from cache if available."
@@ -37,11 +38,14 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
         return True
 
     def modal(self, context, event) -> OperatorReturnItemsSet:
-        if event.type != "TIMER":
-            return {"RUNNING_MODAL", "PASS_THROUGH"}
+        if event.type in {"RIGHTMOUSE", "ESC"}:
+            self._cleanup(context)
+            return {"CANCELLED"}
+        elif event.type != "TIMER":
+            return {"PASS_THROUGH"}
 
-        if not self._queue.empty():
-            _, payload = self._queue.get_nowait()
+        while self._worker and (next := self._worker.dequeue()) is not None:
+            status, payload = next
 
             self._cleanup(context)
 
@@ -52,7 +56,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
                 self.logger().error("VGGT model could not be initialized")
                 return {"CANCELLED"}
 
-        return {"RUNNING_MODAL"}
+        return {"RUNNING_MODAL", "PASS_THROUGH"}
 
     def execute(self, context) -> OperatorReturnItemsSet:
         prefs = self.prefs(context)
@@ -61,26 +65,22 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase):
 
         vggt_outdir_path: Path = Path(self.vggt_outdir)  # convert to path here
 
-        self._queue = Queue()
-        self._thread = threading.Thread(
-            target=self._install_model_thread,
-            args=(self.vggt_hf_id, vggt_outdir_path),
-            daemon=True,
-        )
-        self._thread.start()
-
-        self._timer = self.wm(context).event_timer_add(
-            time_step=0.1, window=context.window
-        )
-        self.wm(context).modal_handler_add(self)  # start timer polling here
+        self._install_model_thread(context, self.vggt_hf_id, vggt_outdir_path)
 
         return {"RUNNING_MODAL"}
 
-    def _install_model_thread(self, hf_id: str, outdir: Path):
+    @worker_fn_auto
+    def _install_model_thread(
+        self,
+        queue: Queue,
+        cancel_event: threading.Event,
+        hf_id: str,
+        outdir: Path,
+    ):
         # put true or false initialize result in queue
         MosplatVGGTInterface.initialize_model(hf_id, outdir)
 
         """
         use initialization status rather than return result as `initialize_model`
         will return `False` if initialization status already occurred"""
-        self._queue.put(("ok", MosplatVGGTInterface._initialized))
+        queue.put(("ok", MosplatVGGTInterface._initialized))

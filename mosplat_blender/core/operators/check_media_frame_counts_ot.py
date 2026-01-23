@@ -4,10 +4,10 @@ from typing import ClassVar, Set, Iterable, TYPE_CHECKING, TypeAlias, Any
 import threading
 from queue import Queue
 
-from .base_ot import MosplatOperatorBase, OperatorReturnItemsSet, OperatorPollReqs
+from .base_ot import MosplatOperatorBase, OperatorPollReqs
 from ..checks import check_data_output_dir
 
-from ...infrastructure.constants import OperatorIDEnum
+from ...infrastructure.constants import OperatorIDEnum, OperatorReturnItemsSet
 from ...interfaces.media_io_interface import (
     MosplatMediaIOInterface,
     MediaProcessStatus,

@@ -1,11 +1,18 @@
 import bpy
-from bpy.types import Context, WindowManager
+from bpy.types import Context, WindowManager, Timer
 
-from typing import Set, TYPE_CHECKING, TypeAlias, ClassVar, Union
+from typing import (
+    Set,
+    TYPE_CHECKING,
+    TypeAlias,
+    ClassVar,
+    Union,
+    Optional,
+    Generic,
+    TypeVar,
+)
 from enum import Enum
 from functools import partial
-from queue import Queue
-from threading import Thread
 
 from ..checks import (
     check_prefs_safe,
@@ -17,16 +24,7 @@ from ...infrastructure.mixins import (
     MosplatAPAccessorMixin,
 )
 from ...infrastructure.constants import OperatorIDEnum
-
-
-if TYPE_CHECKING:
-    from bpy.stub_internal.rna_enums import (
-        OperatorReturnItems as _OperatorReturnItemsSafe,
-    )
-else:
-    _OperatorReturnItemsSafe: TypeAlias = str
-
-OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
+from ...interfaces.worker_interface import MosplatWorkerInterface
 
 
 class OperatorPollReqs(Enum):
@@ -39,7 +37,11 @@ class OperatorPollReqs(Enum):
     )
 
 
+Q = TypeVar("Q")
+
+
 class MosplatOperatorBase(
+    Generic[Q],
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
     MosplatAPAccessorMixin,
@@ -53,6 +55,16 @@ class MosplatOperatorBase(
         OperatorPollReqs.PROPS,
         OperatorPollReqs.WINDOW_MANAGER,
     }
+
+    def __init__(self, *args, **kwargs):
+        self._worker: Optional[MosplatWorkerInterface[Q]]
+        self._timer: Optional[Timer]
+
+    @staticmethod
+    def wm(context: Context) -> WindowManager:
+        if not (wm := context.window_manager):
+            raise RuntimeError("Something went wrong with `poll`-guard.")
+        return wm
 
     @classmethod
     def at_registration(cls):
@@ -69,31 +81,10 @@ class MosplatOperatorBase(
             else True
         )
 
-    @staticmethod
-    def wm(context: Context) -> WindowManager:
-        if not (wm := context.window_manager):
-            raise RuntimeError("Something went wrong with `poll`-guard.")
-        return wm
-
     def cancel(self, context):
         self._cleanup(context)
 
     def _cleanup(self, context: Context):
-        if hasattr(self, "_timer"):
-            if self._timer:
-                self.wm(context).event_timer_remove(self._timer)
-            self._timer = None
+        if self._timer:
+            self.wm(context).event_timer_remove(self._timer)
             self.logger().debug("Timer cleaned up")
-
-        if hasattr(self, "_thread"):
-            self._thread = None
-            self.logger().debug("Thread cleaned up")
-
-        if hasattr(self, "_queue"):
-            queue = getattr(self, "_queue")
-            if isinstance(queue, Queue):
-                # drain queue
-                while not queue.empty():
-                    queue.get_nowait()
-
-            self.logger().debug("Queue cleaned up")

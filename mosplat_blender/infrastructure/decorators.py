@@ -1,11 +1,44 @@
 """decorator functions"""
 
-from functools import wraps
-from typing import Callable, ParamSpec, TypeVar, Type, cast
+from bpy.types import Context  # import `bpy` to enforce types
 
-P = ParamSpec("P")  # maintains original callable's signature for `run_once`
+from functools import wraps, partial
+from typing import (
+    Callable,
+    ParamSpec,
+    TypeVar,
+    Type,
+    Concatenate,
+    TYPE_CHECKING,
+    Any,
+    TypeAlias,
+    Optional,
+    Protocol,
+)
+
+from queue import Queue
+from threading import Event as ThreadingEvent
+
+from .constants import OperatorReturnItemsSet
+
+from ..interfaces import MosplatWorkerInterface
+
+if TYPE_CHECKING:
+    from ..core.operators import MosplatOperatorBase
+else:
+    MosplatOperatorBase: TypeAlias = Any
+
+
+P = ParamSpec(
+    "P"
+)  # maintains original callable's signature for `run_once` and `worker_fn`
 R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
 T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
+
+OpT = TypeVar(
+    "OpT", bound=MosplatOperatorBase
+)  # types the `self` parameter for `worker_fn_auto`
+QT = TypeVar("QT")  # types elements of worker queue for `worker_fn_auto`
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:
@@ -38,3 +71,34 @@ def no_instantiate(cls: T) -> T:
 
     cls.__new__ = staticmethod(__new__)
     return cls
+
+
+# required "Parameter Type" of the defined worker function
+DefinedPT: TypeAlias = Callable[
+    Concatenate[OpT, Queue, ThreadingEvent, P],
+    None,
+]
+
+# "Parameter Type" at the callsite of the worker function
+CallsitePT: TypeAlias = Callable[Concatenate[OpT, Context, P], None]
+
+
+def worker_fn_auto(fn: DefinedPT) -> CallsitePT:
+    """a decorator that creates a closure of the worker creation and other abstractable setup"""
+
+    def wrapper(
+        self: MosplatOperatorBase,
+        context: Context,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ):
+
+        self._worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
+        self._worker.start()
+
+        self._timer = self.wm(context).event_timer_add(
+            time_step=0.1, window=context.window
+        )
+        self.wm(context).modal_handler_add(self)
+
+    return wrapper

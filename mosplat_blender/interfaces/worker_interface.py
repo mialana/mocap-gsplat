@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import threading
 from queue import Queue, Empty
-from typing import Callable, Generic, TypeVar, Optional, final
+from typing import Generic, TypeVar, Optional, Callable
 
-from ..infrastructure.decorators import no_instantiate
-
-T = TypeVar("T")
+QT = TypeVar("QT")  # types elements of worker queue for `worker_fn_auto`
 
 
-class OperatorWorker(Generic[T]):
+class MosplatWorkerInterface(Generic[QT]):
     """
-    worker abstraction for blender ops
+    an abstraction for blender operators that utilize similar "worker" behavior
 
     - thread-owned execution
     - queue-based communication
@@ -19,12 +17,12 @@ class OperatorWorker(Generic[T]):
     - no blender references
     """
 
-    def __init__(self, run_fn: Callable[[Queue, threading.Event], None]):
+    def __init__(self, worker_fn: Callable[[Queue, threading.Event], None]):
         self._queue: Queue = Queue()
         self._cancel_event = threading.Event()
 
         self._thread = threading.Thread(
-            target=run_fn,
+            target=worker_fn,
             args=(self._queue, self._cancel_event),
             daemon=True,
         )
@@ -44,18 +42,8 @@ class OperatorWorker(Generic[T]):
             except Empty:
                 break
 
-    def poll(self) -> Optional[T]:
+    def dequeue(self) -> Optional[QT]:
         try:
             return self._queue.get_nowait()
         except Empty:
             return None
-
-
-@final
-@no_instantiate
-class MosplatWorkerInterface:
-    @staticmethod
-    def create_worker(
-        run_fn: Callable[[Queue, threading.Event], None],
-    ) -> OperatorWorker:
-        return OperatorWorker(run_fn)
