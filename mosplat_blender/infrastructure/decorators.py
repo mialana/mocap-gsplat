@@ -12,14 +12,10 @@ from typing import (
     TYPE_CHECKING,
     Any,
     TypeAlias,
-    Optional,
-    Protocol,
 )
 
 from queue import Queue
 from threading import Event as ThreadingEvent
-
-from .constants import OperatorReturnItemsSet
 
 from ..interfaces import MosplatWorkerInterface
 

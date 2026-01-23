@@ -26,6 +26,15 @@ from ...infrastructure.mixins import (
 from ...infrastructure.constants import OperatorIDEnum
 from ...interfaces.worker_interface import MosplatWorkerInterface
 
+if TYPE_CHECKING:
+    from bpy.stub_internal.rna_enums import (
+        OperatorReturnItems as _OperatorReturnItemsSafe,
+    )
+else:
+    _OperatorReturnItemsSafe: TypeAlias = str
+OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
+OptionalOperatorReturnItemsSet: TypeAlias = Optional[OperatorReturnItemsSet]
+
 
 class OperatorPollReqs(Enum):
     """Custom enum in case operator does not require use of one poll requirement"""
@@ -88,3 +97,22 @@ class MosplatOperatorBase(
         if self._timer:
             self.wm(context).event_timer_remove(self._timer)
             self.logger().debug("Timer cleaned up")
+
+    def modal(self, context, event) -> OperatorReturnItemsSet:
+        if event.type in {"RIGHTMOUSE", "ESC"}:
+            self._cleanup(context)
+            return {"CANCELLED"}
+        elif event.type != "TIMER":
+            return {"PASS_THROUGH"}
+
+        return (
+            optional_return
+            if (optional_return := self.timed_callback_modal(context, event))
+            else {"RUNNING_MODAL", "PASS_THROUGH"}
+        )
+
+    def timed_callback_modal(
+        self, context, event
+    ) -> OptionalOperatorReturnItemsSet: ...
+
+    """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
