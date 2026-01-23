@@ -7,10 +7,15 @@ from typing import Tuple
 
 from ...interfaces import MosplatVGGTInterface
 
-from ...infrastructure.constants import OperatorIDEnum, OperatorReturnItemsSet
+from ...infrastructure.constants import OperatorIDEnum
 from ...infrastructure.decorators import worker_fn_auto
 
-from .base_ot import MosplatOperatorBase, OperatorPollReqs
+from .base_ot import (
+    MosplatOperatorBase,
+    OperatorPollReqs,
+    OperatorReturnItemsSet,
+    OptionalOperatorReturnItemsSet,
+)
 
 
 class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
@@ -37,13 +42,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
             return False  # prevent re-initialization
         return True
 
-    def modal(self, context, event) -> OperatorReturnItemsSet:
-        if event.type in {"RIGHTMOUSE", "ESC"}:
-            self._cleanup(context)
-            return {"CANCELLED"}
-        elif event.type != "TIMER":
-            return {"PASS_THROUGH"}
-
+    def timed_callback_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
         while self._worker and (next := self._worker.dequeue()) is not None:
             status, payload = next
 
@@ -55,8 +54,6 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
             else:
                 self.logger().error("VGGT model could not be initialized")
                 return {"CANCELLED"}
-
-        return {"RUNNING_MODAL", "PASS_THROUGH"}
 
     def execute(self, context) -> OperatorReturnItemsSet:
         prefs = self.prefs(context)

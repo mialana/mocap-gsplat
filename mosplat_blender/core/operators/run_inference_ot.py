@@ -2,9 +2,9 @@ import bpy
 from typing import List, ClassVar
 from pathlib import Path
 
-from ...infrastructure.constants import OperatorIDEnum, OperatorReturnItemsSet
+from ...infrastructure.constants import OperatorIDEnum
 
-from .base_ot import MosplatOperatorBase, OperatorPollReqs
+from .base_ot import MosplatOperatorBase, OperatorPollReqs, OperatorReturnItemsSet
 from ..preferences import Mosplat_AP_Global
 from ..properties import Mosplat_PG_Global
 

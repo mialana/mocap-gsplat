@@ -4,10 +4,15 @@ from typing import ClassVar, Set, Iterable, TYPE_CHECKING, TypeAlias, Any
 import threading
 from queue import Queue
 
-from .base_ot import MosplatOperatorBase, OperatorPollReqs
+from .base_ot import (
+    MosplatOperatorBase,
+    OperatorPollReqs,
+    OperatorReturnItemsSet,
+    OptionalOperatorReturnItemsSet,
+)
 from ..checks import check_data_output_dir
 
-from ...infrastructure.constants import OperatorIDEnum, OperatorReturnItemsSet
+from ...infrastructure.constants import OperatorIDEnum
 from ...interfaces.media_io_interface import (
     MosplatMediaIOInterface,
     MediaProcessStatus,
@@ -109,13 +114,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                     return  # stop processing
         self._queue.put(("done", True))
 
-    def modal(self, context, event) -> OperatorReturnItemsSet:
-        if event.type in {"RIGHTMOUSE", "ESC"}:
-            self._cleanup(context)
-            return {"CANCELLED"}
-        elif event.type != "TIMER":
-            return {"PASS_THROUGH"}
-
+    def timed_callback_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
         props = self.props(context)
 
         while not self._queue.empty():
@@ -157,5 +156,3 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
                         f"'{self._media_dir_path}' contains media files of different frame counts."
                     )
                     return {"CANCELLED"}
-
-        return {"RUNNING_MODAL", "PASS_THROUGH"}

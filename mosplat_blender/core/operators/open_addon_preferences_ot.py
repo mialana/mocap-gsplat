@@ -1,13 +1,13 @@
 import bpy
 from bpy.props import StringProperty
 
-from ...infrastructure.constants import (
-    OperatorIDEnum,
-    ADDON_HUMAN_READABLE,
+from ...infrastructure.constants import OperatorIDEnum, ADDON_HUMAN_READABLE
+
+from .base_ot import (
+    MosplatOperatorBase,
+    OperatorPollReqs,
     OperatorReturnItemsSet,
 )
-
-from .base_ot import MosplatOperatorBase, OperatorPollReqs
 
 
 class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):

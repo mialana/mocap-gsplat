@@ -72,15 +72,8 @@ PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"
 # static typecheck-only abstraction
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
-    from bpy.stub_internal.rna_enums import (
-        OperatorReturnItems as _OperatorReturnItemsSafe,
-    )
 else:
     DataclassInstance: TypeAlias = Any
-    _OperatorReturnItemsSafe: TypeAlias = str
-
-OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
-
 
 """Enum Convenience Classes"""
 
