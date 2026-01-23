@@ -1,27 +1,20 @@
 from pathlib import Path
-from typing import ClassVar, Set, Iterable, TYPE_CHECKING, TypeAlias, Any
 
 import threading
 from queue import Queue
 
 from .base_ot import (
     MosplatOperatorBase,
-    OperatorPollReqs,
     OperatorReturnItemsSet,
     OptionalOperatorReturnItemsSet,
 )
 from ..checks import check_data_output_dir
 
-from ...infrastructure.constants import OperatorIDEnum
+from ...infrastructure.schemas import OperatorIDEnum
 from ...interfaces.media_io_interface import (
     MosplatMediaIOInterface,
     MediaProcessStatus,
 )
-
-if TYPE_CHECKING:
-    from ..properties import Mosplat_PG_MediaProcessStatus
-else:
-    Mosplat_PG_MediaProcessStatus: TypeAlias = Any
 
 
 class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
@@ -30,23 +23,8 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         "Check frame counts of all media files found in given media directory."
     )
 
-    __poll_reqs__ = {OperatorPollReqs.PREFS, OperatorPollReqs.PROPS}
-
-    _extensions: ClassVar[Set[str]]
-
-    _media_dir_path: ClassVar[Path]
-    _data_output_dir: ClassVar[Path]
-
-    _files: ClassVar[Iterable[Path]]
-
     @classmethod
-    def poll(cls, context) -> bool:
-        if not super().poll(context):
-            return False
-
-        prefs = cls.prefs(context)
-        props = cls.props(context)
-
+    def contexted_poll(cls, context, prefs, props) -> bool:
         extension_set_str: str = prefs.media_extension_set
         try:
             cls._extensions = set(
@@ -82,23 +60,21 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
             return False
         return True
 
-    def execute(self, context) -> OperatorReturnItemsSet:
+    def contexted_execute(self, context) -> OperatorReturnItemsSet:
         if not MosplatMediaIOInterface.initialized:
             MosplatMediaIOInterface.initialize(
                 self._media_dir_path, self._data_output_dir
             )
 
-        self.props(context).current_media_io_metadata.media_process_statuses.clear()
+        self._props.metadata.media_process_statuses.clear()
 
         self._queue = Queue()
 
         self._thread = threading.Thread(target=self._process_files_thread, daemon=True)
         self._thread.start()
 
-        self._timer = self.wm(context).event_timer_add(
-            time_step=0.1, window=context.window
-        )
-        self.wm(context).modal_handler_add(self)  # start timer polling here
+        self._timer = self._wm.event_timer_add(time_step=0.1, window=context.window)
+        self._wm.modal_handler_add(self)  # start timer polling here
 
         return {"RUNNING_MODAL"}
 
@@ -115,7 +91,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
         self._queue.put(("done", True))
 
     def timed_callback_modal(self, context, event) -> OptionalOperatorReturnItemsSet:
-        props = self.props(context)
+        props = self._props
 
         while not self._queue.empty():
             tag, payload = self._queue.get_nowait()
@@ -123,9 +99,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase):
             if tag == "status":
                 status: MediaProcessStatus = payload
 
-                media: Mosplat_PG_MediaProcessStatus = (
-                    props.current_media_io_metadata.media_process_statuses.add()
-                )
+                media = props.metadata.media_process_statuses.add()
                 media.filepath = str(status.filepath)
                 media.frame_count = status.frame_count
 

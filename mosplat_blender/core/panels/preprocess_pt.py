@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias, Any
 
-from ...infrastructure.constants import OperatorIDEnum, PanelIDEnum
+from ...infrastructure.schemas import PanelIDEnum, OperatorIDEnum
 
-from .base_pt import MosplatPanelBase, PanelPollReqs
+from .base_pt import MosplatPanelBase
 
 if TYPE_CHECKING:
     from ..properties import Mosplat_PG_MediaProcessStatus
@@ -17,12 +17,10 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
     bl_parent_id = PanelIDEnum.MAIN
 
-    __poll_reqs__ = {PanelPollReqs.PROPS}
-
     def draw_with_layout(self, context, layout):
         column = layout.column()
 
-        props = self.props(context)
+        props = self._props
 
         column.operator(OperatorIDEnum.INITIALIZE_MODEL)
 

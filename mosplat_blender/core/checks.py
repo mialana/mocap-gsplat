@@ -8,7 +8,7 @@ we can operate with type-awareness in development.
 
 from bpy.types import Preferences, Scene, Context
 
-from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn
+from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, NoReturn, Optional
 from pathlib import Path
 
 from ..infrastructure.constants import (
@@ -29,7 +29,7 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 
 def check_propertygroup(
-    scene: Union[Scene, None],
+    scene: Optional[Scene],
 ) -> Union[Mosplat_PG_Global, NoReturn]:
     if scene is None:
         raise RuntimeError("Blender scene unavailable in this context.")
@@ -45,7 +45,7 @@ def check_propertygroup(
 
 
 def check_addonpreferences(
-    prefs_ctx: Union[Preferences, None],
+    prefs_ctx: Optional[Preferences],
 ) -> Union[Mosplat_AP_Global, NoReturn]:
     if prefs_ctx is None:
         raise RuntimeError("Blender preferences unavailable in this context.")
@@ -61,7 +61,7 @@ def check_addonpreferences(
         )
 
 
-def check_props_safe(context: Context) -> Union[Mosplat_PG_Global, None]:
+def check_props_safe(context: Context) -> Optional[Mosplat_PG_Global]:
     """provide a safe, non-throwing check that will log the stack trace but not raise"""
     try:
         return check_propertygroup(context.scene)
@@ -69,7 +69,7 @@ def check_props_safe(context: Context) -> Union[Mosplat_PG_Global, None]:
         return None  # log stack trace but do not raise
 
 
-def check_prefs_safe(context: Context) -> Union[Mosplat_AP_Global, None]:
+def check_prefs_safe(context: Context) -> Optional[Mosplat_AP_Global]:
     """provide a safe, non-throwing check that will log the stack trace but not raise"""
     try:
         return check_addonpreferences(context.preferences)
@@ -100,3 +100,12 @@ def check_json_filepath(
     prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
 ) -> Union[Path, NoReturn]:
     return check_data_output_dir(prefs, props).joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
+
+
+def check_media_directory(
+    props: Mosplat_PG_Global,
+    prefs: Mosplat_AP_Global,
+):
+    dc = props.metadata.to_dataclass()
+
+    files = dc.base_directory

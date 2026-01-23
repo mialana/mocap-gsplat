@@ -1,6 +1,6 @@
 """decorator functions"""
 
-from bpy.types import Context  # import `bpy` to enforce types
+from bpy.types import Context, Event  # import `bpy` to enforce types
 
 from functools import wraps, partial
 from typing import (
@@ -12,6 +12,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     TypeAlias,
+    TypedDict,
+    Required,
+    NotRequired,
+    Unpack,
+    Union,
 )
 
 from queue import Queue
@@ -33,8 +38,7 @@ T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
 
 OpT = TypeVar(
     "OpT", bound=MosplatOperatorBase
-)  # types the `self` parameter for `worker_fn_auto`
-QT = TypeVar("QT")  # types elements of worker queue for `worker_fn_auto`
+)  # types the `self` parameter for `worker_fn_auto` and `encapsulated_context`
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:
@@ -69,22 +73,13 @@ def no_instantiate(cls: T) -> T:
     return cls
 
 
-# required "Parameter Type" of the defined worker function
-DefinedPT: TypeAlias = Callable[
-    Concatenate[OpT, Queue, ThreadingEvent, P],
-    None,
-]
-
-# "Parameter Type" at the callsite of the worker function
-CallsitePT: TypeAlias = Callable[Concatenate[OpT, Context, P], None]
-
-
-def worker_fn_auto(fn: DefinedPT) -> CallsitePT:
+def worker_fn_auto(
+    fn: Callable[Concatenate[OpT, Queue, ThreadingEvent, P], None],
+) -> Callable[Concatenate[OpT, P], None]:
     """a decorator that creates a closure of the worker creation and other abstractable setup"""
 
     def wrapper(
-        self: MosplatOperatorBase,
-        context: Context,
+        self: OpT,
         *args: P.args,
         **kwargs: P.kwargs,
     ):
@@ -92,9 +87,36 @@ def worker_fn_auto(fn: DefinedPT) -> CallsitePT:
         self._worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
         self._worker.start()
 
-        self._timer = self.wm(context).event_timer_add(
-            time_step=0.1, window=context.window
+        self._timer = self._wm.event_timer_add(
+            time_step=0.1, window=self._context.window
         )
-        self.wm(context).modal_handler_add(self)
+        self._wm.modal_handler_add(self)
+
+    return wrapper
+
+
+class WithContextKwargs(TypedDict):
+    context: Required[Context]
+    event: NotRequired[Event]
+
+
+def encapsulated_context(
+    fn: Callable[Concatenate[OpT, Context, ...], R],
+) -> Callable[Concatenate[OpT, Context, ...], R]:
+    """a decorator that sets `_context` properties before function runs, and removes it when complete."""
+
+    def wrapper(self: OpT, *args, **kwargs: Unpack[WithContextKwargs]):
+
+        context = kwargs["context"]
+        self._context = context
+        self._props._context = context
+        self._prefs._context = context
+
+        try:
+            return fn(self, context, *args, **kwargs)
+        finally:
+            self._context = None
+            self._props._context = None
+            self._prefs._context = None
 
     return wrapper

@@ -1,11 +1,10 @@
 import bpy
-from bpy.props import StringProperty
 
-from ...infrastructure.constants import OperatorIDEnum, ADDON_HUMAN_READABLE
+from ...infrastructure.constants import ADDON_HUMAN_READABLE
+from ...infrastructure.schemas import OperatorIDEnum
 
 from .base_ot import (
     MosplatOperatorBase,
-    OperatorPollReqs,
     OperatorReturnItemsSet,
 )
 
@@ -16,12 +15,10 @@ class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
         f"Quick navigation to {ADDON_HUMAN_READABLE} saved addon preferences."
     )
 
-    __poll_reqs__ = {OperatorPollReqs.WINDOW_MANAGER}
-
-    def execute(self, context) -> OperatorReturnItemsSet:
+    def contexted_execute(self, context) -> OperatorReturnItemsSet:
         bpy.ops.screen.userpref_show()
 
-        wm = self.wm(context)
+        wm = self._wm
         wm.addon_search = ADDON_HUMAN_READABLE
         wm.addon_filter = "All"
 

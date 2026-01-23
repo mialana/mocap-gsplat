@@ -10,9 +10,8 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-from typing import Any, Final, TYPE_CHECKING, TypeAlias, Set
+from typing import Any, Final, TYPE_CHECKING, TypeAlias
 from pathlib import Path
-from enum import StrEnum, auto
 from string import capwords
 
 _MISSING_: Any = object()  # sentinel variable
@@ -74,69 +73,6 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 else:
     DataclassInstance: TypeAlias = Any
-
-"""Enum Convenience Classes"""
-
-
-class OperatorIDEnum(StrEnum):
-    @staticmethod
-    def _prefix():
-        return OPERATOR_ID_PREFIX
-
-    @staticmethod
-    def _category():
-        return ADDON_SHORTNAME
-
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{OPERATOR_ID_PREFIX}{name.lower()}"
-
-    @staticmethod
-    def label_factory(member: OperatorIDEnum):
-        """
-        creates the operator label from the id
-        keeping this here so this file can be a one-stop shop for metadata construction
-        """
-        return capwords(member.value.removeprefix(OPERATOR_ID_PREFIX).replace("_", " "))
-
-    @staticmethod
-    def basename_factory(member: OperatorIDEnum):
-        return member.value.rpartition(".")[-1]
-
-    @staticmethod
-    def run(bpy_ops, member: OperatorIDEnum):
-        getattr(getattr(bpy_ops, member._category()), member.basename_factory(member))()
-
-    INITIALIZE_MODEL = auto()
-    RUN_INFERENCE = auto()
-    OPEN_ADDON_PREFERENCES = auto()
-    CHECK_MEDIA_FRAME_COUNTS = auto()
-
-
-class PanelIDEnum(StrEnum):
-    @staticmethod
-    def _prefix():
-        return PANEL_ID_PREFIX
-
-    @staticmethod
-    def _category():
-        return ADDON_SHORTNAME
-
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{PANEL_ID_PREFIX}{name.lower()}"
-
-    @staticmethod
-    def label_factory(member: PanelIDEnum):
-        """
-        creates the panel label from the id
-        keeping this here so this file can be a one-stop shop for metadata construction
-        """
-        return capwords(member.value.removeprefix(PANEL_ID_PREFIX).replace("_", " "))
-
-    MAIN = auto()
-    PREPROCESS = auto()
-
 
 # path location of the shipped preprocess script
 DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(

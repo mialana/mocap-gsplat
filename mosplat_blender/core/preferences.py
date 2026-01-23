@@ -5,13 +5,10 @@ from bpy.props import StringProperty, IntProperty
 
 from pathlib import Path
 import os
-from typing import Union
-
-from .checks import check_props_safe
+from typing import Set, Optional
 
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import (
-    MosplatLogClassMixin,
     MosplatBlPropertyAccessorMixin,
     MosplatPGAccessorMixin,
 )
@@ -44,9 +41,7 @@ def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
 
 
 class Mosplat_AP_Global(
-    AddonPreferences,
-    MosplatPGAccessorMixin,
-    MosplatBlPropertyAccessorMixin,
+    AddonPreferences, MosplatBlPropertyAccessorMixin, MosplatPGAccessorMixin
 ):
     bl_idname = ADDON_PREFERENCES_ID
 
@@ -150,6 +145,20 @@ class Mosplat_AP_Global(
     @property
     def vggt_model_dir(self) -> Path:
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
+
+    @property
+    def extensions_list(self) -> Optional[Set[str]]:
+        try:
+            return set(
+                [
+                    ext.strip().lower()
+                    for ext in str(self.media_extension_set).split(",")
+                ]
+            )
+        except IndexError:
+            raise AttributeError(
+                f"Extensions in '{self.get_prop_name('media_extension_set')}' should be separated by commas."
+            )
 
     def draw(self, _: Context):
         layout = self.layout
