@@ -68,22 +68,28 @@ class MosplatLoggingInterface:
     def init_handlers_from_addon_prefs(cls, addon_prefs: SupportsMosplat_AP_Global):
         if not cls._root_logger:
             return
+        try:
+            if cls.init_stdout_handler(
+                addon_prefs.stdout_log_format,
+                addon_prefs.stdout_date_log_format,
+            ):
+                cls._root_logger.info(
+                    f"STDOUT handler initialized from addon preferences."
+                )
 
-        if cls.init_stdout_handler(
-            addon_prefs.stdout_log_format,
-            addon_prefs.stdout_date_log_format,
-        ):
-            cls._root_logger.info(f"STDOUT handler initialized from addon preferences.")
-
-        if cls.init_json_handler(
-            log_fmt=addon_prefs.json_log_format,
-            log_date_fmt=addon_prefs.json_date_log_format,
-            outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
-            file_fmt=addon_prefs.json_log_filename_format,
-        ):
-            cls._root_logger.info(f"JSON handler initialized from addon preferences.")
-
-        return
+            if cls.init_json_handler(
+                log_fmt=addon_prefs.json_log_format,
+                log_date_fmt=addon_prefs.json_date_log_format,
+                outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
+                file_fmt=addon_prefs.json_log_filename_format,
+            ):
+                cls._root_logger.info(
+                    f"JSON handler initialized from addon preferences."
+                )
+        except Exception:
+            cls._root_logger.exception(
+                "Initialization from addon preferences unsuccessful"
+            )
 
     @classmethod
     @run_once
@@ -133,7 +139,7 @@ class MosplatLoggingInterface:
             return True
         except Exception:
             cls._root_logger.exception("Configuration for STDOUT handler invalid.")
-            return False
+            raise
 
     @classmethod
     def init_json_handler(
@@ -168,7 +174,7 @@ class MosplatLoggingInterface:
             return True
         except Exception:
             cls._root_logger.exception("Configuration for JSON handler invalid.")
-            return False
+            raise
 
     @classmethod
     def set_log_record_factory(cls):

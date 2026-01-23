@@ -18,26 +18,31 @@ from ..infrastructure.constants import (
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
     ADDON_SHORTNAME,
 )
+from ..infrastructure.schemas import PropertyUpdateError
 
 
 def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
-    if MosplatLoggingInterface.init_stdout_handler(
-        log_fmt=prefs.stdout_log_format,
-        log_date_fmt=prefs.stdout_date_log_format,
-    ):
-        prefs.logger().info("STDOUT logging updated.")
-    else:
-        raise TypeError()
+    try:
+        if MosplatLoggingInterface.init_stdout_handler(
+            log_fmt=prefs.stdout_log_format,
+            log_date_fmt=prefs.stdout_date_log_format,
+        ):
+            prefs.logger().info("STDOUT logging updated.")
+    except Exception:
+        raise PropertyUpdateError
 
 
 def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
-    if MosplatLoggingInterface.init_json_handler(
-        log_fmt=prefs.json_log_format,
-        log_date_fmt=prefs.json_date_log_format,
-        outdir=prefs.json_log_dir,
-        file_fmt=prefs.json_log_filename_format,
-    ):
-        prefs.logger().info("JSON logging updated.")
+    try:
+        if MosplatLoggingInterface.init_json_handler(
+            log_fmt=prefs.json_log_format,
+            log_date_fmt=prefs.json_date_log_format,
+            outdir=prefs.json_log_dir,
+            file_fmt=prefs.json_log_filename_format,
+        ):
+            prefs.logger().info("JSON logging updated.")
+    except Exception:
+        raise PropertyUpdateError
 
 
 class Mosplat_AP_Global(
@@ -156,7 +161,7 @@ class Mosplat_AP_Global(
                 ]
             )
         except IndexError:
-            raise AttributeError(
+            raise PropertyUpdateError(
                 f"Extensions in '{self.get_prop_name('media_extension_set')}' should be separated by commas."
             )
 

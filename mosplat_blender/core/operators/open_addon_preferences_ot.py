@@ -18,7 +18,7 @@ class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
         bpy.ops.screen.userpref_show()
 
-        wm = self._wm
+        wm = self.wm
         wm.addon_search = ADDON_HUMAN_READABLE
         wm.addon_filter = "All"
 

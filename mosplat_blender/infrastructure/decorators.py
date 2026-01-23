@@ -84,13 +84,11 @@ def worker_fn_auto(
         **kwargs: P.kwargs,
     ):
 
-        self._worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
-        self._worker.start()
+        self.worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
+        self.worker.start()
 
-        self._timer = self._wm.event_timer_add(
-            time_step=0.1, window=self._context.window
-        )
-        self._wm.modal_handler_add(self)
+        self.timer = self.wm.event_timer_add(time_step=0.1, window=self.context.window)
+        self.wm.modal_handler_add(self)
 
     return wrapper
 
@@ -108,15 +106,15 @@ def encapsulated_context(
     def wrapper(self: OpT, *args, **kwargs: Unpack[WithContextKwargs]):
 
         context = kwargs["context"]
-        self._context = context
-        self._props._context = context
-        self._prefs._context = context
+        self.context = context
+        self.props.context = context
+        self.prefs.context = context
 
         try:
             return fn(self, context, *args, **kwargs)
         finally:
-            self._context = None
-            self._props._context = None
-            self._prefs._context = None
+            self.context = None
+            self.props.context = None
+            self.prefs.context = None
 
     return wrapper

@@ -20,7 +20,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
     def draw_with_layout(self, context, layout):
         column = layout.column()
 
-        props = self._props
+        props = self.props
 
         column.operator(OperatorIDEnum.INITIALIZE_MODEL)
 

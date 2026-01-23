@@ -25,8 +25,9 @@ from ..infrastructure.mixins import (
     MosplatDataclassInteropMixin,
     MosplatAPAccessorMixin,
 )
-from ..infrastructure.constants import OperatorIDEnum, DataclassInstance
+from ..infrastructure.constants import DataclassInstance
 from ..infrastructure.schemas import (
+    OperatorIDEnum,
     GlobalData,
     MediaIOMetadata,
     MediaProcessStatus,
@@ -160,7 +161,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorM
         media_directory_name = media_dir_path.name
 
         formatted_output_path = Path(
-            str(self._prefs.data_output_path).format(
+            str(self.prefs.data_output_path).format(
                 media_directory_name=media_directory_name
             )
         )

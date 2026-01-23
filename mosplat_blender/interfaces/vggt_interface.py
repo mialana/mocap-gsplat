@@ -4,6 +4,7 @@ provides the interface between the add-on and the VGGT model.
 
 from typing import ClassVar, TYPE_CHECKING, TypeAlias, final
 from pathlib import Path
+import threading
 import gc
 
 from ..infrastructure.mixins import MosplatLogClassMixin
@@ -24,15 +25,21 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
     _initialized: ClassVar[bool] = False
 
     @classmethod
-    def initialize_model(cls, hf_id: str, outdir: Path) -> bool:
+    def initialize_model(
+        cls, hf_id: str, outdir: Path, cancel_event: threading.Event
+    ) -> bool:
         from vggt.models.vggt import VGGT
 
         if cls._model:
             return False  # initialization did not occur
 
         cls._model = VGGT.from_pretrained(hf_id, cache_dir=outdir)
-
         cls._initialized = True
+
+        if (
+            cancel_event.is_set()
+        ):  # if cancel event was set at some point cleanup the resources
+            cls.cleanup()
 
         return cls._initialized
 

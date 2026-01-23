@@ -76,28 +76,39 @@ class MosplatOperatorBase(
         """an overrideable entrypoint for `poll` with access to prefs and props"""
         ...
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._worker: Optional[MosplatWorkerInterface[Q]]
-        self._timer: Optional[Timer]
+    @property
+    def worker(self) -> Optional[MosplatWorkerInterface[Q]]:
+        return getattr(self, "_worker", None)
+    
+    @worker.setter
+    def worker(self, wkr: Optional[MosplatWorkerInterface[Q]]):
+        self._worker = wkr
 
     @property
-    def _wm(self) -> WindowManager:
-        if not (wm := self._context.window_manager):
+    def timer(self) -> Optional[Timer]:
+        return getattr(self, "_timer", None)
+    
+    @timer.setter
+    def timer(self, tmr: Optional[Timer]):
+        self._timer = tmr
+
+    @property
+    def wm(self) -> WindowManager:
+        if not (wm := self.context.window_manager):
             raise PollGuardError
         return wm
 
     @contextlib.contextmanager
     def context_block(self, context: Context):
-        self._context = context
-        self._props._context = context
-        self._prefs._context = context
+        self.context = context
+        self.props.context = context
+        self.prefs.context = context
         try:
             yield
         finally:
-            self._context = None
-            self._props._context = None
-            self._prefs._context = None
+            self.context = None
+            self.props.context = None
+            self.prefs.context = None
 
     def execute(self, context) -> OperatorReturnItemsSet:
         with self.context_block(context):
@@ -148,9 +159,9 @@ class MosplatOperatorBase(
             self._cleanup(context)
 
     def _cleanup(self, context: Context):
-        if self._timer:
-            self._wm.event_timer_remove(self._timer)
+        if self.timer:
+            self.wm.event_timer_remove(self.timer)
             self.logger().debug("Timer cleaned up")
-        if self._worker:
-            self._worker.cleanup()
+        if self.worker:
+            self.worker.cleanup()
             self.logger().debug("Worker cleaned up")

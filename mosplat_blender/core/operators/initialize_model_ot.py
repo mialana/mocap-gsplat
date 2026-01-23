@@ -31,9 +31,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
     )  # pyright: ignore[reportInvalidTypeForm]
 
     @classmethod
-    def poll(cls, context) -> bool:
-        if not super().poll(context):
-            return False
+    def contexted_poll(cls, context, prefs, props) -> bool:
         if MosplatVGGTInterface._initialized:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
@@ -53,13 +51,8 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
                 return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        prefs = self._prefs
-        self.vggt_hf_id = prefs.vggt_hf_id
-        self.vggt_outdir = prefs.vggt_model_dir
-
-        vggt_outdir_path: Path = Path(self.vggt_outdir)  # convert to path here
-
-        self._install_model_thread(self.vggt_hf_id, vggt_outdir_path)
+        prefs = self.prefs
+        self._install_model_thread(prefs.vggt_hf_id, prefs.vggt_model_dir)
 
         return {"RUNNING_MODAL"}
 
@@ -72,7 +65,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
         outdir: Path,
     ):
         # put true or false initialize result in queue
-        MosplatVGGTInterface.initialize_model(hf_id, outdir)
+        MosplatVGGTInterface.initialize_model(hf_id, outdir, cancel_event)
 
         """
         use initialization status rather than return result as `initialize_model`
