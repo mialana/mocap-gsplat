@@ -41,21 +41,18 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase[Tuple[str]]):
             restore_metadata_from_json(props, prefs)  # try to restore from local JSON
 
             # try setting all the properties that are needed for the op
-            prefs.media_extensions_set = check_media_extensions(prefs)
-            props.data_output_dirpath = check_data_output_dirpath(prefs, props)
-            props.media_files = check_media_files(prefs, props)
+            self._media_extensions_set = check_media_extensions(prefs)
+            self._data_output_dirpath = check_data_output_dirpath(prefs, props)
+            self._media_files = check_media_files(prefs, props)
             return self.execute(context)
         except UserFacingError as e:
             self.logger().error(str(e))
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        if self.props.media_files is None:
-            return {"CANCELLED"}
-
         check_frame_counts_thread(
             self,
-            updated_media_files=self.props.media_files,
+            updated_media_files=self._media_files,
             metadata_dc=self.metadata_dc,
         )
 
@@ -73,7 +70,7 @@ def check_frame_counts_thread(
     queue: Queue[str],
     cancel_event: threading.Event,
     *,
-    updated_media_files: Set[Path],
+    updated_media_files: List[Path],
     metadata_dc: MediaIOMetadata,
 ):
     status_lookup = MediaProcessStatus.as_lookup(metadata_dc.media_process_statuses)
@@ -90,13 +87,13 @@ def check_frame_counts_thread(
         status = status_lookup.get(str(file), MediaProcessStatus(filepath=str(file)))
 
         # if success is already valid skip new extraction
-        success = status.is_valid or _extract_media_frame_count(
-            status
-        )  # overwrite `success` here
+        success = status.is_valid or _extract_media_frame_count(status)
 
-        target_frame_count = max(
-            metadata_dc.collective_media_frame_count, status.frame_count
-        )  # weed out if either are -1
+        target_frame_count = (
+            status.frame_count
+            if metadata_dc.collective_media_frame_count == -1
+            else metadata_dc.collective_media_frame_count
+        )
 
         metadata_dc.do_media_durations_all_match = (
             metadata_dc.do_media_durations_all_match

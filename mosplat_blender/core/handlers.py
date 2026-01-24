@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING, TypeAlias, TypeAlias, Any, Optional
 from .checks import (
     check_propertygroup,
     check_addonpreferences,
-    check_data_output_dirpath,
+    check_metadata_json_filepath,
+    check_current_media_dirpath,
 )
 
-from ..infrastructure.schemas import MediaIOMetadata
+from ..infrastructure.schemas import MediaIOMetadata, UserFacingError
 from ..interfaces.logging_interface import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -43,16 +44,16 @@ def restore_metadata_from_json(
     """base entrypoint"""
     prefs = prefs or check_addonpreferences(bpy.context.preferences)
 
-    # update to the latest output path
-    data_output_dirpath = check_data_output_dirpath(prefs, props)
-    props.data_output_dirpath = data_output_dirpath
+    # get destination path for json
+    json_dirpath = check_metadata_json_filepath(prefs, props)
 
-    json_dirpath = props.metadata_json_filepath
     if not json_dirpath.exists:
         logger.info("No JSON file to be restored. Creating default metadata.")
 
+    current_media_dirpath = check_current_media_dirpath(props)
+
     dc = MediaIOMetadata.from_JSON(
-        json_path=json_dirpath, base_directory=props.current_media_dirpath
+        json_path=json_dirpath, base_directory=current_media_dirpath
     )
 
     metadata_prop = props.metadata_ptr

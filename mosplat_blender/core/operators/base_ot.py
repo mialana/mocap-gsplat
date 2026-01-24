@@ -2,7 +2,7 @@ from bpy.types import Context, WindowManager, Timer, Event, Operator
 
 from typing import Set, TYPE_CHECKING, TypeAlias, Optional, Generic, TypeVar, Any
 
-from ..checks import check_prefs_safe, check_props_safe
+from ..checks import check_prefs_safe, check_props_safe, check_metadata_json_filepath
 from ...infrastructure.mixins import (
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
@@ -165,7 +165,11 @@ class MosplatOperatorBase(
     ) -> OptionalOperatorReturnItemsSet:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
         while self.worker and (next := self.worker.dequeue()) is not None:
-            return self.queue_callback(context, event, next)
+            try:
+                return self.queue_callback(context, event, next)
+            finally:
+                if context.area:
+                    context.area.tag_redraw()  # redraw UI
 
     def queue_callback(
         self, context: Context, event: Event, next: Q
@@ -179,7 +183,8 @@ class MosplatOperatorBase(
 
     def cleanup(self, context: Context):
         # update JSON with current state of PG as source of truth
-        self.props.metadata_ptr.to_JSON(self.props.metadata_json_filepath)
+        metadata_json_filepath = check_metadata_json_filepath(self.prefs, self.props)
+        self.props.metadata_ptr.to_JSON(metadata_json_filepath)
 
         if self.timer:
             self.wm.event_timer_remove(self.timer)
