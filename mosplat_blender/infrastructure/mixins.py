@@ -172,7 +172,7 @@ class MosplatAPAccessorMixin(MosplatLogClassMixin):
 
         context = getattr(self, "context", None)
         if context is None:
-            self.logger().warning("Using fallback context for prefs.", stack_info=True)
+            self.logger().warning("Using fallback context for prefs.")
             from bpy import context as fallback_context
 
             context = fallback_context
@@ -196,7 +196,7 @@ class MosplatPGAccessorMixin(MosplatLogClassMixin):
 
         context = getattr(self, "context", None)
         if context is None:
-            self.logger().warning("Using fallback context for props.", stack_info=True)
+            self.logger().warning("Using fallback context for props.")
             from bpy import context as fallback_context
 
             context = fallback_context

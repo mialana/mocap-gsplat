@@ -13,12 +13,12 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar, TYPE_CHECKING, Any, TypeAlias
+from typing import Generic, TypeVar, Optional, Set
 
 from pathlib import Path
 
 from .handlers import restore_metadata_from_json
-from .checks import check_addonpreferences
+from .checks import check_addonpreferences, check_media_files, check_data_output_dirpath
 
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
@@ -29,7 +29,7 @@ from ..infrastructure.constants import (
     MEDIA_IO_METADATA_JSON_FILENAME,
 )
 from ..infrastructure.schemas import (
-    UserFacingError,
+    DeveloperError,
     OperatorIDEnum,
     GlobalData,
     MediaIOMetadata,
@@ -38,23 +38,7 @@ from ..infrastructure.schemas import (
     PreprocessScriptApplication,
 )
 
-if TYPE_CHECKING:
-    from ..core.preferences import Mosplat_AP_Global
-else:
-    Mosplat_AP_Global: TypeAlias = Any
-
 D = TypeVar("D", bound=DataclassInstance)
-
-
-def update_current_media_dir(props: Mosplat_PG_Global, context: Context):
-    prefs = check_addonpreferences(context.preferences)
-    restore_metadata_from_json(props, prefs)  # try to restore from local JSON
-
-    props.metadata.base_directory = (
-        props.current_media_dir
-    )  # sync directories on success
-
-    OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
 
 class MosplatPropertyGroupBase(
@@ -127,8 +111,34 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
     )
 
 
+def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
+    from .operators.check_media_frame_counts_ot import (
+        Mosplat_OT_check_media_frame_counts,
+    )
+
+    prefs = check_addonpreferences(context.preferences)
+
+    # update custom properties
+    self.media_files = check_media_files(prefs, self)
+    self.data_output_dirpath = check_data_output_dirpath(prefs, self)
+
+    restore_metadata_from_json(self, prefs)  # try to restore from local JSON
+
+    self.logger().info(f"'{self.get_prop_name('current_media_dir')}' updated.")
+
+    if Mosplat_OT_check_media_frame_counts.poll(context):
+        self.metadata.base_directory = (
+            self.current_media_dir
+        )  # sync directories on success
+
+        OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
+
+
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     __dataclass_type__ = GlobalData
+
+    __data_output_dirpath: Optional[Path] = None
+    __media_files: Optional[Set[Path]] = None
 
     current_media_dir: StringProperty(
         name="Media Directory",
@@ -159,32 +169,30 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
 
     @property
     def current_media_dirpath(self) -> Path:
-        if not (media_dir_path := Path(self.current_media_dir)).is_dir():
-            raise UserFacingError(
-                f"'{self.get_prop_name('media_dir_path')}' is not a valid directory."
+        from .checks import check_current_media_dirpath
+
+        return check_current_media_dirpath(self)
+
+    @property
+    def data_output_dirpath(self) -> Optional[Path]:
+        return self.__data_output_dirpath
+
+    @data_output_dirpath.setter
+    def data_output_dirpath(self, path: Path):
+        self.__data_output_dirpath = path
+
+    @property
+    def metadata_json_filepath(self) -> Path:
+        if not self.data_output_dirpath:
+            raise DeveloperError(
+                f"'{self.data_output_dirpath=}' should be set before this access."
             )
+        return self.data_output_dirpath.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
 
-        return media_dir_path
+    @property
+    def media_files(self):
+        return self.__media_files
 
-    def data_output_dirpath(self, prefs: Mosplat_AP_Global) -> Path:
-        media_directory_name = self.current_media_dirpath.name
-
-        formatted_output_path = Path(
-            str(prefs.data_output_path).format(
-                media_directory_name=media_directory_name
-            )
-        )
-        if formatted_output_path.is_absolute():
-            return formatted_output_path
-        else:
-            return self.current_media_dirpath.joinpath(formatted_output_path)
-
-    def metadata_json_filepath(self, prefs: Mosplat_AP_Global) -> Path:
-        return self.data_output_dirpath(prefs).joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
-
-    def media_files(self, prefs: Mosplat_AP_Global):
-        return [
-            p
-            for p in self.current_media_dirpath.iterdir()
-            if p.suffix.lower() in prefs.media_extensions_set
-        ]
+    @media_files.setter
+    def media_files(self, files: Set[Path]):
+        self.__media_files = files
