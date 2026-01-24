@@ -17,8 +17,8 @@ class MosplatWorkerInterface(Generic[QT]):
     - no blender references
     """
 
-    def __init__(self, worker_fn: Callable[[Queue, threading.Event], None]):
-        self._queue: Queue = Queue()
+    def __init__(self, worker_fn: Callable[[Queue[QT], threading.Event], None]):
+        self._queue: Queue[QT] = Queue[QT]()
         self._cancel_event = threading.Event()
 
         self._thread = threading.Thread(

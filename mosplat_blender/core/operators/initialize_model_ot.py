@@ -3,6 +3,7 @@ from bpy.props import StringProperty
 from pathlib import Path
 import threading
 from queue import Queue
+from typing import Tuple
 
 from ...interfaces import MosplatVGGTInterface
 
@@ -16,7 +17,7 @@ from .base_ot import (
 )
 
 
-class Mosplat_OT_initialize_model(MosplatOperatorBase[tuple[str, bool]]):
+class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
     bl_description = (
         f"Install VGGT model weights from Hugging Face or load from cache if available."
@@ -59,7 +60,7 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[tuple[str, bool]]):
 
 @worker_fn_auto
 def initialize_model_thread(
-    queue: Queue,
+    queue: Queue[Tuple[str, bool]],
     cancel_event: threading.Event,
     *,
     hf_id: str,

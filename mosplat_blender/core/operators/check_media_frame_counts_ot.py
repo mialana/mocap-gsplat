@@ -1,5 +1,4 @@
-from pathlib import Path
-
+from typing import Optional, Tuple
 import threading
 from queue import Queue
 
@@ -14,13 +13,13 @@ from ...infrastructure.schemas import (
     UserFacingError,
     DeveloperError,
     MediaIOMetadata,
+    MediaProcessStatus,
 )
 from ...infrastructure.decorators import worker_fn_auto
-from ...interfaces.media_io_interface import MediaProcessStatus
 
 
 class Mosplat_OT_check_media_frame_counts(
-    MosplatOperatorBase[tuple[str, MediaProcessStatus]]
+    MosplatOperatorBase[Tuple[str, Optional[MediaIOMetadata]]]
 ):
     bl_idname = OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS
     bl_description = (
@@ -52,9 +51,12 @@ class Mosplat_OT_check_media_frame_counts(
 
 @worker_fn_auto
 def check_frame_counts_thread(
-    queue: Queue, cancel_event: threading.Event, *, metadata: MediaIOMetadata
+    queue: Queue[Tuple[str, MediaIOMetadata]],
+    cancel_event: threading.Event,
+    *,
+    metadata: MediaIOMetadata,
 ):
-    pass
+    queue.put(("metadata", metadata))
 
 
 def _extract_media_frame_count(status: MediaProcessStatus):

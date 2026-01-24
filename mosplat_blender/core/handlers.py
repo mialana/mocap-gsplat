@@ -49,9 +49,11 @@ def restore_metadata_from_json(
 
     json_dirpath = props.metadata_json_filepath
     if not json_dirpath.exists:
-        logger.info("No JSON file to be restored.")
+        logger.info("No JSON file to be restored. Creating default metadata.")
 
-    dc = MediaIOMetadata.from_JSON(json_dirpath)
+    dc = MediaIOMetadata.from_JSON(
+        json_path=json_dirpath, base_directory=props.current_media_dirpath
+    )
 
     metadata_prop = props.metadata
     metadata_prop.from_dataclass(dc)
