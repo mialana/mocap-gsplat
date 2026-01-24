@@ -48,7 +48,7 @@ class MosplatOperatorBase(
 
     __worker: Optional[MosplatWorkerInterface[Q]] = None
     __timer: Optional[Timer] = None
-    __metadata: Optional[MediaIOMetadata] = None
+    __metadata_dc: Optional[MediaIOMetadata] = None
 
     @classmethod
     def at_registration(cls):
@@ -65,13 +65,11 @@ class MosplatOperatorBase(
             or context.window_manager is None
         ):
             return False
-        test = cls.contexted_poll(context, prefs, props)
-
         return (
             overrideable_return
             if (overrideable_return := cls.contexted_poll(context, prefs, props))
             is not None
-            else True
+            else True  # if not implemented return true
         )
 
     @classmethod
@@ -100,15 +98,15 @@ class MosplatOperatorBase(
         self.__timer = tmr
 
     @property
-    def metadata(self) -> MediaIOMetadata:
-        if self.__metadata is None:
-            raise DeveloperError("Metadata not available in this scope.")
+    def metadata_dc(self) -> MediaIOMetadata:
+        if self.__metadata_dc is None:
+            raise DeveloperError("Metadata as dataclass not available in this scope.")
         else:
-            return self.__metadata
+            return self.__metadata_dc
 
-    @metadata.setter
-    def metadata(self, mta: MediaIOMetadata):
-        self.__metadata = mta
+    @metadata_dc.setter
+    def metadata_dc(self, mta: Optional[MediaIOMetadata]):
+        self.__metadata_dc = mta
 
     @property
     def wm(self) -> WindowManager:
@@ -116,9 +114,29 @@ class MosplatOperatorBase(
             raise UnexpectedError("Poll-guard failed for window manager.")
         return wm
 
+    def invoke(self, context, event) -> OperatorReturnItemsSet:
+        with self.encapsulated_context_block(context):
+            return (
+                overrideable_return
+                if (overrideable_return := self.contexted_invoke(context, event))
+                is not None
+                else self.execute(context)  # if not implemented return execute
+            )
+
+    def contexted_invoke(
+        self, context: Context, event: Event
+    ) -> OperatorReturnItemsSet:
+        """
+        an overrideable entrypoint for `execute` that ensures context is available as a property
+        so that subsequently `props` and `prefs` properties can be accessed
+        """
+        ...
+
     def execute(self, context) -> OperatorReturnItemsSet:
         with self.encapsulated_context_block(context):
-            self.metadata = self.props.metadata.to_dataclass()  # set metadata before
+            self.metadata_dc = (
+                self.props.metadata_ptr.to_dataclass()
+            )  # set metadata before
             return self.contexted_execute(context)
 
     def contexted_execute(self, context: Context) -> OperatorReturnItemsSet:
@@ -160,6 +178,9 @@ class MosplatOperatorBase(
             self.cleanup(context)
 
     def cleanup(self, context: Context):
+        # update JSON with current state of PG as source of truth
+        self.props.metadata_ptr.to_JSON(self.props.metadata_json_filepath)
+
         if self.timer:
             self.wm.event_timer_remove(self.timer)
             self.timer = None
@@ -168,3 +189,5 @@ class MosplatOperatorBase(
             self.worker.cleanup()
             self.worker = None
             self.logger().debug("Worker cleaned up")
+
+        self.metadata_dc = None  # metadata is not guaranteed to be in-sync anymore

@@ -55,7 +55,7 @@ def restore_metadata_from_json(
         json_path=json_dirpath, base_directory=props.current_media_dirpath
     )
 
-    metadata_prop = props.metadata
+    metadata_prop = props.metadata_ptr
     metadata_prop.from_dataclass(dc)
 
     logger.info("Metadata JSON file successfully restored.")

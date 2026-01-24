@@ -1,6 +1,9 @@
-from typing import Optional, Tuple
+from typing import Tuple, Set, List
 import threading
 from queue import Queue
+from pathlib import Path
+
+from bpy.types import Context, Event
 
 from .base_ot import (
     MosplatOperatorBase,
@@ -11,66 +14,130 @@ from .base_ot import (
 from ...infrastructure.schemas import (
     OperatorIDEnum,
     UserFacingError,
-    DeveloperError,
     MediaIOMetadata,
     MediaProcessStatus,
 )
 from ...infrastructure.decorators import worker_fn_auto
+from ..checks import (
+    check_media_extensions,
+    check_data_output_dirpath,
+    check_media_files,
+)
+from ..handlers import restore_metadata_from_json
 
 
-class Mosplat_OT_check_media_frame_counts(
-    MosplatOperatorBase[Tuple[str, Optional[MediaIOMetadata]]]
-):
+class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase[Tuple[str]]):
     bl_idname = OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS
     bl_description = (
         "Check frame counts of all media files found in given media directory."
     )
 
-    @classmethod
-    def contexted_poll(cls, context, prefs, props) -> bool:
+    def contexted_invoke(
+        self, context: Context, event: Event
+    ) -> OperatorReturnItemsSet:
+        prefs = self.prefs
+        props = self.props
         try:
-            return bool(
-                prefs.media_extensions_set
-                and props.data_output_dirpath
-                and props.media_files
-            )
+            restore_metadata_from_json(props, prefs)  # try to restore from local JSON
+
+            # try setting all the properties that are needed for the op
+            prefs.media_extensions_set = check_media_extensions(prefs)
+            props.data_output_dirpath = check_data_output_dirpath(prefs, props)
+            props.media_files = check_media_files(prefs, props)
+            return self.execute(context)
         except UserFacingError as e:
-            cls.poll_message_set(str(e))
-            return False
+            self.logger().error(str(e))
+            return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        self.props.metadata.media_process_statuses.clear()
+        if self.props.media_files is None:
+            return {"CANCELLED"}
 
-        check_frame_counts_thread(self, metadata=self.metadata)
+        check_frame_counts_thread(
+            self,
+            updated_media_files=self.props.media_files,
+            metadata_dc=self.metadata_dc,
+        )
 
         return {"RUNNING_MODAL"}
 
     def queue_callback(self, context, event, next) -> OptionalOperatorReturnItemsSet:
-        pass
+        if next == "update":  # keep props up-to-date so updates are reflected in UI
+            self.props.metadata_ptr.from_dataclass(self.metadata_dc)
+        elif next == "done":
+            self.cleanup(context)  # write props (as dataclass) to JSON
 
 
 @worker_fn_auto
 def check_frame_counts_thread(
-    queue: Queue[Tuple[str, MediaIOMetadata]],
+    queue: Queue[str],
     cancel_event: threading.Event,
     *,
-    metadata: MediaIOMetadata,
+    updated_media_files: Set[Path],
+    metadata_dc: MediaIOMetadata,
 ):
-    queue.put(("metadata", metadata))
+    status_lookup = MediaProcessStatus.as_lookup(metadata_dc.media_process_statuses)
+
+    # replace the statuses with the fresh validated list we are building
+    updated_statuses: List[MediaProcessStatus] = []
+    metadata_dc.media_process_statuses = updated_statuses
+
+    for file in updated_media_files:
+        if cancel_event.is_set():
+            return  # simply return as new queue items will not be read anymore
+
+        # check if the status for the file already exists, create new if not
+        status = status_lookup.get(str(file), MediaProcessStatus(filepath=str(file)))
+
+        # if success is already valid skip new extraction
+        success = status.is_valid or _extract_media_frame_count(
+            status
+        )  # overwrite `success` here
+
+        target_frame_count = max(
+            metadata_dc.collective_media_frame_count, status.frame_count
+        )  # weed out if either are -1
+
+        metadata_dc.do_media_durations_all_match = (
+            metadata_dc.do_media_durations_all_match
+            and success
+            and target_frame_count == status.frame_count
+        )  # accumulate success
+
+        metadata_dc.collective_media_frame_count = (
+            target_frame_count if metadata_dc.do_media_durations_all_match else -1
+        )
+
+        updated_statuses.append(status)
+
+        queue.put("update")  # transmit that metadata has been updated
+
+    queue.put("done")  # signal done
+    return
 
 
-def _extract_media_frame_count(status: MediaProcessStatus):
+def _extract_media_frame_count(status: MediaProcessStatus) -> bool:
     """use opencv to get the frame count of media"""
     import cv2
 
     def _cleanup(method: str):
         cap.release()
-        status.frame_count = frame_count
-        status.message = f"Read media file '{status.filepath}' with the frame count '{frame_count}' ({method})."
+        stat = Path(status.filepath).stat()
+
+        status.overwrite(
+            is_valid=True,
+            frame_count=frame_count,
+            message=f"Read file with the frame count '{frame_count}' ({method}).",
+            mod_time=stat.st_mtime,
+            file_size=stat.st_size,
+        )
+        return True
 
     cap = cv2.VideoCapture(status.filepath)
     if not cap.isOpened():
-        raise DeveloperError(f"Could not open media file: {status.filepath}")
+        status.is_valid = False
+        status.message = f"Could not open file."
+        return False  # mark invalid and update message
 
     cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # seek to end
     duration_ms = cap.get(cv2.CAP_PROP_POS_MSEC)

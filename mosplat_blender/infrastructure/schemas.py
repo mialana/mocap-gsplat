@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, cast, Tuple
+from typing import Dict, List, cast, Tuple, TypedDict
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import json
@@ -74,8 +74,10 @@ class OperatorIDEnum(StrEnum):
         return member.value.rpartition(".")[-1]
 
     @staticmethod
-    def run(bpy_ops, member: OperatorIDEnum):
-        getattr(getattr(bpy_ops, member._category()), member.basename_factory(member))()
+    def run(bpy_ops, member: OperatorIDEnum, *args, **kwargs):
+        getattr(getattr(bpy_ops, member._category()), member.basename_factory(member))(
+            *args, **kwargs
+        )
 
     INITIALIZE_MODEL = auto()
     RUN_INFERENCE = auto()
@@ -156,11 +158,32 @@ class MediaProcessStatus:
     def from_dict(cls, d: Dict) -> MediaProcessStatus:
         return cls(**d)
 
+    def overwrite(
+        self,
+        *,
+        is_valid: bool,
+        frame_count: int,
+        message: str,
+        mod_time: float,
+        file_size: int,
+    ):
+        self.is_valid = is_valid
+        self.frame_count = frame_count
+        self.message = message
+        self.mod_time = mod_time
+        self.file_size = file_size
+
+    @classmethod
+    def as_lookup(
+        cls, statuses: List[MediaProcessStatus]
+    ) -> Dict[str, MediaProcessStatus]:
+        return {s.filepath: s for s in statuses}
+
 
 @dataclass
 class MediaIOMetadata:
     base_directory: str
-    do_media_durations_all_match: bool = False
+    do_media_durations_all_match: bool = True
     collective_media_frame_count: int = -1
     media_process_statuses: List[MediaProcessStatus] = field(default_factory=list)
     processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)

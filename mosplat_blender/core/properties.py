@@ -110,28 +110,16 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
         name="Processed Frame Ranges", type=Mosplat_PG_ProcessedFrameRange
     )
 
+    def to_JSON(self, json_filepath):
+        self.to_dataclass().to_JSON(json_filepath)
+
 
 def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
-    from .operators.check_media_frame_counts_ot import (
-        Mosplat_OT_check_media_frame_counts,
+    OperatorIDEnum.run(
+        bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS, "INVOKE_DEFAULT"
     )
 
-    prefs = check_addonpreferences(context.preferences)
-
-    # update custom properties
-    self.media_files = check_media_files(prefs, self)
-    self.data_output_dirpath = check_data_output_dirpath(prefs, self)
-
-    restore_metadata_from_json(self, prefs)  # try to restore from local JSON
-
     self.logger().info(f"'{self.get_prop_name('current_media_dir')}' updated.")
-
-    if Mosplat_OT_check_media_frame_counts.poll(context):
-        self.metadata.base_directory = (
-            self.current_media_dir
-        )  # sync directories on success
-
-        OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
@@ -164,7 +152,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     )
 
     @property
-    def metadata(self) -> Mosplat_PG_MediaIOMetadata:
+    def metadata_ptr(self) -> Mosplat_PG_MediaIOMetadata:
         return self.current_media_io_metadata
 
     @property
