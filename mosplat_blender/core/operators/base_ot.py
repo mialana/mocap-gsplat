@@ -2,7 +2,7 @@ from bpy.types import Context, WindowManager, Timer, Event, Operator
 
 from typing import Set, TYPE_CHECKING, TypeAlias, Optional, Generic, TypeVar, Any
 
-from ..checks import check_prefs_safe, check_props_safe, check_metadata_json_filepath
+from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
@@ -183,7 +183,7 @@ class MosplatOperatorBase(
 
     def cleanup(self, context: Context):
         # update JSON with current state of PG as source of truth
-        metadata_json_filepath = check_metadata_json_filepath(self.prefs, self.props)
+        metadata_json_filepath = self.props.metadata_json_filepath(self.prefs)
         self.props.metadata_ptr.to_JSON(metadata_json_filepath)
 
         if self.timer:

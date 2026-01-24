@@ -6,12 +6,7 @@ from bpy.app.handlers import persistent
 
 from typing import TYPE_CHECKING, TypeAlias, TypeAlias, Any, Optional
 
-from .checks import (
-    check_propertygroup,
-    check_addonpreferences,
-    check_metadata_json_filepath,
-    check_current_media_dirpath,
-)
+from .checks import check_propertygroup, check_addonpreferences
 
 from ..infrastructure.schemas import MediaIOMetadata, UserFacingError
 from ..interfaces.logging_interface import MosplatLoggingInterface
@@ -45,12 +40,12 @@ def restore_metadata_from_json(
     prefs = prefs or check_addonpreferences(bpy.context.preferences)
 
     # get destination path for json
-    json_dirpath = check_metadata_json_filepath(prefs, props)
+    json_dirpath = props.metadata_json_filepath(prefs)
 
     if not json_dirpath.exists:
         logger.info("No JSON file to be restored. Creating default metadata.")
 
-    current_media_dirpath = check_current_media_dirpath(props)
+    current_media_dirpath = props.current_media_dirpath
 
     dc = MediaIOMetadata.from_JSON(
         json_path=json_dirpath, base_directory=current_media_dirpath

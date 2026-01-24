@@ -116,7 +116,7 @@ def check_metadata_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Glo
 
 
 def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> List[Path]:
-    exts = check_media_extensions(prefs)
+    exts = check_media_extensions_set(prefs)
 
     files = sorted(
         [
@@ -133,7 +133,7 @@ def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> Lis
     return files
 
 
-def check_media_extensions(prefs: Mosplat_AP_Global) -> Set[str]:
+def check_media_extensions_set(prefs: Mosplat_AP_Global) -> Set[str]:
     try:
         exts = set(
             [ext.strip().lower() for ext in str(prefs.media_extensions).split(",")]

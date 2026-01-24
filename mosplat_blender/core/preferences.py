@@ -9,7 +9,7 @@ from pathlib import Path
 import os
 from typing import Set, Optional, Any, TypeAlias, TYPE_CHECKING
 
-from .checks import check_media_extensions, check_media_files, check_propertygroup
+from .checks import check_media_extensions_set
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
@@ -160,6 +160,10 @@ class Mosplat_AP_Global(
     @property
     def vggt_model_dir(self) -> Path:
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
+
+    @property
+    def media_extensions_set(self) -> Set[str]:
+        return check_media_extensions_set(self)
 
     def draw(self, _: Context):
         layout = self.layout
