@@ -13,20 +13,24 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar, Optional
+from typing import Generic, TypeVar
 
 from pathlib import Path
 
 from .handlers import restore_metadata_from_json
-from .checks import check_addonpreferences, check_media_directory, check_data_output_dir
+from .checks import check_addonpreferences
 
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
     MosplatDataclassInteropMixin,
     MosplatAPAccessorMixin,
 )
-from ..infrastructure.constants import DataclassInstance
+from ..infrastructure.constants import (
+    DataclassInstance,
+    MEDIA_IO_METADATA_JSON_FILENAME,
+)
 from ..infrastructure.schemas import (
+    UserFacingError,
     OperatorIDEnum,
     GlobalData,
     MediaIOMetadata,
@@ -41,8 +45,6 @@ D = TypeVar("D", bound=DataclassInstance)
 def update_current_media_dir(props: Mosplat_PG_Global, context: Context):
     prefs = check_addonpreferences(context.preferences)
     restore_metadata_from_json(props, prefs)  # try to restore from local JSON
-
-    check_media_directory(props, prefs)  # let errors rise
 
     props.metadata.base_directory = (
         props.current_media_dir
@@ -152,13 +154,17 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorM
         return self.current_media_io_metadata
 
     @property
-    def data_output_dir(self) -> Path:
+    def current_media_dirpath(self) -> Path:
         if not (media_dir_path := Path(self.current_media_dir)).is_dir():
-            raise AttributeError(
+            raise UserFacingError(
                 f"'{self.get_prop_name('media_dir_path')}' is not a valid directory."
             )
 
-        media_directory_name = media_dir_path.name
+        return media_dir_path
+
+    @property
+    def data_output_dirpath(self) -> Path:
+        media_directory_name = self.current_media_dirpath.name
 
         formatted_output_path = Path(
             str(self.prefs.data_output_path).format(
@@ -168,4 +174,16 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorM
         if formatted_output_path.is_absolute():
             return formatted_output_path
         else:
-            return media_dir_path.joinpath(formatted_output_path)
+            return self.current_media_dirpath.joinpath(formatted_output_path)
+
+    @property
+    def metadata_json_filepath(self) -> Path:
+        return self.data_output_dirpath.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
+
+    @property
+    def media_files(self):
+        return [
+            p
+            for p in self.current_media_dirpath.iterdir()
+            if p.suffix.lower() in self.prefs.media_extensions_set
+        ]

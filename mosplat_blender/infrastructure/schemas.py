@@ -11,18 +11,36 @@ from string import capwords
 from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX
 
 
-class PollGuardError(RuntimeError):
-    """Create a custom `RuntimeError` for errors that were not guarded correctly by `poll`."""
+class UserFacingError(RuntimeError):
+    """a custom `RuntimeError` for errors that are user-caused and user-facing (i.e. should be visible to user)."""
 
-    def __str__(self) -> str:
-        return "Something went wrong with `poll`-guard."
+    def __init__(self, msg: str):
+        self.message = f"A user error occured.\n{msg}"  # be nice?
+        super().__init__(self.message)
 
 
-class PropertyUpdateError(AttributeError):
-    """Create a custom `AttributeError` for errors when Blender properties are updated."""
+class DeveloperError(RuntimeWarning):
+    """a custom `RuntimeError` for developer logic errors."""
 
-    def __str__(self) -> str:
-        return "The entered property value is invalid"
+    def __init__(self, msg: str):
+        self.message = f"Developer error (you are doing something wrong).\n{msg}"
+        super().__init__(self.message)
+
+
+class UnexpectedError(RuntimeError):
+    """a custom `RuntimeError` for errors that actually should never occur."""
+
+    def __init__(self, msg: str):
+        self.message = f"Something went wrong!\n{msg}"
+        super().__init__(self.message)
+
+
+class SafeError(RuntimeError):
+    """a custom `RuntimeError` for errors that are real but are safe."""
+
+    def __init__(self, msg: str):
+        self.message = f"A safe error occured.\n{msg}"
+        super().__init__(self.message)
 
 
 """Enum Convenience Classes"""

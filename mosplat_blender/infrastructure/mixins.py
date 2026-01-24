@@ -20,7 +20,7 @@ import logging
 import inspect
 
 from .constants import _MISSING_, DataclassInstance
-from .schemas import PollGuardError
+from .schemas import UnexpectedError, DeveloperError
 
 S = TypeVar("S")
 D = TypeVar("D", bound=DataclassInstance)
@@ -76,7 +76,7 @@ class MosplatEnforceAttributesMixin:
         # `getmembers_static` with custom predicate
         if missing := inspect.getmembers_static(cls, lambda val: val is _MISSING_):
             for attr_name, _ in missing:
-                raise AttributeError(
+                raise DeveloperError(
                     f"`{cls.__name__}` does not define required mixin variable: `{attr_name}`"
                 )
 
@@ -114,11 +114,11 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
     def guard_type_of_bl_idname(bl_idname, __id_enum_type__: Type[S]) -> TypeGuard[S]:
         """guards `bl_idname` with its narrowed type"""
         if not issubclass(__id_enum_type__, StrEnum):
-            raise AttributeError(
+            raise DeveloperError(
                 f"`{__name__}` defines `__id_enum_type__` with incorrect type.\nExpected: {Type[StrEnum]}, \nActual: {bl_idname}"
             )
         if not isinstance(bl_idname, __id_enum_type__):
-            raise AttributeError(
+            raise DeveloperError(
                 f"`{__name__}` defines `bl_idname` with incorrect type.\nExpected: {Type[__id_enum_type__]}, \nActual: {bl_idname}"
             )
         return True
@@ -135,7 +135,7 @@ class MosplatEncapsulatedContextMixin:
     @property
     def context(self) -> Context:
         if self.__context is None:  # protect against incorrect usage
-            raise AttributeError("Context has not yet been set yet in this scope.")
+            raise DeveloperError("Context has not yet been set yet in this scope.")
         else:
             return self.__context
 
@@ -158,10 +158,7 @@ class MosplatAPAccessorMixin(MosplatEncapsulatedContextMixin):
     def prefs(self) -> Mosplat_AP_Global:
         from ..core.checks import check_addonpreferences
 
-        try:
-            return check_addonpreferences(self.context.preferences)
-        except RuntimeError:
-            raise PollGuardError
+        return check_addonpreferences(self.context.preferences)
 
 
 class MosplatPGAccessorMixin(MosplatEncapsulatedContextMixin):
@@ -178,10 +175,7 @@ class MosplatPGAccessorMixin(MosplatEncapsulatedContextMixin):
     def props(self) -> Mosplat_PG_Global:
         from ..core.checks import check_propertygroup
 
-        try:
-            return check_propertygroup(self.context.scene)
-        except RuntimeError:
-            raise PollGuardError
+        return check_propertygroup(self.context.scene)
 
 
 class MosplatBlPropertyAccessorMixin(

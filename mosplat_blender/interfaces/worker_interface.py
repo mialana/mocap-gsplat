@@ -36,6 +36,7 @@ class MosplatWorkerInterface(Generic[QT]):
     def cleanup(self):
         self.cancel()
 
+        # drain queue
         while True:
             try:
                 self._queue.get_nowait()
