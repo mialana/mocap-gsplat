@@ -42,7 +42,6 @@ def restore_metadata_from_json(
 ):
     """base entrypoint"""
     prefs = prefs or check_addonpreferences(bpy.context.preferences)
-    metadata_prop = props.metadata
 
     # update to the latest output path
     data_output_dirpath = check_data_output_dirpath(prefs, props)
@@ -53,6 +52,8 @@ def restore_metadata_from_json(
         logger.info("No JSON file to be restored.")
 
     dc = MediaIOMetadata.from_JSON(json_dirpath)
+
+    metadata_prop = props.metadata
     metadata_prop.from_dataclass(dc)
 
     logger.info("Metadata JSON file successfully restored.")
