@@ -18,9 +18,10 @@ from enum import StrEnum
 from dataclasses import fields
 import logging
 import inspect
+import contextlib
 
 from .constants import _MISSING_, DataclassInstance
-from .schemas import UnexpectedError, DeveloperError
+from .schemas import DeveloperError
 
 S = TypeVar("S")
 D = TypeVar("D", bound=DataclassInstance)
@@ -125,8 +126,10 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
 
 
 class MosplatEncapsulatedContextMixin:
-    """a mixin that, paired with decorators, allows for an accessible and updated
-    `context` property within desired class methods."""
+    """
+    a mixin that allows for a `context` property within desired instance methods.
+    when paired with `contextlib.contextmanager` functions can have a local updated `context` property
+    """
 
     from bpy.types import Context  # local import
 
@@ -143,8 +146,17 @@ class MosplatEncapsulatedContextMixin:
     def context(self, context: Optional[Context]):
         self.__context = context
 
+    @contextlib.contextmanager
+    def encapsulated_context_block(self, context: Context):
+        """ensures `context` is set for code wrapped in a `with` block"""
+        self.context = context  # update `context` before block starts
+        try:
+            yield  # run code in `with`
+        finally:  # set to `None` after block finishes
+            self.context = None
 
-class MosplatAPAccessorMixin(MosplatEncapsulatedContextMixin):
+
+class MosplatAPAccessorMixin(MosplatLogClassMixin):
     """a mixin class for any class that has access to global preferences"""
 
     from bpy.types import Context  # local import
@@ -158,10 +170,17 @@ class MosplatAPAccessorMixin(MosplatEncapsulatedContextMixin):
     def prefs(self) -> Mosplat_AP_Global:
         from ..core.checks import check_addonpreferences
 
-        return check_addonpreferences(self.context.preferences)
+        context = getattr(self, "context", None)
+        if context is None:
+            self.logger().warning("Using fallback context for prefs.", stack_info=True)
+            from bpy import context as fallback_context
+
+            context = fallback_context
+
+        return check_addonpreferences(context.preferences)
 
 
-class MosplatPGAccessorMixin(MosplatEncapsulatedContextMixin):
+class MosplatPGAccessorMixin(MosplatLogClassMixin):
     """a mixin class for any class that has access to global properties"""
 
     from bpy.types import Context  # local import
@@ -175,7 +194,14 @@ class MosplatPGAccessorMixin(MosplatEncapsulatedContextMixin):
     def props(self) -> Mosplat_PG_Global:
         from ..core.checks import check_propertygroup
 
-        return check_propertygroup(self.context.scene)
+        context = getattr(self, "context", None)
+        if context is None:
+            self.logger().warning("Using fallback context for props.", stack_info=True)
+            from bpy import context as fallback_context
+
+            context = fallback_context
+
+        return check_propertygroup(context.scene)
 
 
 class MosplatBlPropertyAccessorMixin(

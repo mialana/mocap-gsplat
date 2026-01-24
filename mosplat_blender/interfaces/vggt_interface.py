@@ -26,14 +26,14 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
 
     @classmethod
     def initialize_model(
-        cls, hf_id: str, outdir: Path, cancel_event: threading.Event
+        cls, hf_id: str, model_cache_dir: Path, cancel_event: threading.Event
     ) -> bool:
         from vggt.models.vggt import VGGT
 
         if cls._model:
             return False  # initialization did not occur
 
-        cls._model = VGGT.from_pretrained(hf_id, cache_dir=outdir)
+        cls._model = VGGT.from_pretrained(hf_id, cache_dir=model_cache_dir)
         cls._initialized = True
 
         if (

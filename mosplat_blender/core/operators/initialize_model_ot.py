@@ -50,7 +50,9 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[tuple[str, bool]]):
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
         prefs = self.prefs
-        initialize_model_thread(self, prefs.vggt_hf_id, prefs.vggt_model_dir)
+        initialize_model_thread(
+            self, hf_id=prefs.vggt_hf_id, model_cache_dir=prefs.vggt_model_dir
+        )
 
         return {"RUNNING_MODAL"}
 
@@ -59,11 +61,12 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[tuple[str, bool]]):
 def initialize_model_thread(
     queue: Queue,
     cancel_event: threading.Event,
+    *,
     hf_id: str,
-    outdir: Path,
+    model_cache_dir: Path,
 ):
     # put true or false initialize result in queue
-    MosplatVGGTInterface.initialize_model(hf_id, outdir, cancel_event)
+    MosplatVGGTInterface.initialize_model(hf_id, model_cache_dir, cancel_event)
 
     """
     use initialization status rather than return result as `initialize_model`

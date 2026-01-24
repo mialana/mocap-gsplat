@@ -13,7 +13,7 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, TYPE_CHECKING, Any, TypeAlias
 
 from pathlib import Path
 
@@ -23,7 +23,6 @@ from .checks import check_addonpreferences
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
     MosplatDataclassInteropMixin,
-    MosplatAPAccessorMixin,
 )
 from ..infrastructure.constants import (
     DataclassInstance,
@@ -38,6 +37,11 @@ from ..infrastructure.schemas import (
     ProcessedFrameRange,
     PreprocessScriptApplication,
 )
+
+if TYPE_CHECKING:
+    from ..core.preferences import Mosplat_AP_Global
+else:
+    Mosplat_AP_Global: TypeAlias = Any
 
 D = TypeVar("D", bound=DataclassInstance)
 
@@ -123,7 +127,7 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
     )
 
 
-class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorMixin):
+class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     __dataclass_type__ = GlobalData
 
     current_media_dir: StringProperty(
@@ -162,12 +166,11 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorM
 
         return media_dir_path
 
-    @property
-    def data_output_dirpath(self) -> Path:
+    def data_output_dirpath(self, prefs: Mosplat_AP_Global) -> Path:
         media_directory_name = self.current_media_dirpath.name
 
         formatted_output_path = Path(
-            str(self.prefs.data_output_path).format(
+            str(prefs.data_output_path).format(
                 media_directory_name=media_directory_name
             )
         )
@@ -176,14 +179,12 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData], MosplatAPAccessorM
         else:
             return self.current_media_dirpath.joinpath(formatted_output_path)
 
-    @property
-    def metadata_json_filepath(self) -> Path:
-        return self.data_output_dirpath.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
+    def metadata_json_filepath(self, prefs: Mosplat_AP_Global) -> Path:
+        return self.data_output_dirpath(prefs).joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
 
-    @property
-    def media_files(self):
+    def media_files(self, prefs: Mosplat_AP_Global):
         return [
             p
             for p in self.current_media_dirpath.iterdir()
-            if p.suffix.lower() in self.prefs.media_extensions_set
+            if p.suffix.lower() in prefs.media_extensions_set
         ]

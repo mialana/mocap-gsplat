@@ -43,7 +43,7 @@ def register_addon():
             if issubclass(c, MosplatEnforceAttributesMixin):
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
-        except (RuntimeError, AttributeError):
+        except (ValueError, RuntimeError, AttributeError):
             logger.exception(f"Exception during registration: `{c.__name__=}`")
 
     setattr(
