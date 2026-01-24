@@ -27,8 +27,8 @@ class Mosplat_OT_check_media_frame_counts(
         try:
             return bool(
                 prefs.media_extensions_set
-                and props.data_output_dirpath
-                and props.media_files
+                and props.data_output_dirpath(prefs)
+                and props.media_files(prefs)
             )
         except UserFacingError as e:
             cls.poll_message_set(str(e))

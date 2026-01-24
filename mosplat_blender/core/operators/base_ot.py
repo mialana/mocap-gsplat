@@ -1,24 +1,20 @@
-import bpy
-from bpy.types import Context, WindowManager, Timer, Event
+from bpy.types import Context, WindowManager, Timer, Event, Operator
 
-from typing import (
-    Set,
-    TYPE_CHECKING,
-    TypeAlias,
-    Optional,
-    Generic,
-    TypeVar,
-)
-import contextlib
+from typing import Set, TYPE_CHECKING, TypeAlias, Optional, Generic, TypeVar, Any
 
 from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
     MosplatAPAccessorMixin,
+    MosplatEncapsulatedContextMixin,
 )
 
-from ...infrastructure.schemas import UnexpectedError, OperatorIDEnum, MediaIOMetadata
+from ...infrastructure.schemas import (
+    UnexpectedError,
+    OperatorIDEnum,
+    MediaIOMetadata,
+)
 from ...interfaces.worker_interface import MosplatWorkerInterface
 
 if TYPE_CHECKING:
@@ -39,11 +35,12 @@ Q = TypeVar("Q")  # the type of the elements in worker queue, if used
 
 
 class MosplatOperatorBase(
+    Operator,
     Generic[Q],
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
     MosplatAPAccessorMixin,
-    bpy.types.Operator,
+    MosplatEncapsulatedContextMixin,
 ):
     bl_category = OperatorIDEnum._category()
     __id_enum_type__ = OperatorIDEnum
@@ -64,12 +61,15 @@ class MosplatOperatorBase(
         if (
             (prefs := check_prefs_safe(context)) is None
             or (props := check_props_safe(context)) is None
-            or context.window_manager is not None
+            or context.window_manager is None
         ):
             return False
+        test = cls.contexted_poll(context, prefs, props)
+
         return (
-            ((((overrideable_return))))
-            if ((((overrideable_return))) := cls.contexted_poll(context, prefs, props)) is not ...
+            overrideable_return
+            if (overrideable_return := cls.contexted_poll(context, prefs, props))
+            is not None
             else True
         )
 
@@ -81,6 +81,7 @@ class MosplatOperatorBase(
         ...
 
     """instance properties backed by mangled class attributes"""
+
     @property
     def worker(self) -> Optional[MosplatWorkerInterface]:
         return self.__worker
@@ -111,22 +112,9 @@ class MosplatOperatorBase(
             raise UnexpectedError("Poll-guard failed for window manager.")
         return wm
 
-    @contextlib.contextmanager
-    def _context_block(self, context: Context):
-        """ensures `context` is set for code wrapped in `with`"""
-        self.context = context
-        self.props.context = context
-        self.prefs.context = context
-        try:
-            yield # run code in `with`
-        finally:
-            self.context = None
-            self.props.context = None
-            self.prefs.context = None
-
     def execute(self, context) -> OperatorReturnItemsSet:
-        with self._context_block(context):
-            self.metadata = self.props.metadata.to_dataclass() # set metadata before
+        with self.encapsulated_context_block(context):
+            self.metadata = self.props.metadata.to_dataclass()  # set metadata before
             return self.contexted_execute(context)
 
     def contexted_execute(self, context: Context) -> OperatorReturnItemsSet:
@@ -136,21 +124,8 @@ class MosplatOperatorBase(
         """
         ...
 
-    def invoke(self, context, event) -> OperatorReturnItemsSet:
-        with self._context_block(context):
-            return self.contexted_invoke(context, event)
-
-    def contexted_invoke(
-        self, context: Context, event: Event
-    ) -> OperatorReturnItemsSet:
-        """
-        an overrideable entrypoint for `invoke` that ensures context is available as a property
-        so that subsequently `props` and `prefs` properties can be accessed
-        """
-        ...
-
     def modal(self, context, event) -> OperatorReturnItemsSet:
-        with self._context_block(context):
+        with self.encapsulated_context_block(context):
             if event.type in {"RIGHTMOUSE", "ESC"}:
                 self.cleanup(context)
                 return {"CANCELLED"}
@@ -170,12 +145,14 @@ class MosplatOperatorBase(
         while self.worker and (next := self.worker.dequeue()) is not None:
             return self.queue_callback(context, event, next)
 
-    def queue_callback(self, context: Context, event: Event, next: Q) -> OptionalOperatorReturnItemsSet:
+    def queue_callback(
+        self, context: Context, event: Event, next: Q
+    ) -> OptionalOperatorReturnItemsSet:
         """an entrypoint for when a new element is placed in the queue during `modal`"""
         ...
 
     def cancel(self, context):
-        with self._context_block(context):
+        with self.encapsulated_context_block(context):
             self.cleanup(context)
 
     def cleanup(self, context: Context):

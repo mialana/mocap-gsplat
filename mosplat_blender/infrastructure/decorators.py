@@ -22,13 +22,14 @@ from typing import (
 from queue import Queue
 from threading import Event as ThreadingEvent
 
-from ..interfaces import MosplatWorkerInterface
 from .schemas import DeveloperError
 
 if TYPE_CHECKING:
     from ..core.operators import MosplatOperatorBase
+    from ..core.panels import MosplatPanelBase
 else:
     MosplatOperatorBase: TypeAlias = Any
+    MosplatPanelBase: TypeAlias = Any
 
 
 P = ParamSpec(
@@ -38,7 +39,7 @@ R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
 T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
 
 OpT = TypeVar(
-    "OpT", bound=MosplatOperatorBase
+    "OpT", bound=Union[MosplatOperatorBase, MosplatPanelBase]
 )  # types the `self` parameter for `worker_fn_auto` and `encapsulated_context`
 
 
@@ -79,6 +80,8 @@ def worker_fn_auto(
 ) -> Callable[Concatenate[MosplatOperatorBase, P], None]:
     """a decorator that creates a closure of the worker creation and other abstractable setup"""
 
+    from ..interfaces import MosplatWorkerInterface  # local import
+
     def wrapper(
         self: MosplatOperatorBase,
         *args: P.args,
@@ -102,20 +105,16 @@ class WithContextKwargs(TypedDict):
 def encapsulated_context(
     fn: Callable[Concatenate[OpT, Context, ...], R],
 ) -> Callable[Concatenate[OpT, Context, ...], R]:
-    """a decorator that sets `_context` properties before function runs, and removes it when complete."""
+    """a decorator that sets `context` properties before function runs, and removes it when complete."""
 
     def wrapper(self: OpT, *args, **kwargs: Unpack[WithContextKwargs]):
 
         context = kwargs["context"]
         self.context = context
-        self.props.context = context
-        self.prefs.context = context
 
         try:
-            return fn(self, context, *args, **kwargs)
+            return fn(self, *args, **kwargs)
         finally:
             self.context = None
-            self.props.context = None
-            self.prefs.context = None
 
     return wrapper

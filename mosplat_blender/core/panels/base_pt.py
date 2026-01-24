@@ -1,19 +1,21 @@
 from bpy.types import Panel, UILayout, Context
 
-from enum import Enum
-from functools import partial
-
 from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
     MosplatAPAccessorMixin,
+    MosplatEncapsulatedContextMixin,
 )
 from ...infrastructure.schemas import PanelIDEnum
 
 
 class MosplatPanelBase(
-    MosplatBlTypeMixin, MosplatPGAccessorMixin, MosplatAPAccessorMixin, Panel
+    Panel,
+    MosplatEncapsulatedContextMixin,
+    MosplatBlTypeMixin,
+    MosplatPGAccessorMixin,
+    MosplatAPAccessorMixin,
 ):
     __id_enum_type__ = PanelIDEnum
 
@@ -34,12 +36,13 @@ class MosplatPanelBase(
             and check_props_safe(context) is not None
         )
 
-    def draw(self, context: Context):
+    def draw(self, context: Context) -> None:
         if not (layout := self.layout):
             return
 
-        return self.draw_with_layout(context, layout)
+        with self.encapsulated_context_block(context):
+            self.draw_with_layout(context, layout)
 
-    def draw_with_layout(self, context: Context, layout: UILayout):
+    def draw_with_layout(self, context: Context, layout: UILayout) -> None:
         """layout will always exist with this function"""
         ...

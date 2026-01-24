@@ -41,7 +41,7 @@ def restore_metadata_from_json(
     prefs = prefs or check_addonpreferences(bpy.context.preferences)
     metadata_prop = props.metadata
 
-    json_filepath = props.metadata_json_filepath
+    json_filepath = props.metadata_json_filepath(prefs)
 
     if not json_filepath.exists:
         logger.info("No JSON file to be restored.")
