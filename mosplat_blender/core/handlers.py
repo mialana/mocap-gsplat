@@ -6,7 +6,11 @@ from bpy.app.handlers import persistent
 
 from typing import TYPE_CHECKING, TypeAlias, TypeAlias, Any, Optional
 
-from .checks import check_propertygroup, check_addonpreferences
+from .checks import (
+    check_propertygroup,
+    check_addonpreferences,
+    check_data_output_dirpath,
+)
 
 from ..infrastructure.schemas import MediaIOMetadata
 from ..interfaces.logging_interface import MosplatLoggingInterface
@@ -25,7 +29,6 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 def handle_restore_from_json(scene: Scene):
     """entrypoint for `bpy.app.handlers.load_post`"""
     props = check_propertygroup(scene)
-
     restore_metadata_from_json(props)
 
 
@@ -41,12 +44,15 @@ def restore_metadata_from_json(
     prefs = prefs or check_addonpreferences(bpy.context.preferences)
     metadata_prop = props.metadata
 
-    json_filepath = props.metadata_json_filepath(prefs)
+    # update to the latest output path
+    data_output_dirpath = check_data_output_dirpath(prefs, props)
+    props.data_output_dirpath = data_output_dirpath
 
-    if not json_filepath.exists:
+    json_dirpath = props.metadata_json_filepath
+    if not json_dirpath.exists:
         logger.info("No JSON file to be restored.")
 
-    dc = MediaIOMetadata.from_JSON(json_filepath)
+    dc = MediaIOMetadata.from_JSON(json_dirpath)
     metadata_prop.from_dataclass(dc)
 
     logger.info("Metadata JSON file successfully restored.")

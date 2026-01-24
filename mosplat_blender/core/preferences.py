@@ -1,12 +1,15 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
+
+import bpy
 from bpy.types import AddonPreferences, Context
 from bpy.props import StringProperty, IntProperty
 
 from pathlib import Path
 import os
-from typing import Set, Optional
+from typing import Set, Optional, Any, TypeAlias, TYPE_CHECKING
 
+from .checks import check_media_extensions, check_media_files, check_propertygroup
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
@@ -18,31 +21,54 @@ from ..infrastructure.constants import (
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
     ADDON_SHORTNAME,
 )
-from ..infrastructure.schemas import UserFacingError
+from ..infrastructure.schemas import OperatorIDEnum
+
+if TYPE_CHECKING:
+    from .preferences import Mosplat_AP_Global
+else:
+    Mosplat_AP_Global: TypeAlias = Any
 
 
-def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
+def update_stdout_logging(self: Mosplat_AP_Global, _: Context):
     if MosplatLoggingInterface.init_stdout_handler(
-        log_fmt=prefs.stdout_log_format,
-        log_date_fmt=prefs.stdout_date_log_format,
+        log_fmt=self.stdout_log_format,
+        log_date_fmt=self.stdout_date_log_format,
     ):
-        prefs.logger().info("STDOUT logging updated.")
+        self.logger().info("STDOUT logging updated.")
 
 
-def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
+def update_json_logging(self: Mosplat_AP_Global, _: Context):
     if MosplatLoggingInterface.init_json_handler(
-        log_fmt=prefs.json_log_format,
-        log_date_fmt=prefs.json_date_log_format,
-        outdir=prefs.json_log_dir,
-        file_fmt=prefs.json_log_filename_format,
+        log_fmt=self.json_log_format,
+        log_date_fmt=self.json_date_log_format,
+        outdir=self.json_log_dir,
+        file_fmt=self.json_log_filename_format,
     ):
-        prefs.logger().info("JSON logging updated.")
+        self.logger().info("JSON logging updated.")
+
+
+def update_media_extensions(self: Mosplat_AP_Global, context: Context):
+    from .operators.check_media_frame_counts_ot import (
+        Mosplat_OT_check_media_frame_counts,
+    )
+
+    self.media_extensions_set = check_media_extensions(self)
+
+    props = check_propertygroup(context.scene)
+    props.media_files = check_media_files(self, props)
+
+    self.logger().info(f"'{self.get_prop_name('media_extensions')}' updated.")
+
+    if Mosplat_OT_check_media_frame_counts.poll(context):
+        OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
 
 
 class Mosplat_AP_Global(
     AddonPreferences, MosplatBlPropertyAccessorMixin, MosplatPGAccessorMixin
 ):
     bl_idname = ADDON_PREFERENCES_ID
+
+    __media_extensions_set: Optional[Set[str]] = None
 
     cache_dir: StringProperty(
         name="Cache Directory",
@@ -86,6 +112,7 @@ class Mosplat_AP_Global(
         name="Media Extensions",
         description="Comma separated string of all file extensions that should be considered as media files within the media directory",
         default=".avi,.mp4,.mov",
+        update=update_media_extensions,
     )
 
     max_frame_range: IntProperty(
@@ -146,15 +173,12 @@ class Mosplat_AP_Global(
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
 
     @property
-    def media_extensions_set(self) -> Set[str]:
-        try:
-            return set(
-                [ext.strip().lower() for ext in str(self.media_extensions).split(",")]
-            )
-        except IndexError:
-            raise UserFacingError(
-                f"Extensions in '{self.get_prop_name('media_extensions')}' should be separated by commas."
-            )
+    def media_extensions_set(self) -> Optional[Set[str]]:
+        return self.__media_extensions_set
+
+    @media_extensions_set.setter
+    def media_extensions_set(self, exts: Set[str]):
+        self.__media_extensions_set = exts
 
     def draw(self, _: Context):
         layout = self.layout

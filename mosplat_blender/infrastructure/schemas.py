@@ -14,8 +14,10 @@ from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX
 class UserFacingError(RuntimeError):
     """a custom `RuntimeError` for errors that are user-caused and user-facing (i.e. should be visible to user)."""
 
-    def __init__(self, msg: str):
-        self.message = f"A user error occured.\n{msg}"  # be nice?
+    def __init__(self, msg: str = ""):
+        self.message = "USER ERROR"
+        if msg != "":
+            self.message += f": {msg}"
         super().__init__(self.message)
 
 

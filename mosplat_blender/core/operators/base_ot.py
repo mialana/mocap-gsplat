@@ -14,6 +14,7 @@ from ...infrastructure.schemas import (
     UnexpectedError,
     OperatorIDEnum,
     MediaIOMetadata,
+    DeveloperError,
 )
 from ...interfaces.worker_interface import MosplatWorkerInterface
 
@@ -45,7 +46,7 @@ class MosplatOperatorBase(
     bl_category = OperatorIDEnum._category()
     __id_enum_type__ = OperatorIDEnum
 
-    __worker: Optional[MosplatWorkerInterface] = None
+    __worker: Optional[MosplatWorkerInterface[Q]] = None
     __timer: Optional[Timer] = None
     __metadata: Optional[MediaIOMetadata] = None
 
@@ -83,11 +84,11 @@ class MosplatOperatorBase(
     """instance properties backed by mangled class attributes"""
 
     @property
-    def worker(self) -> Optional[MosplatWorkerInterface]:
+    def worker(self) -> Optional[MosplatWorkerInterface[Q]]:
         return self.__worker
 
     @worker.setter
-    def worker(self, wkr: Optional[MosplatWorkerInterface]):
+    def worker(self, wkr: Optional[MosplatWorkerInterface[Q]]):
         self.__worker = wkr
 
     @property
@@ -99,11 +100,14 @@ class MosplatOperatorBase(
         self.__timer = tmr
 
     @property
-    def metadata(self) -> Optional[MediaIOMetadata]:
-        return self.__metadata
+    def metadata(self) -> MediaIOMetadata:
+        if self.__metadata is None:
+            raise DeveloperError("Metadata not available in this scope.")
+        else:
+            return self.__metadata
 
     @metadata.setter
-    def metadata(self, mta: Optional[MediaIOMetadata]):
+    def metadata(self, mta: MediaIOMetadata):
         self.__metadata = mta
 
     @property
