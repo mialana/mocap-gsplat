@@ -154,33 +154,3 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     @property
     def metadata_ptr(self) -> Mosplat_PG_MediaIOMetadata:
         return self.current_media_io_metadata
-
-    @property
-    def current_media_dirpath(self) -> Path:
-        from .checks import check_current_media_dirpath
-
-        return check_current_media_dirpath(self)
-
-    @property
-    def data_output_dirpath(self) -> Optional[Path]:
-        return self.__data_output_dirpath
-
-    @data_output_dirpath.setter
-    def data_output_dirpath(self, path: Path):
-        self.__data_output_dirpath = path
-
-    @property
-    def metadata_json_filepath(self) -> Path:
-        if not self.data_output_dirpath:
-            raise DeveloperError(
-                f"'{self.data_output_dirpath=}' should be set before this access."
-            )
-        return self.data_output_dirpath.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
-
-    @property
-    def media_files(self):
-        return self.__media_files
-
-    @media_files.setter
-    def media_files(self, files: Set[Path]):
-        self.__media_files = files

@@ -10,19 +10,13 @@ from bpy.types import Preferences, Scene, Context
 
 import os
 from pathlib import Path
-from typing import (
-    Union,
-    cast,
-    TYPE_CHECKING,
-    Any,
-    TypeAlias,
-    NoReturn,
-    Optional,
-    Set,
-    assert_never,
-)
+from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, Optional, Set, List
 
-from ..infrastructure.constants import ADDON_PREFERENCES_ID, ADDON_PROPERTIES_ATTRIBNAME
+from ..infrastructure.constants import (
+    ADDON_PREFERENCES_ID,
+    ADDON_PROPERTIES_ATTRIBNAME,
+    MEDIA_IO_METADATA_JSON_FILENAME,
+)
 from ..infrastructure.schemas import UnexpectedError, SafeError, UserFacingError
 from ..interfaces import MosplatLoggingInterface
 
@@ -38,7 +32,7 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 def check_propertygroup(
     scene: Optional[Scene],
-) -> Union[Mosplat_PG_Global, NoReturn]:
+) -> Mosplat_PG_Global:
     if scene is None:  # can occur if checked at the wrong time
         raise SafeError("Blender scene unavailable in this context.")
     try:
@@ -54,7 +48,7 @@ def check_propertygroup(
 
 def check_addonpreferences(
     prefs_ctx: Optional[Preferences],
-) -> Union[Mosplat_AP_Global, NoReturn]:
+) -> Mosplat_AP_Global:
     if prefs_ctx is None:  # can occur if checked at the wrong time
         raise SafeError("Blender preferences unavailable in this context.")
 
@@ -91,7 +85,9 @@ def check_data_output_dirpath(
     prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
 ) -> Path:
     output: Path
-    media_directory_name = props.current_media_dirpath.name
+
+    current_media_dirpath = check_current_media_dirpath(props)
+    media_directory_name = current_media_dirpath.name
 
     formatted_output_path = Path(
         str(prefs.data_output_path).format(media_directory_name=media_directory_name)
@@ -99,7 +95,7 @@ def check_data_output_dirpath(
     if formatted_output_path.is_absolute():
         output = formatted_output_path
     else:
-        output = props.current_media_dirpath.joinpath(formatted_output_path)
+        output = current_media_dirpath.joinpath(formatted_output_path)
 
     try:
         os.makedirs(
@@ -113,17 +109,26 @@ def check_data_output_dirpath(
     return output
 
 
-def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> Set[Path]:
-    exts = check_media_extensions(prefs)
-    prefs.media_extensions_set = exts  # also set the value here
+def check_metadata_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
+    return check_data_output_dirpath(prefs, props).joinpath(
+        MEDIA_IO_METADATA_JSON_FILENAME
+    )
 
-    files = set(
-        [p for p in props.current_media_dirpath.iterdir() if p.suffix.lower() in exts]
+
+def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> List[Path]:
+    exts = check_media_extensions(prefs)
+
+    files = sorted(
+        [
+            p
+            for p in check_current_media_dirpath(props).iterdir()
+            if p.suffix.lower() in exts
+        ]
     )
 
     if len(files) == 0:
         raise UserFacingError(
-            f"No files were found in '{props.current_media_dirpath}' with extensions of '{prefs.media_extensions}'."
+            f"No files were found in '{props.current_media_dir}' with extensions of '{prefs.media_extensions}'."
         )
     return files
 

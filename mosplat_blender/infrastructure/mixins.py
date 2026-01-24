@@ -237,7 +237,7 @@ class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):
             value = getattr(self, f.name)
             if hasattr(value, "to_dataclass"):
                 value = value.to_dataclass()
-            elif isinstance(value, (list, tuple)):
+            elif hasattr(value, "__iter__") and not isinstance(value, (str, bytes)):
                 value = [
                     v.to_dataclass() if hasattr(v, "to_dataclass") else v for v in value
                 ]

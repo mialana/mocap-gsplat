@@ -161,14 +161,6 @@ class Mosplat_AP_Global(
     def vggt_model_dir(self) -> Path:
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
 
-    @property
-    def media_extensions_set(self) -> Optional[Set[str]]:
-        return self.__media_extensions_set
-
-    @media_extensions_set.setter
-    def media_extensions_set(self, exts: Set[str]):
-        self.__media_extensions_set = exts
-
     def draw(self, _: Context):
         layout = self.layout
 
