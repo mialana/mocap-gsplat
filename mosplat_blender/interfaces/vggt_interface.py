@@ -38,7 +38,7 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
 
         if (
             cancel_event.is_set()
-        ):  # if cancel event was set at some point cleanup the resources
+        ):  # if cancel event was set at some point cleanup the resources now
             cls.cleanup()
 
         return cls._initialized

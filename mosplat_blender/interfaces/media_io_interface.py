@@ -9,6 +9,7 @@ import json
 from ..infrastructure.decorators import no_instantiate
 from ..infrastructure.mixins import MosplatLogClassMixin
 from ..infrastructure.constants import MEDIA_IO_METADATA_JSON_FILENAME
+from ..infrastructure.schemas import DeveloperError, UserFacingError
 
 StrPath: TypeAlias = Union[str, Path]
 
@@ -37,7 +38,7 @@ class ProcessedFrameRange:
     @classmethod
     def from_dict(cls, d):
         if not isinstance(d, Dict):
-            raise TypeError("Use this method with dictionary objects.")
+            raise DeveloperError("Use this method with dictionary objects.")
         return cls(**d)
 
 
@@ -53,7 +54,7 @@ class MediaProcessStatus:
     @classmethod
     def from_dict(cls, d):
         if not isinstance(d, Dict):
-            raise TypeError("Use this method with dictionary objects.")
+            raise DeveloperError("Use this method with dictionary objects.")
         return cls(**d)
 
 
@@ -153,7 +154,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
     @classmethod
     def update_metadata_json(cls):
         if not cls.initialized:
-            raise RuntimeError(f"`{cls.__qualname__}` not initialized.")
+            raise DeveloperError(f"`{cls.__qualname__}` not initialized.")
 
         json_filepath = cls.data_output_dir.joinpath(MEDIA_IO_METADATA_JSON_FILENAME)
         cls.metadata.to_JSON(json_filepath)
@@ -163,7 +164,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
         cls, filepath: Path
     ) -> Generator[MediaProcessStatus, None, None]:
         if not cls.initialized:
-            raise RuntimeError(f"`{cls.__qualname__}` not initialized.")
+            raise DeveloperError(f"`{cls.__qualname__}` not initialized.")
 
         status = cls.metadata.get_cached_media_status(filepath)
         if not status:
@@ -178,7 +179,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
                 status.mod_time = stat.st_mtime
                 status.file_size = stat.st_size
                 cls.metadata.handle_media_status(status)
-            except RuntimeError as e:
+            except UserFacingError as e:
                 status.message = str(e)
                 status.is_valid = False
 
@@ -198,7 +199,7 @@ class MosplatMediaIOInterface(MosplatLogClassMixin):
 
         cap = cv2.VideoCapture(str(filepath))
         if not cap.isOpened():
-            raise RuntimeError(f"Could not open media file: {filepath}")
+            raise UserFacingError(f"Could not open media file: {filepath}")
 
         cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # seek to end
         duration_ms = cap.get(cv2.CAP_PROP_POS_MSEC)

@@ -17,6 +17,7 @@ def test_deps_imports():
         import einops
         import safetensors
         import plyfile
+        import cv2
         import torch
         import torchvision
         import vggt

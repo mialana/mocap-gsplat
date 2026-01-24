@@ -20,6 +20,7 @@ from ..infrastructure.constants import (
 )
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
 from ..infrastructure.decorators import run_once, no_instantiate
+from ..infrastructure.schemas import UserFacingError
 
 
 @final
@@ -68,28 +69,20 @@ class MosplatLoggingInterface:
     def init_handlers_from_addon_prefs(cls, addon_prefs: SupportsMosplat_AP_Global):
         if not cls._root_logger:
             return
-        try:
-            if cls.init_stdout_handler(
-                addon_prefs.stdout_log_format,
-                addon_prefs.stdout_date_log_format,
-            ):
-                cls._root_logger.info(
-                    f"STDOUT handler initialized from addon preferences."
-                )
 
-            if cls.init_json_handler(
-                log_fmt=addon_prefs.json_log_format,
-                log_date_fmt=addon_prefs.json_date_log_format,
-                outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
-                file_fmt=addon_prefs.json_log_filename_format,
-            ):
-                cls._root_logger.info(
-                    f"JSON handler initialized from addon preferences."
-                )
-        except Exception:
-            cls._root_logger.exception(
-                "Initialization from addon preferences unsuccessful"
-            )
+        if cls.init_stdout_handler(
+            addon_prefs.stdout_log_format,
+            addon_prefs.stdout_date_log_format,
+        ):
+            cls._root_logger.info(f"STDOUT handler initialized from addon preferences.")
+
+        if cls.init_json_handler(
+            log_fmt=addon_prefs.json_log_format,
+            log_date_fmt=addon_prefs.json_date_log_format,
+            outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
+            file_fmt=addon_prefs.json_log_filename_format,
+        ):
+            cls._root_logger.info(f"JSON handler initialized from addon preferences.")
 
     @classmethod
     @run_once
@@ -137,9 +130,8 @@ class MosplatLoggingInterface:
                 saved_handler.close()
 
             return True
-        except Exception:
-            cls._root_logger.exception("Configuration for STDOUT handler invalid.")
-            raise
+        except Exception as e:
+            raise UserFacingError("Configuration for STDOUT handler invalid.") from e
 
     @classmethod
     def init_json_handler(
@@ -172,9 +164,8 @@ class MosplatLoggingInterface:
                 saved_handler.close()
 
             return True
-        except Exception:
-            cls._root_logger.exception("Configuration for JSON handler invalid.")
-            raise
+        except Exception as e:
+            raise UserFacingError("Configuration for JSON handler invalid.") from e
 
     @classmethod
     def set_log_record_factory(cls):

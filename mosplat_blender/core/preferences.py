@@ -18,31 +18,25 @@ from ..infrastructure.constants import (
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
     ADDON_SHORTNAME,
 )
-from ..infrastructure.schemas import PropertyUpdateError
+from ..infrastructure.schemas import UserFacingError
 
 
 def update_stdout_logging(prefs: Mosplat_AP_Global, _: Context):
-    try:
-        if MosplatLoggingInterface.init_stdout_handler(
-            log_fmt=prefs.stdout_log_format,
-            log_date_fmt=prefs.stdout_date_log_format,
-        ):
-            prefs.logger().info("STDOUT logging updated.")
-    except Exception:
-        raise PropertyUpdateError
+    if MosplatLoggingInterface.init_stdout_handler(
+        log_fmt=prefs.stdout_log_format,
+        log_date_fmt=prefs.stdout_date_log_format,
+    ):
+        prefs.logger().info("STDOUT logging updated.")
 
 
 def update_json_logging(prefs: Mosplat_AP_Global, _: Context):
-    try:
-        if MosplatLoggingInterface.init_json_handler(
-            log_fmt=prefs.json_log_format,
-            log_date_fmt=prefs.json_date_log_format,
-            outdir=prefs.json_log_dir,
-            file_fmt=prefs.json_log_filename_format,
-        ):
-            prefs.logger().info("JSON logging updated.")
-    except Exception:
-        raise PropertyUpdateError
+    if MosplatLoggingInterface.init_json_handler(
+        log_fmt=prefs.json_log_format,
+        log_date_fmt=prefs.json_date_log_format,
+        outdir=prefs.json_log_dir,
+        file_fmt=prefs.json_log_filename_format,
+    ):
+        prefs.logger().info("JSON logging updated.")
 
 
 class Mosplat_AP_Global(
@@ -88,8 +82,8 @@ class Mosplat_AP_Global(
         subtype="FILE_PATH",
     )
 
-    media_extension_set: StringProperty(
-        name="Media Extension Set",
+    media_extensions: StringProperty(
+        name="Media Extensions",
         description="Comma separated string of all file extensions that should be considered as media files within the media directory",
         default=".avi,.mp4,.mov",
     )
@@ -152,17 +146,14 @@ class Mosplat_AP_Global(
         return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
 
     @property
-    def extensions_list(self) -> Optional[Set[str]]:
+    def media_extensions_set(self) -> Set[str]:
         try:
             return set(
-                [
-                    ext.strip().lower()
-                    for ext in str(self.media_extension_set).split(",")
-                ]
+                [ext.strip().lower() for ext in str(self.media_extensions).split(",")]
             )
         except IndexError:
-            raise PropertyUpdateError(
-                f"Extensions in '{self.get_prop_name('media_extension_set')}' should be separated by commas."
+            raise UserFacingError(
+                f"Extensions in '{self.get_prop_name('media_extensions')}' should be separated by commas."
             )
 
     def draw(self, _: Context):
@@ -186,7 +177,7 @@ class Mosplat_AP_Global(
         data_proc_box.label(text="Data Processing Configuration", icon="MESH_CYLINDER")
         data_proc_box.prop(self, "data_output_path")
         data_proc_box.prop(self, "preprocess_media_script_file")
-        data_proc_box.prop(self, "media_extension_set")
+        data_proc_box.prop(self, "media_extensions")
         data_proc_box.prop(self, "max_frame_range")
 
         layout.separator()

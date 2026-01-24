@@ -23,6 +23,7 @@ from queue import Queue
 from threading import Event as ThreadingEvent
 
 from ..interfaces import MosplatWorkerInterface
+from .schemas import DeveloperError
 
 if TYPE_CHECKING:
     from ..core.operators import MosplatOperatorBase
@@ -67,19 +68,19 @@ def no_instantiate(cls: T) -> T:
     """
 
     def __new__(cls_, *args, **kwargs):
-        raise RuntimeError(f"{cls_.__name__} cannot be instantiated")
+        raise DeveloperError(f"{cls_.__name__} cannot be instantiated")
 
     cls.__new__ = staticmethod(__new__)
     return cls
 
 
 def worker_fn_auto(
-    fn: Callable[Concatenate[OpT, Queue, ThreadingEvent, P], None],
-) -> Callable[Concatenate[OpT, P], None]:
+    fn: Callable[Concatenate[Queue, ThreadingEvent, P], None],
+) -> Callable[Concatenate[MosplatOperatorBase, P], None]:
     """a decorator that creates a closure of the worker creation and other abstractable setup"""
 
     def wrapper(
-        self: OpT,
+        self: MosplatOperatorBase,
         *args: P.args,
         **kwargs: P.kwargs,
     ):

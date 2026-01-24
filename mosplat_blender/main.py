@@ -78,12 +78,9 @@ def unregister_addon():
     try:
         delattr(bpy.types.Scene, ADDON_PROPERTIES_ATTRIBNAME)
     except AttributeError:
-        logger.exception(f"Error during unregistration of add-on properties")
+        logger.exception(f"Error during unregistration of add-on properties.")
 
-    try:
-        MosplatVGGTInterface.cleanup()
-    except Exception:
-        logger.exception(f"Error while cleaning up VGGT interface")
+    MosplatVGGTInterface.cleanup()
 
     bpy.app.handlers.load_post.remove(handle_restore_from_json)
 

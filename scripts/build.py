@@ -214,10 +214,10 @@ def install_dev_pypi_packages(ctx: BuildContext):
             ]
         )
 
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         print(f"Error while installing PyPI wheels for development")
         raise
-    except Exception as e:
+    except Exception:
         print(f"An unexpected error occurred")
         raise
 
