@@ -45,9 +45,9 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
                 f"Start frame for '{prop_name}' must be less than end frame."
             )
 
-        if end >= props.metadata_ptr.collective_media_frame_count:
+        if end >= props.metadata_ptr.common_frame_count:
             cls._poll_error_msg_list.append(
-                f"End frame must be less than '{props.metadata_ptr.get_prop_name('collective_media_frame_count')}' of '{props.metadata_ptr.collective_media_frame_count}' frames."
+                f"End frame must be less than '{props.metadata_ptr.get_prop_name('common_frame_count')}' of '{props.metadata_ptr.common_frame_count}' frames."
             )
 
         max_frame_range = prefs.max_frame_range

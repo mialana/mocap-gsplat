@@ -79,6 +79,8 @@ class Mosplat_PG_MediaProcessStatus(MosplatPropertyGroupBase[MediaProcessStatus]
 
     filepath: StringProperty(name="Filepath", subtype="FILE_PATH")
     frame_count: IntProperty(name="Frame Count", default=-1)
+    width: IntProperty(name="Width", default=-1)
+    height: IntProperty(name="Height", default=-1)
     is_valid: BoolProperty(name="Is Valid", default=False)
     message: StringProperty(name="Message")
     mod_time: FloatProperty(name="Modification Time", default=-1.0)
@@ -95,15 +97,28 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
         subtype="DIR_PATH",
     )
 
-    do_media_durations_all_match: BoolProperty(
-        name="Do Media Durations All Match",
-        description="Tracks whether the found media in the current media directory all have matching durations.",
+    do_all_details_match: BoolProperty(
+        name="Do All Details Match",
+        description="Tracks whether the found media in the current media directory all"
+        "have matching frame count, width, and height.",
         default=False,
     )
 
-    collective_media_frame_count: IntProperty(
+    common_frame_count: IntProperty(
         name="Collective Media Frame Count",
-        description="Shared frame count for media within the selected media directory.",
+        description="Common frame count for media within the selected media directory.",
+        default=-1,
+    )
+
+    common_width: IntProperty(
+        name="Collective Media Frame Count",
+        description="Common width for media within the selected media directory.",
+        default=-1,
+    )
+
+    common_height: IntProperty(
+        name="Collective Media Frame Count",
+        description="Common height for media within the selected media directory.",
         default=-1,
     )
 
@@ -121,7 +136,7 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
 
 def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
     OperatorIDEnum.run(
-        bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS, "INVOKE_DEFAULT"
+        bpy.ops, OperatorIDEnum.VALIDATE_COMMON_MEDIA_DETAILS, "INVOKE_DEFAULT"
     )
 
     self.logger().info(f"'{self.get_prop_name('current_media_dir')}' updated.")

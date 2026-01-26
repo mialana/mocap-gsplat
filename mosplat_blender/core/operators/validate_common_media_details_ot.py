@@ -1,15 +1,16 @@
-from typing import Tuple, Set, List
+from __future__ import annotations
+
+from typing import Tuple, List, TYPE_CHECKING
 import threading
 from queue import Queue
 from pathlib import Path
-
-from bpy.types import Context, Event
 
 from .base_ot import (
     MosplatOperatorBase,
     OperatorReturnItemsSet,
     OptionalOperatorReturnItemsSet,
 )
+from ..handlers import restore_metadata_from_json
 
 from ...infrastructure.schemas import (
     OperatorIDEnum,
@@ -18,18 +19,16 @@ from ...infrastructure.schemas import (
     MediaProcessStatus,
 )
 from ...infrastructure.decorators import worker_fn_auto
-from ..handlers import restore_metadata_from_json
+
+if TYPE_CHECKING:
+    from cv2 import VideoCapture
 
 
-class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase[Tuple[str]]):
-    bl_idname = OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS
-    bl_description = (
-        "Check frame counts of all media files found in given media directory."
-    )
+class Mosplat_OT_validate_common_media_details(MosplatOperatorBase[Tuple[str]]):
+    bl_idname = OperatorIDEnum.VALIDATE_COMMON_MEDIA_DETAILS
+    bl_description = "Check frame count, width, and height of all media files found in current media directory."
 
-    def contexted_invoke(
-        self, context: Context, event: Event
-    ) -> OperatorReturnItemsSet:
+    def contexted_invoke(self, context, event) -> OperatorReturnItemsSet:
         prefs = self.prefs
         props = self.props
         try:
@@ -43,7 +42,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase[Tuple[str]]):
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        check_frame_counts_thread(
+        validate_common_media_details_thread(
             self,
             updated_media_files=self._media_files,
             metadata_dc=self.metadata_dc,
@@ -59,7 +58,7 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase[Tuple[str]]):
 
 
 @worker_fn_auto
-def check_frame_counts_thread(
+def validate_common_media_details_thread(
     queue: Queue[str],
     cancel_event: threading.Event,
     *,
@@ -80,23 +79,10 @@ def check_frame_counts_thread(
         status = status_lookup.get(str(file), MediaProcessStatus(filepath=str(file)))
 
         # if success is already valid skip new extraction
-        success = status.is_valid or _extract_media_frame_count(status)
+        if not status.is_valid:
+            _extract_media_details(status)
 
-        target_frame_count = (
-            status.frame_count
-            if metadata_dc.collective_media_frame_count == -1
-            else metadata_dc.collective_media_frame_count
-        )
-
-        metadata_dc.do_media_durations_all_match = (
-            metadata_dc.do_media_durations_all_match
-            and success
-            and target_frame_count == status.frame_count
-        )  # accumulate success
-
-        metadata_dc.collective_media_frame_count = (
-            target_frame_count if metadata_dc.do_media_durations_all_match else -1
-        )
+        metadata_dc.accumulate_media_status(status)  # update metadata from new status
 
         updated_statuses.append(status)
 
@@ -106,49 +92,56 @@ def check_frame_counts_thread(
     return
 
 
-def _extract_media_frame_count(status: MediaProcessStatus) -> bool:
-    """use opencv to get the frame count of media"""
+def _extract_media_details(status: MediaProcessStatus):
+    """use opencv to get width, height, and frame count of media"""
     import cv2
-
-    def _cleanup(method: str):
-        cap.release()
-        stat = Path(status.filepath).stat()
-
-        status.overwrite(
-            is_valid=True,
-            frame_count=frame_count,
-            message=f"Read file with the frame count '{frame_count}' ({method}).",
-            mod_time=stat.st_mtime,
-            file_size=stat.st_size,
-        )
-        return True
 
     cap = cv2.VideoCapture(status.filepath)
     if not cap.isOpened():
-        status.is_valid = False
-        status.message = f"Could not open file."
-        return False  # mark invalid and update message
+        status.mark_invalid
+        return
 
+    stat = Path(status.filepath).stat()
+
+    status.overwrite(
+        is_valid=True,
+        frame_count=_extract_media_frame_count(cap),
+        width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        mod_time=stat.st_mtime,
+        file_size=stat.st_size,
+    )
+
+    cap.release()
+    return
+
+
+def _extract_media_frame_count(cap: VideoCapture) -> int:
+    import cv2
+
+    frame_count = -1
     cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # seek to end
     duration_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
     if fps > 0 and duration_ms > 0:
-        frame_count = int(round((duration_ms / 1000.0) * fps))
-        if frame_count > 0:
-            return _cleanup("fps + duration metadata")
+        estimated = int(round((duration_ms / 1000.0) * fps))
+        if estimated > 0:
+            frame_count = estimated
+    else:
+        reported = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if 0 < reported < 2**32 - 1:
+            frame_count = reported
+        else:
+            cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 0.0)  # return seek to start
 
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if 0 < frame_count < 2**32 - 1:
-        return _cleanup("frame count metadata")
+            count = 0
+            while True:
+                ret, _ = cap.read()
+                if not ret:
+                    break
+                count += 1
 
-    cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 0.0)  # return seek to start
+            frame_count = count
 
-    frame_count = 0
-    while True:
-        ret, _ = cap.read()
-        if not ret:
-            break
-        frame_count += 1
-
-    return _cleanup("manual")
+    return frame_count
