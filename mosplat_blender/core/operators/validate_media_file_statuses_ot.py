@@ -10,13 +10,13 @@ from .base_ot import (
     OperatorReturnItemsSet,
     OptionalOperatorReturnItemsSet,
 )
-from ..handlers import restore_metadata_from_json
+from ..handlers import restore_dataset_from_json
 
 from ...infrastructure.schemas import (
     OperatorIDEnum,
     UserFacingError,
-    MediaIOMetadata,
-    MediaProcessStatus,
+    MediaIODataset,
+    MediaFileStatus,
 )
 from ...infrastructure.decorators import worker_fn_auto
 
@@ -24,15 +24,15 @@ if TYPE_CHECKING:
     from cv2 import VideoCapture
 
 
-class Mosplat_OT_validate_common_media_details(MosplatOperatorBase[Tuple[str]]):
-    bl_idname = OperatorIDEnum.VALIDATE_COMMON_MEDIA_DETAILS
+class Mosplat_OT_validate_media_file_statuses(MosplatOperatorBase[Tuple[str]]):
+    bl_idname = OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES
     bl_description = "Check frame count, width, and height of all media files found in current media directory."
 
     def contexted_invoke(self, context, event) -> OperatorReturnItemsSet:
         prefs = self.prefs
         props = self.props
         try:
-            restore_metadata_from_json(props, prefs)  # try to restore from local JSON
+            restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
             # try setting all the properties that are needed for the op
             self._media_files: List[Path] = props.media_files(prefs)
@@ -42,64 +42,73 @@ class Mosplat_OT_validate_common_media_details(MosplatOperatorBase[Tuple[str]]):
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        validate_common_media_details_thread(
+        validate_common_media_features_thread(
             self,
             updated_media_files=self._media_files,
-            metadata_dc=self.metadata_dc,
+            dataset_as_dc=self.dataset_as_dc,
         )
 
         return {"RUNNING_MODAL"}
 
     def queue_callback(self, context, event, next) -> OptionalOperatorReturnItemsSet:
-        if next == "update":  # keep props up-to-date so updates are reflected in UI
-            self.props.metadata_ptr.from_dataclass(self.metadata_dc)
-        elif next == "done":
+        if next == "done":
             self.cleanup(context)  # write props (as dataclass) to JSON
+            return
+
+        if next != "update":  # if sent an error message via queue
+            self.logger().warning(next)
+
+        # sync props regardless as the updated dataclass is still valid
+        self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
 
 
 @worker_fn_auto
-def validate_common_media_details_thread(
+def validate_common_media_features_thread(
     queue: Queue[str],
     cancel_event: threading.Event,
     *,
     updated_media_files: List[Path],
-    metadata_dc: MediaIOMetadata,
+    dataset_as_dc: MediaIODataset,
 ):
-    status_lookup = MediaProcessStatus.as_lookup(metadata_dc.media_process_statuses)
+    status_lookup = MediaFileStatus.as_lookup(dataset_as_dc.media_file_statuses)
 
     # replace the statuses with the fresh validated list we are building
-    updated_statuses: List[MediaProcessStatus] = []
-    metadata_dc.media_process_statuses = updated_statuses
+    updated_statuses: List[MediaFileStatus] = []
+    dataset_as_dc.media_file_statuses = updated_statuses
 
     for file in updated_media_files:
         if cancel_event.is_set():
             return  # simply return as new queue items will not be read anymore
+        queue_msg = "update"
 
         # check if the status for the file already exists, create new if not
-        status = status_lookup.get(str(file), MediaProcessStatus(filepath=str(file)))
+        status = status_lookup.get(str(file), MediaFileStatus(filepath=str(file)))
 
         # if success is already valid skip new extraction
         if not status.is_valid:
-            _extract_media_details(status)
+            try:
+                _extract_media_status(status)
+            except UserFacingError as e:
+                queue_msg = str(e)  # change queue message to error message
 
-        metadata_dc.accumulate_media_status(status)  # update metadata from new status
+        dataset_as_dc.accumulate_media_status(status)  # update dataset from new status
 
         updated_statuses.append(status)
 
-        queue.put("update")  # transmit that metadata has been updated
+        queue.put(queue_msg)  # transmit that dataset has been updated
 
     queue.put("done")  # signal done
     return
 
 
-def _extract_media_details(status: MediaProcessStatus):
+def _extract_media_status(status: MediaFileStatus):
     """use opencv to get width, height, and frame count of media"""
     import cv2
 
     cap = cv2.VideoCapture(status.filepath)
     if not cap.isOpened():
-        status.mark_invalid
-        return
+        status.mark_invalid()
+        raise UserFacingError(f"Could not open media file: {status.filepath}")
 
     stat = Path(status.filepath).stat()
 

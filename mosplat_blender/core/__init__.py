@@ -15,8 +15,8 @@ from .properties import (
     MosplatPropertyGroupBase,
     Mosplat_PG_PreprocessScriptApplication,
     Mosplat_PG_ProcessedFrameRange,
-    Mosplat_PG_MediaProcessStatus,
-    Mosplat_PG_MediaIOMetadata,
+    Mosplat_PG_MediaFileStatus,
+    Mosplat_PG_MediaIODataset,
     Mosplat_PG_Global,
 )
 
@@ -24,7 +24,7 @@ from .properties import (
 all_properties: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_PreprocessScriptApplication,
     Mosplat_PG_ProcessedFrameRange,
-    Mosplat_PG_MediaProcessStatus,
-    Mosplat_PG_MediaIOMetadata,
+    Mosplat_PG_MediaFileStatus,
+    Mosplat_PG_MediaIODataset,
     Mosplat_PG_Global,
 ]

@@ -20,7 +20,7 @@ from pathlib import Path
 from .checks import (
     check_media_files,
     check_data_output_dirpath,
-    check_metadata_json_filepath,
+    check_data_json_filepath,
     check_current_media_dirpath,
 )
 
@@ -28,12 +28,13 @@ from ..infrastructure.mixins import (
     MosplatBlPropertyAccessorMixin,
     MosplatDataclassInteropMixin,
 )
+from ..infrastructure.protocols import SupportsCollectionProperty
 from ..infrastructure.constants import DataclassInstance
 from ..infrastructure.schemas import (
     OperatorIDEnum,
     GlobalData,
-    MediaIOMetadata,
-    MediaProcessStatus,
+    MediaIODataset,
+    MediaFileStatus,
     ProcessedFrameRange,
     PreprocessScriptApplication,
 )
@@ -73,9 +74,15 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
         name="Applied Preprocess Scripts", type=Mosplat_PG_PreprocessScriptApplication
     )
 
+    @property
+    def scripts_accessor(
+        self,
+    ) -> SupportsCollectionProperty[Mosplat_PG_PreprocessScriptApplication]:
+        return self.applied_preprocess_scripts
 
-class Mosplat_PG_MediaProcessStatus(MosplatPropertyGroupBase[MediaProcessStatus]):
-    __dataclass_type__ = MediaProcessStatus
+
+class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
+    __dataclass_type__ = MediaFileStatus
 
     filepath: StringProperty(name="Filepath", subtype="FILE_PATH")
     frame_count: IntProperty(name="Frame Count", default=-1)
@@ -87,8 +94,8 @@ class Mosplat_PG_MediaProcessStatus(MosplatPropertyGroupBase[MediaProcessStatus]
     file_size: IntProperty(name="File Size", default=-1)
 
 
-class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
-    __dataclass_type__ = MediaIOMetadata
+class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
+    __dataclass_type__ = MediaIODataset
 
     base_directory: StringProperty(
         name="Base Directory",
@@ -122,8 +129,8 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
         default=-1,
     )
 
-    media_process_statuses: CollectionProperty(
-        name="Found Media Files", type=Mosplat_PG_MediaProcessStatus
+    media_file_statuses: CollectionProperty(
+        name="Media File Statuses", type=Mosplat_PG_MediaFileStatus
     )
 
     processed_frame_ranges: CollectionProperty(
@@ -133,10 +140,22 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
     def to_JSON(self, json_filepath):
         self.to_dataclass().to_JSON(json_filepath)
 
+    @property
+    def statuses_accessor(
+        self,
+    ) -> SupportsCollectionProperty[Mosplat_PG_MediaFileStatus]:
+        return self.media_file_statuses
+
+    @property
+    def ranges_accessor(
+        self,
+    ) -> SupportsCollectionProperty[Mosplat_PG_ProcessedFrameRange]:
+        return self.processed_frame_ranges
+
 
 def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
     OperatorIDEnum.run(
-        bpy.ops, OperatorIDEnum.VALIDATE_COMMON_MEDIA_DETAILS, "INVOKE_DEFAULT"
+        bpy.ops, OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT"
     )
 
     self.logger().info(f"'{self.get_prop_name('current_media_dir')}' updated.")
@@ -161,16 +180,16 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         min=0,
     )
 
-    current_media_io_metadata: PointerProperty(
-        name="Media IO Metadata",
-        description="Metadata for all media I/O operations",
-        type=Mosplat_PG_MediaIOMetadata,
+    current_media_io_dataset: PointerProperty(
+        name="Media IO Dataset",
+        description="Dataset for all media I/O operations",
+        type=Mosplat_PG_MediaIODataset,
         options={"SKIP_SAVE"},
     )
 
     @property
-    def metadata_ptr(self) -> Mosplat_PG_MediaIOMetadata:
-        return self.current_media_io_metadata
+    def dataset_accessor(self) -> Mosplat_PG_MediaIODataset:
+        return self.current_media_io_dataset
 
     @property
     def current_media_dirpath(self) -> Path:
@@ -179,8 +198,8 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     def data_output_dirpath(self, prefs: Mosplat_AP_Global) -> Path:
         return check_data_output_dirpath(prefs, self)
 
-    def metadata_json_filepath(self, prefs: Mosplat_AP_Global) -> Path:
-        return check_metadata_json_filepath(prefs, self)
+    def data_json_filepath(self, prefs: Mosplat_AP_Global) -> Path:
+        return check_data_json_filepath(prefs, self)
 
     def media_files(self, prefs: Mosplat_AP_Global) -> List[Path]:
         return check_media_files(prefs, self)

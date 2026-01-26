@@ -82,4 +82,7 @@ DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(
     .joinpath("fix_mocap_video_rotations.py")
 )
 
-MEDIA_IO_METADATA_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_metadata.json"
+MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
+
+PER_FRAME_DIRNAME = "frame_{:04d}"
+RAW_FRAME_DIRNAME = "raw"

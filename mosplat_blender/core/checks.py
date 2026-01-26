@@ -15,7 +15,7 @@ from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, Optional, Set, Li
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_PROPERTIES_ATTRIBNAME,
-    MEDIA_IO_METADATA_JSON_FILENAME,
+    MEDIA_IO_DATASET_JSON_FILENAME,
 )
 from ..infrastructure.schemas import UnexpectedError, SafeError, UserFacingError
 from ..interfaces import MosplatLoggingInterface
@@ -109,9 +109,9 @@ def check_data_output_dirpath(
     return output
 
 
-def check_metadata_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
+def check_data_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
     return check_data_output_dirpath(prefs, props).joinpath(
-        MEDIA_IO_METADATA_JSON_FILENAME
+        MEDIA_IO_DATASET_JSON_FILENAME
     )
 
 

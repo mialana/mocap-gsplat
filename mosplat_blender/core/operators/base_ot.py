@@ -23,7 +23,7 @@ from ...infrastructure.mixins import (
 from ...infrastructure.schemas import (
     UnexpectedError,
     OperatorIDEnum,
-    MediaIOMetadata,
+    MediaIODataset,
     DeveloperError,
 )
 from ...interfaces.worker_interface import MosplatWorkerInterface
@@ -58,7 +58,7 @@ class MosplatOperatorBase(
 
     __worker: Optional[MosplatWorkerInterface[Q]] = None
     __timer: Optional[Timer] = None
-    __metadata_dc: Optional[MediaIOMetadata] = None
+    __dataset_as_dc: Optional[MediaIODataset] = None
 
     _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
 
@@ -78,6 +78,7 @@ class MosplatOperatorBase(
         ):
             return False
 
+        cls._poll_error_msg_list.clear()
         overrideable_return = cls.contexted_poll(context, prefs, props)
 
         if len(cls._poll_error_msg_list) > 0:
@@ -115,15 +116,15 @@ class MosplatOperatorBase(
         self.__timer = tmr
 
     @property
-    def metadata_dc(self) -> MediaIOMetadata:
-        if self.__metadata_dc is None:
-            raise DeveloperError("Metadata as dataclass not available in this scope.")
+    def dataset_as_dc(self) -> MediaIODataset:
+        if self.__dataset_as_dc is None:
+            raise DeveloperError("Dataset as dataclass not available in this scope.")
         else:
-            return self.__metadata_dc
+            return self.__dataset_as_dc
 
-    @metadata_dc.setter
-    def metadata_dc(self, mta: Optional[MediaIOMetadata]):
-        self.__metadata_dc = mta
+    @dataset_as_dc.setter
+    def dataset_as_dc(self, mta: Optional[MediaIODataset]):
+        self.__dataset_as_dc = mta
 
     @property
     def wm(self) -> WindowManager:
@@ -151,9 +152,9 @@ class MosplatOperatorBase(
 
     def execute(self, context) -> OperatorReturnItemsSet:
         with self.encapsulated_context_block(context):
-            self.metadata_dc = (
-                self.props.metadata_ptr.to_dataclass()
-            )  # set metadata before
+            self.dataset_as_dc = (
+                self.props.dataset_accessor.to_dataclass()
+            )  # set dataset as dataclass property beforehand
             return self.contexted_execute(context)
 
     def contexted_execute(self, context: Context) -> OperatorReturnItemsSet:
@@ -200,8 +201,8 @@ class MosplatOperatorBase(
 
     def cleanup(self, context: Context):
         # update JSON with current state of PG as source of truth
-        metadata_json_filepath = self.props.metadata_json_filepath(self.prefs)
-        self.props.metadata_ptr.to_JSON(metadata_json_filepath)
+        json_filepath = self.props.data_json_filepath(self.prefs)
+        self.props.dataset_accessor.to_JSON(json_filepath)
 
         if self.timer:
             self.wm.event_timer_remove(self.timer)
@@ -212,4 +213,6 @@ class MosplatOperatorBase(
             self.worker = None
             self.logger().debug("Worker cleaned up")
 
-        self.metadata_dc = None  # metadata is not guaranteed to be in-sync anymore
+        self.dataset_as_dc = (
+            None  # dataset as dataclass is not guaranteed to be in-sync anymore
+        )
