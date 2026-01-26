@@ -13,7 +13,7 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar, TypeAlias, TYPE_CHECKING, Any, List
+from typing import Generic, TypeVar, TYPE_CHECKING, List, Tuple, Union
 
 from pathlib import Path
 
@@ -41,8 +41,6 @@ from ..infrastructure.schemas import (
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
-else:
-    Mosplat_AP_Global: TypeAlias = Any
 
 D = TypeVar("D", bound=DataclassInstance)
 
@@ -62,7 +60,8 @@ class Mosplat_PG_AppliedPreprocessScript(
     __dataclass_type__ = AppliedPreprocessScript
 
     script_path: StringProperty(name="Script Path", subtype="FILE_PATH")
-    application_time: FloatProperty(name="Application Time", default=-1.0)
+    mod_time: FloatProperty(name="Modification Time", default=-1.0)
+    file_size: IntProperty(name="File Size", default=-1)
 
 
 class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
@@ -89,9 +88,17 @@ class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
     width: IntProperty(name="Width", default=-1)
     height: IntProperty(name="Height", default=-1)
     is_valid: BoolProperty(name="Is Valid", default=False)
-    message: StringProperty(name="Message")
     mod_time: FloatProperty(name="Modification Time", default=-1.0)
     file_size: IntProperty(name="File Size", default=-1)
+
+    def matches_dataset(
+        self, dataset: Union[Mosplat_PG_MediaIODataset, MediaIODataset]
+    ) -> Tuple[bool, bool, bool]:
+        return (
+            self.frame_count == dataset.median_frame_count,
+            self.width == dataset.median_width,
+            self.height == dataset.median_height,
+        )
 
 
 class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
@@ -104,28 +111,28 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
         subtype="DIR_PATH",
     )
 
-    do_all_details_match: BoolProperty(
-        name="Do All Details Match",
+    is_valid_media_directory: BoolProperty(
+        name="Is Valid Media Directory",
         description="Tracks whether the found media in the current media directory all"
         "have matching frame count, width, and height.",
         default=False,
     )
 
-    common_frame_count: IntProperty(
-        name="Collective Media Frame Count",
-        description="Common frame count for media within the selected media directory.",
+    median_frame_count: IntProperty(
+        name="Median Frame Count",
+        description="Median frame count for all media files within the selected media directory.",
         default=-1,
     )
 
-    common_width: IntProperty(
-        name="Collective Media Frame Count",
-        description="Common width for media within the selected media directory.",
+    median_width: IntProperty(
+        name="Median Width",
+        description="Median width for all media files within the selected media directory.",
         default=-1,
     )
 
-    common_height: IntProperty(
-        name="Collective Media Frame Count",
-        description="Common height for media within the selected media directory.",
+    median_height: IntProperty(
+        name="Median Height",
+        description="Median height for all media files within the selected media directory.",
         default=-1,
     )
 
