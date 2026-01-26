@@ -82,7 +82,7 @@ class OperatorIDEnum(StrEnum):
     INITIALIZE_MODEL = auto()
     RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
-    VALIDATE_COMMON_MEDIA_DETAILS = auto()
+    VALIDATE_MEDIA_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
 
 
@@ -147,7 +147,7 @@ class ProcessedFrameRange:
 
 
 @dataclass
-class MediaProcessStatus:
+class MediaFileStatus:
     filepath: str
     is_valid: bool = False
     frame_count: int = -1
@@ -157,7 +157,7 @@ class MediaProcessStatus:
     file_size: int = -1
 
     @classmethod
-    def from_dict(cls, d: Dict) -> MediaProcessStatus:
+    def from_dict(cls, d: Dict) -> MediaFileStatus:
         return cls(**d)
 
     def overwrite(
@@ -186,30 +186,28 @@ class MediaProcessStatus:
         self.file_size = -1
 
     @classmethod
-    def as_lookup(
-        cls, statuses: List[MediaProcessStatus]
-    ) -> Dict[str, MediaProcessStatus]:
+    def as_lookup(cls, statuses: List[MediaFileStatus]) -> Dict[str, MediaFileStatus]:
         return {s.filepath: s for s in statuses}
 
 
 @dataclass
-class MediaIOMetadata:
+class MediaIODataset:
     base_directory: str
     do_all_details_match: bool = True
     common_frame_count: int = -1
     common_width: int = -1
     common_height: int = -1
-    media_process_statuses: List[MediaProcessStatus] = field(default_factory=list)
+    media_file_statuses: List[MediaFileStatus] = field(default_factory=list)
     processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, d: Dict) -> MediaIOMetadata:
+    def from_dict(cls, d: Dict) -> MediaIODataset:
         instance = cls(**d)
-        instance.media_process_statuses = [
-            MediaProcessStatus.from_dict(
+        instance.media_file_statuses = [
+            MediaFileStatus.from_dict(
                 cast(Dict, m)
             )  # note that the underlying structure of `m` is still a dict after `cls(**d)`
-            for m in instance.media_process_statuses
+            for m in instance.media_file_statuses
         ]
         instance.processed_frame_ranges = [
             ProcessedFrameRange.from_dict(cast(Dict, p))
@@ -225,7 +223,7 @@ class MediaIOMetadata:
             json.dump(as_dict, f, sort_keys=True, indent=4)
 
     @classmethod
-    def from_JSON(cls, *, json_path: Path, base_directory: Path) -> MediaIOMetadata:
+    def from_JSON(cls, *, json_path: Path, base_directory: Path) -> MediaIODataset:
         if json_path.exists():
             try:
                 with json_path.open("r", encoding="utf-8") as f:
@@ -237,12 +235,12 @@ class MediaIOMetadata:
 
         return cls(base_directory=str(base_directory))
 
-    def synchronize_to_incoming(self, status: MediaProcessStatus):
+    def synchronize_to_incoming(self, status: MediaFileStatus):
         self.common_frame_count = status.frame_count
         self.common_width = status.width
         self.common_height = status.height
 
-    def accumulate_media_status(self, status: MediaProcessStatus) -> None:
+    def accumulate_media_status(self, status: MediaFileStatus) -> None:
         def _create_target(common: int, incoming: int) -> int:
             return incoming if common == -1 else common
 
@@ -268,7 +266,7 @@ class MediaIOMetadata:
 class GlobalData:
     current_media_dir: str = str(Path.home())
     current_frame_range: Tuple[int, int] = field(default_factory=tuple[0, 6])
-    current_media_io_metadata: MediaIOMetadata = field(
-        default_factory=lambda: MediaIOMetadata(base_directory=str(Path.home()))
+    current_media_io_dataset: MediaIODataset = field(
+        default_factory=lambda: MediaIODataset(base_directory=str(Path.home()))
     )
     was_restored_from_json: bool = False

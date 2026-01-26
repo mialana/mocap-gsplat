@@ -1,4 +1,6 @@
-from typing import Tuple, List
+from __future__ import annotations
+
+from typing import Tuple, List, TYPE_CHECKING
 import threading
 from queue import Queue
 from pathlib import Path
@@ -15,14 +17,15 @@ from ..properties import Mosplat_PG_Global
 from ...infrastructure.schemas import (
     OperatorIDEnum,
     UserFacingError,
-    MediaIOMetadata,
+    MediaIODataset,
     ProcessedFrameRange,
 )
+from ..handlers import restore_dataset_from_json
 from ...infrastructure.decorators import worker_fn_auto
-from ..handlers import restore_metadata_from_json
+from ...infrastructure.constants import PER_FRAME_DIRNAME, RAW_FRAME_DIRNAME
 
-FRAME_DIR_FMT = "frame_{:04d}"
-RAW_DIR_NAME = "raw"
+if TYPE_CHECKING:
+    from cv2 import VideoCapture
 
 
 class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
@@ -31,7 +34,12 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
 
     @classmethod
     def contexted_poll(cls, context, prefs, props) -> bool:
-        cls._validate_frame_range(prefs, props)
+        if not props.dataset_accessor.do_all_details_match:
+            cls._poll_error_msg_list.append(
+                "Ensure that frame count, width, and height of all media files within current media directory match."
+            )
+        else:
+            cls._validate_frame_range(prefs, props)
 
         return len(cls._poll_error_msg_list) == 0
 
@@ -45,9 +53,9 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
                 f"Start frame for '{prop_name}' must be less than end frame."
             )
 
-        if end >= props.metadata_ptr.common_frame_count:
+        if end >= props.dataset_accessor.common_frame_count:
             cls._poll_error_msg_list.append(
-                f"End frame must be less than '{props.metadata_ptr.get_prop_name('common_frame_count')}' of '{props.metadata_ptr.common_frame_count}' frames."
+                f"End frame must be less than '{props.dataset_accessor.get_prop_name('common_frame_count')}' of '{props.dataset_accessor.common_frame_count}' frames."
             )
 
         max_frame_range = prefs.max_frame_range
@@ -64,9 +72,10 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
         prefs = self.prefs
         props = self.props
         try:
-            restore_metadata_from_json(props, prefs)  # try to restore from local JSON
+            restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
             # try setting all the properties that are needed for the op
+            self._data_output_dirpath: Path = props.data_output_dirpath(prefs)
             self._media_files: List[Path] = props.media_files(prefs)
             self._frame_range: Tuple[int, int] = props.current_frame_range
             return self.execute(context)
@@ -79,16 +88,22 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
             self,
             updated_media_files=self._media_files,
             frame_range=self._frame_range,
-            metadata_dc=self.metadata_dc,
+            data_output_dirpath=self._data_output_dirpath,
+            dataset_as_dc=self.dataset_as_dc,
         )
 
         return {"RUNNING_MODAL"}
 
     def queue_callback(self, context, event, next) -> OptionalOperatorReturnItemsSet:
-        if next == "update":  # keep props up-to-date so updates are reflected in UI
-            self.props.metadata_ptr.from_dataclass(self.metadata_dc)
-        elif next == "done":
+        if next == "done":
             self.cleanup(context)  # write props (as dataclass) to JSON
+            return
+
+        if next != "update":  # if sent an error message via queue
+            self.logger().warning(next)
+
+        # sync props regardless as the updated dataclass is still valid
+        self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
 
 
 @worker_fn_auto
@@ -98,68 +113,60 @@ def extract_frame_range_thread(
     *,
     updated_media_files: List[Path],
     frame_range: Tuple[int, int],
-    metadata_dc: MediaIOMetadata,
-):
-    start, end = frame_range
-    base_dir = Path(metadata_dc.base_directory)
-
-    for frame_idx in range(start, end):
-        if cancel_event.is_set():
-            return
-
-        frame_dir = base_dir / FRAME_DIR_FMT
-        frame_dir.mkdir(parents=True, exist_ok=True)
-
-        _extract_frame_to_npy(
-            frame_idx=frame_idx,
-            media_files=updated_media_files,
-            out_dir=frame_dir,
-            stage_name="raw",
-        )
-
-        queue.put("update")
-
-    metadata_dc.processed_frame_ranges.append(
-        ProcessedFrameRange(
-            start_frame=start,
-            end_frame=end,
-        )
-    )
-
-    queue.put("done")
-
-
-def _extract_frame_to_npy(
-    *,
-    frame_idx: int,
-    media_files: List[Path],
-    out_dir: Path,
-    stage_name: str,
+    data_output_dirpath: Path,
+    dataset_as_dc: MediaIODataset,
 ):
     import cv2
-    import numpy as np
 
-    caps = []
+    start, end = frame_range
+    caps: List[cv2.VideoCapture] = []
+
     try:
-        for media in media_files:
+        for media in updated_media_files:
             cap = cv2.VideoCapture(str(media))
             if not cap.isOpened():
                 raise UserFacingError(f"Could not open media file: {media}")
             caps.append(cap)
 
-        images = []
-        for cap in caps:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-            ret, frame = cap.read()
-            if not ret:
-                raise UserFacingError(f"Failed to read frame {frame_idx}")
-            # BGR → RGB once, here
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            images.append(frame)
+        # create a new frame range with both limits at start
+        new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
+        dataset_as_dc.processed_frame_ranges.append(new_frame_range)
 
-        stacked = np.stack(images, axis=0)
-        np.save(out_dir / f"{stage_name}.npy", stacked)
+        for frame_idx in range(start, end):
+            if cancel_event.is_set():
+                return
+            frame_dir = data_output_dirpath.joinpath(
+                PER_FRAME_DIRNAME.format(frame_idx)
+            )
+            frame_dir.mkdir(parents=True, exist_ok=True)
 
+            frame_npy_filepath = frame_dir.joinpath(f"{RAW_FRAME_DIRNAME}.npy")
+            if not frame_npy_filepath.exists():
+                _write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
+
+            new_frame_range.end_frame = frame_idx
+            queue.put("update")
+    except UserFacingError as e:
+        queue.put(str(e))  # exit early wherever error occurs and put error on queue
     finally:
         for cap in caps:
             cap.release()
+
+    queue.put("done")
+
+
+def _write_frame_data_to_npy(frame_idx: int, caps: List[VideoCapture], out_path: Path):
+    import cv2
+    import numpy as np
+
+    images: List[cv2.typing.MatLike] = []
+    for cap in caps:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        if not ret:
+            raise UserFacingError(f"Failed to read frame: {frame_idx}")
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # BGR to RGB
+        images.append(frame)
+
+    stacked = np.stack(images, axis=0)
+    np.save(out_path, stacked)
