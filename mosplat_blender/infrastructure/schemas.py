@@ -83,6 +83,7 @@ class OperatorIDEnum(StrEnum):
     RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
     CHECK_MEDIA_FRAME_COUNTS = auto()
+    EXTRACT_FRAME_RANGE = auto()
 
 
 class PanelIDEnum(StrEnum):
