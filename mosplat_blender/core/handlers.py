@@ -54,3 +54,15 @@ def restore_dataset_from_json(
     props.dataset_accessor.from_dataclass(dc)
 
     logger.info("Properties synced with cached dataset.")
+
+    from .properties import Mosplat_PG_AppliedPreprocessScript
+    from ..infrastructure.schemas import AppliedPreprocessScript
+
+    script = AppliedPreprocessScript.now(str(prefs.preprocess_media_script_file))
+
+    for range in props.dataset_accessor.ranges_accessor:
+        new: Mosplat_PG_AppliedPreprocessScript = range.scripts_accessor.add()
+        new.from_dataclass(script)
+
+        new2: Mosplat_PG_AppliedPreprocessScript = range.scripts_accessor.add()
+        new2.from_dataclass(script)

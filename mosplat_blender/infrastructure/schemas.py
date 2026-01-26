@@ -112,19 +112,19 @@ class PanelIDEnum(StrEnum):
 
 
 @dataclass(frozen=True)
-class PreprocessScriptApplication:
+class AppliedPreprocessScript:
     script_path: str
     application_time: float
 
     @staticmethod
-    def now(script_path: str) -> PreprocessScriptApplication:
-        return PreprocessScriptApplication(
+    def now(script_path: str) -> AppliedPreprocessScript:
+        return AppliedPreprocessScript(
             script_path=script_path,
             application_time=datetime.now().timestamp(),
         )
 
     @classmethod
-    def from_dict(cls, d: Dict) -> PreprocessScriptApplication:
+    def from_dict(cls, d: Dict) -> AppliedPreprocessScript:
         return cls(**d)
 
 
@@ -132,7 +132,7 @@ class PreprocessScriptApplication:
 class ProcessedFrameRange:
     start_frame: int
     end_frame: int
-    applied_preprocess_scripts: List[PreprocessScriptApplication] = field(
+    applied_preprocess_scripts: List[AppliedPreprocessScript] = field(
         default_factory=list
     )
 
@@ -140,7 +140,7 @@ class ProcessedFrameRange:
     def from_dict(cls, d: Dict) -> ProcessedFrameRange:
         instance = cls(**d)
         instance.applied_preprocess_scripts = [
-            PreprocessScriptApplication.from_dict(cast(Dict, a))
+            AppliedPreprocessScript.from_dict(cast(Dict, a))
             for a in instance.applied_preprocess_scripts
         ]
         return instance
