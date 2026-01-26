@@ -13,7 +13,7 @@ from .panels import MosplatPanelBase, all_panels
 from .preferences import Mosplat_AP_Global
 from .properties import (
     MosplatPropertyGroupBase,
-    Mosplat_PG_PreprocessScriptApplication,
+    Mosplat_PG_AppliedPreprocessScript,
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,
@@ -22,7 +22,7 @@ from .properties import (
 
 # property groups need to be registered in a bottom-to-top "owning" class order
 all_properties: List[Type[MosplatPropertyGroupBase]] = [
-    Mosplat_PG_PreprocessScriptApplication,
+    Mosplat_PG_AppliedPreprocessScript,
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,

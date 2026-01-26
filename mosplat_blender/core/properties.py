@@ -36,7 +36,7 @@ from ..infrastructure.schemas import (
     MediaIODataset,
     MediaFileStatus,
     ProcessedFrameRange,
-    PreprocessScriptApplication,
+    AppliedPreprocessScript,
 )
 
 if TYPE_CHECKING:
@@ -56,10 +56,10 @@ class MosplatPropertyGroupBase(
     pass
 
 
-class Mosplat_PG_PreprocessScriptApplication(
-    MosplatPropertyGroupBase[PreprocessScriptApplication]
+class Mosplat_PG_AppliedPreprocessScript(
+    MosplatPropertyGroupBase[AppliedPreprocessScript]
 ):
-    __dataclass_type__ = PreprocessScriptApplication
+    __dataclass_type__ = AppliedPreprocessScript
 
     script_path: StringProperty(name="Script Path", subtype="FILE_PATH")
     application_time: FloatProperty(name="Application Time", default=-1.0)
@@ -71,13 +71,13 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
     start_frame: IntProperty(name="Start Frame", default=0, min=0)
     end_frame: IntProperty(name="End Frame", default=0, min=0)
     applied_preprocess_scripts: CollectionProperty(
-        name="Applied Preprocess Scripts", type=Mosplat_PG_PreprocessScriptApplication
+        name="Applied Preprocess Scripts", type=Mosplat_PG_AppliedPreprocessScript
     )
 
     @property
     def scripts_accessor(
         self,
-    ) -> SupportsCollectionProperty[Mosplat_PG_PreprocessScriptApplication]:
+    ) -> SupportsCollectionProperty[Mosplat_PG_AppliedPreprocessScript]:
         return self.applied_preprocess_scripts
 
 
