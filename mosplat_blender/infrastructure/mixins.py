@@ -13,6 +13,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     TypeAlias,
+    List,
 )
 from enum import StrEnum
 from dataclasses import fields
@@ -20,6 +21,8 @@ import logging
 import inspect
 import contextlib
 
+
+from .protocols import SupportsCollectionProperty
 from .constants import _MISSING_, DataclassInstance
 from .schemas import DeveloperError
 
@@ -163,8 +166,6 @@ class MosplatAPAccessorMixin(MosplatLogClassMixin):
 
     if TYPE_CHECKING:
         from ..core.preferences import Mosplat_AP_Global
-    else:
-        Mosplat_AP_Global: TypeAlias = Any
 
     @property
     def prefs(self) -> Mosplat_AP_Global:
@@ -187,8 +188,6 @@ class MosplatPGAccessorMixin(MosplatLogClassMixin):
 
     if TYPE_CHECKING:
         from ..core.properties import Mosplat_PG_Global
-    else:
-        Mosplat_PG_Global: TypeAlias = Any
 
     @property
     def props(self) -> Mosplat_PG_Global:
@@ -235,12 +234,10 @@ class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):
         kwargs = {}
         for f in fields(cls):
             value = getattr(self, f.name)
-            if hasattr(value, "to_dataclass"):
+            if isinstance(value, MosplatDataclassInteropMixin):
                 value = value.to_dataclass()
-            elif hasattr(value, "__iter__") and not isinstance(value, (str, bytes)):
-                value = [
-                    v.to_dataclass() if hasattr(v, "to_dataclass") else v for v in value
-                ]
+            elif isinstance(value, SupportsCollectionProperty):
+                value = self.collection_property_to_dataclass_list(value)
             kwargs[f.name] = value
 
         return cls(**kwargs)
@@ -249,15 +246,24 @@ class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):
         for f in fields(dc):
             value = getattr(dc, f.name)
             target = getattr(self, f.name, None)
-            if hasattr(target, "from_dataclass"):
-                getattr(target, "from_dataclass")(value)  # nested `PropertyGroup`
-            elif hasattr(target, "clear") and hasattr(target, "add"):
-                getattr(target, "clear")()  # `CollectionProperty`
+            if isinstance(target, MosplatDataclassInteropMixin):
+                target.from_dataclass(value)
+            elif isinstance(target, SupportsCollectionProperty):
+                target.clear()  # clear out the old collection property
                 for item_dc in value:
-                    item_pg = getattr(target, "add")()
-                    if hasattr(item_pg, "from_dataclass"):
+                    item_pg = target.add()
+                    if isinstance(item_pg, MosplatDataclassInteropMixin):
                         item_pg.from_dataclass(item_dc)
                     else:
                         item_pg = item_dc
             else:
                 setattr(self, f.name, value)
+
+    @staticmethod
+    def collection_property_to_dataclass_list(
+        cp: SupportsCollectionProperty[MosplatDataclassInteropMixin[SD]],
+    ) -> List[SD]:
+        return [v.to_dataclass() for v in cp]
+
+
+SD = TypeVar("SD", bound=DataclassInstance)

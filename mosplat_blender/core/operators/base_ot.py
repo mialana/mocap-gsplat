@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from bpy.types import Context, WindowManager, Timer, Event, Operator
 
 from typing import (
@@ -7,7 +9,6 @@ from typing import (
     Optional,
     Generic,
     TypeVar,
-    Any,
     ClassVar,
     List,
 )
@@ -36,8 +37,6 @@ if TYPE_CHECKING:
     from ..properties import Mosplat_PG_Global
 else:
     _OperatorReturnItemsSafe: TypeAlias = str
-    Mosplat_AP_Global: TypeAlias = Any
-    Mosplat_PG_Global: TypeAlias = Any
 
 OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
 OptionalOperatorReturnItemsSet: TypeAlias = Optional[OperatorReturnItemsSet]

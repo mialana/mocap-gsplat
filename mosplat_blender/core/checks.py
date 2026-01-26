@@ -6,11 +6,13 @@ if they do successfuly pass though, they perform static casting so that
 we can operate with type-awareness in development.
 """
 
+from __future__ import annotations
+
 from bpy.types import Preferences, Scene, Context
 
 import os
 from pathlib import Path
-from typing import Union, cast, TYPE_CHECKING, Any, TypeAlias, Optional, Set, List
+from typing import cast, TYPE_CHECKING, Optional, Set, List
 
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
@@ -23,9 +25,6 @@ from ..interfaces import MosplatLoggingInterface
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
     from .properties import Mosplat_PG_Global
-else:
-    Mosplat_AP_Global: TypeAlias = Any
-    Mosplat_PG_Global: TypeAlias = Any
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
@@ -37,9 +36,12 @@ def check_propertygroup(
         raise SafeError("Blender scene unavailable in this context.")
     try:
         found_properties = getattr(scene, ADDON_PROPERTIES_ATTRIBNAME)
-        # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
-        properties = cast(Mosplat_PG_Global, found_properties)
-        return properties
+
+        if TYPE_CHECKING:
+            # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
+            found_properties = cast(Mosplat_PG_Global, found_properties)
+
+        return found_properties
     except AttributeError as e:
         raise UnexpectedError(
             "Registration of addon properties was never successful. Cannot continue."
@@ -53,10 +55,12 @@ def check_addonpreferences(
         raise SafeError("Blender preferences unavailable in this context.")
 
     try:
-        found_addon = prefs_ctx.addons[ADDON_PREFERENCES_ID]
-        # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
-        preferences = cast(Mosplat_AP_Global, found_addon.preferences)
-        return preferences
+        found_preferences = prefs_ctx.addons[ADDON_PREFERENCES_ID].preferences
+
+        if TYPE_CHECKING:
+            # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
+            found_preferences = cast(Mosplat_AP_Global, found_preferences)
+        return found_preferences
     except KeyError as e:
         raise UnexpectedError(
             "Registration of addon preferences was never successful. Cannot continue."

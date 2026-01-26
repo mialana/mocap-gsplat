@@ -1,14 +1,12 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeAlias, Any
+import os
 
-from ...infrastructure.schemas import PanelIDEnum, OperatorIDEnum
+from ..properties import Mosplat_PG_MediaIODataset
+from ...infrastructure.schemas import PanelIDEnum, OperatorIDEnum, MediaFileStatus
 
 from .base_pt import MosplatPanelBase
 
-if TYPE_CHECKING:
-    from ..properties import Mosplat_PG_MediaFileStatus
-else:
-    Mosplat_PG_MediaFileStatus: TypeAlias = Any
+_median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")
 
 
 class Mosplat_PT_Preprocess(MosplatPanelBase):
@@ -27,42 +25,47 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         box.row().prop(props, "current_media_dir", text="")
 
         dataset = props.dataset_accessor
-        statuses = dataset.statuses_accessor
-        if len(statuses) > 0:
-            statuses_box = box.box()
-            statuses_box.label(text=dataset.get_prop_name("media_file_statuses"))
-            ranges_grid = statuses_box.grid_flow(columns=4, align=True, row_major=True)
-            for status in statuses:
-                media_filename = Path(status.filepath).name
-                name_column = ranges_grid.column()
-                name_column.label(text=media_filename, icon="FILE_MOVIE")
-                name_column.alert = not status.is_valid
 
-                frame_count_column = ranges_grid.column()
-                frame_count_column.alignment = "RIGHT"
-                frame_count_column.label(text=f"F: {str(status.frame_count)}")
+        statuses = dataset.collection_property_to_dataclass_list(
+            dataset.statuses_accessor
+        )
+        statuses_length: int = len(statuses)
+        if statuses_length == 0:
+            return  # early return
 
-                width_column = ranges_grid.column()
-                width_column.alignment = "RIGHT"
-                width_column.label(text=f"W: {str(status.width)}")
+        statuses_box = box.box()
+        statuses_box.label(text=dataset.get_prop_name("media_file_statuses"))
 
-                height_column = ranges_grid.column()
-                height_column.alignment = "RIGHT"
-                height_column.label(text=f"H: {str(status.height)}")
+        grid = statuses_box.grid_flow(columns=4, align=True, row_major=True)
+
+        if "MOSPLAT_TESTING" in os.environ:
+            self._overwrite_median_as_status(dataset)
+            statuses.append(_median_as_status)
+
+        for s in statuses:
+            _media_filename = Path(s.filepath).name
+            _icon = "CON_TRANSFORM_CACHE" if s is _median_as_status else "FILE_MOVIE"
+            self._col_factory(grid, _media_filename, not s.is_valid, icon=_icon)
+
+            fc_matches, w_matches, h_matches = s.matches_dataset(dataset)
+
+            self._col_factory(grid, f"F: {s.frame_count}", not fc_matches, pos="RIGHT")
+            self._col_factory(grid, f"W: {s.width}", not w_matches, pos="RIGHT")
+            self._col_factory(grid, f"H: {s.height}", not h_matches, pos="RIGHT")
 
         ranges = dataset.ranges_accessor
         if len(ranges) > 0:
             ranges_box = box.box()
             ranges_box.label(text=dataset.get_prop_name("processed_frame_ranges"))
-            for range in ranges:
-                scripts = range.scripts_accessor
+            for r in ranges:
+                scripts = r.scripts_accessor
                 has_scripts = len(scripts) > 0
                 range_row = ranges_box.row()
 
                 factor = 0.25 if has_scripts else 1
                 split = range_row.split(factor=factor, align=True)
                 split.label(
-                    text=f"{str(range.start_frame)}-{str(range.end_frame)}",
+                    text=f"{str(r.start_frame)}-{str(r.end_frame)}",
                     icon="CON_ACTION",
                 )
 
@@ -77,8 +80,20 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         box.row().prop(props, "current_frame_range")
         box.row().operator(OperatorIDEnum.EXTRACT_FRAME_RANGE)
 
-        # column.operator(OperatorIDEnum.INITIALIZE_MODEL)
+        column.operator(OperatorIDEnum.INITIALIZE_MODEL)
 
         # column.separator()
 
         # column.row().operator(OperatorIDEnum.RUN_INFERENCE)
+
+    @staticmethod
+    def _overwrite_median_as_status(dataset: Mosplat_PG_MediaIODataset):
+        global _median_as_status
+        _median_as_status.overwrite(
+            is_valid=dataset.is_valid_media_directory,
+            frame_count=dataset.median_frame_count,
+            width=dataset.median_width,
+            height=dataset.median_height,
+            mod_time=-1.0,
+            file_size=-1,
+        )

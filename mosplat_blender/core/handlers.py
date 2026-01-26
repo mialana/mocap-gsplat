@@ -1,22 +1,21 @@
 """methods that are hooked by `bpy.app.handlers`"""
 
+from __future__ import annotations
+
 import bpy
 from bpy.types import Scene
 from bpy.app.handlers import persistent
 
-from typing import TYPE_CHECKING, TypeAlias, TypeAlias, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 from .checks import check_propertygroup, check_addonpreferences
 
-from ..infrastructure.schemas import MediaIODataset, UserFacingError
+from ..infrastructure.schemas import MediaIODataset
 from ..interfaces.logging_interface import MosplatLoggingInterface
 
 if TYPE_CHECKING:
     from .properties import Mosplat_PG_Global
     from .preferences import Mosplat_AP_Global
-else:
-    Mosplat_PG_Global: TypeAlias = Any
-    Mosplat_AP_Global: TypeAlias = Any
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
@@ -55,14 +54,10 @@ def restore_dataset_from_json(
 
     logger.info("Properties synced with cached dataset.")
 
-    from .properties import Mosplat_PG_AppliedPreprocessScript
-    from ..infrastructure.schemas import AppliedPreprocessScript
 
-    script = AppliedPreprocessScript.now(str(prefs.preprocess_media_script_file))
+@persistent
+def handle_save_to_json(scene: Scene):
+    props = check_propertygroup(scene)
+    prefs = check_addonpreferences(bpy.context.preferences)
 
-    for range in props.dataset_accessor.ranges_accessor:
-        new: Mosplat_PG_AppliedPreprocessScript = range.scripts_accessor.add()
-        new.from_dataclass(script)
-
-        new2: Mosplat_PG_AppliedPreprocessScript = range.scripts_accessor.add()
-        new2.from_dataclass(script)
+    props.dataset_accessor.to_JSON(props.data_json_filepath(prefs))

@@ -3,11 +3,10 @@ from bpy.props import StringProperty
 from pathlib import Path
 import threading
 from queue import Queue
-from typing import Tuple
 
 from ...interfaces import MosplatVGGTInterface
 
-from ...infrastructure.schemas import OperatorIDEnum
+from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError
 from ...infrastructure.decorators import worker_fn_auto
 
 from .base_ot import (
@@ -17,7 +16,7 @@ from .base_ot import (
 )
 
 
-class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
+class Mosplat_OT_initialize_model(MosplatOperatorBase[str]):
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
     bl_description = (
         f"Install VGGT model weights from Hugging Face or load from cache if available."
@@ -32,21 +31,19 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
 
     @classmethod
     def contexted_poll(cls, context, prefs, props) -> bool:
-        if MosplatVGGTInterface._initialized:
+        if MosplatVGGTInterface._model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
         return True
 
     def queue_callback(self, context, event, next) -> OptionalOperatorReturnItemsSet:
-        status, payload = next
-
         self.cleanup(context)
 
-        if payload:
+        if next == "ok":
             self.logger().info("Successfully initialized VGGT model!")
             return {"FINISHED"}
         else:
-            self.logger().error("VGGT model could not be initialized")
+            self.logger().error(next + "\nCannot continue.")
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
@@ -60,16 +57,18 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, bool]]):
 
 @worker_fn_auto
 def initialize_model_thread(
-    queue: Queue[Tuple[str, bool]],
+    queue: Queue[str],
     cancel_event: threading.Event,
     *,
     hf_id: str,
     model_cache_dir: Path,
 ):
-    # put true or false initialize result in queue
-    MosplatVGGTInterface.initialize_model(hf_id, model_cache_dir, cancel_event)
+    try:
+        MosplatVGGTInterface.initialize_model(hf_id, model_cache_dir, cancel_event)
 
-    """
-    use initialization status rather than return result as `initialize_model`
-    will return `False` if initialization status already occurred"""
-    queue.put(("ok", MosplatVGGTInterface._initialized))
+        """
+        use initialization status rather than return result as `initialize_model`
+        will return `False` if initialization status already occurred"""
+        queue.put("ok")
+    except UnexpectedError as e:
+        queue.put(str(e))

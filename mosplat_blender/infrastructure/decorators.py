@@ -1,6 +1,6 @@
 """decorator functions"""
 
-from bpy.types import Context, Event  # import `bpy` to enforce types
+from __future__ import annotations
 
 from functools import wraps, partial
 from typing import (
@@ -10,13 +10,13 @@ from typing import (
     Type,
     Concatenate,
     TYPE_CHECKING,
-    Any,
-    TypeAlias,
     TypedDict,
     Required,
     NotRequired,
     Unpack,
     Union,
+    TypeAlias,
+    Any,
 )
 
 from queue import Queue
@@ -27,6 +27,7 @@ from .schemas import DeveloperError
 if TYPE_CHECKING:
     from ..core.operators import MosplatOperatorBase
     from ..core.panels import MosplatPanelBase
+    from bpy.types import Context, Event  # import `bpy` to enforce types
 else:
     MosplatOperatorBase: TypeAlias = Any
     MosplatPanelBase: TypeAlias = Any

@@ -7,7 +7,7 @@ from bpy.props import StringProperty, IntProperty
 
 from pathlib import Path
 import os
-from typing import Set, Optional, Any, TypeAlias, TYPE_CHECKING
+from typing import Set, Optional, TYPE_CHECKING
 
 from .checks import check_media_extensions_set
 from ..interfaces.logging_interface import MosplatLoggingInterface
@@ -25,8 +25,6 @@ from ..infrastructure.schemas import OperatorIDEnum
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
-else:
-    Mosplat_AP_Global: TypeAlias = Any
 
 
 def update_stdout_logging(self: Mosplat_AP_Global, _: Context):

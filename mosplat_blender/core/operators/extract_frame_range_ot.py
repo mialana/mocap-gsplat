@@ -23,6 +23,7 @@ from ...infrastructure.schemas import (
 from ..handlers import restore_dataset_from_json
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import PER_FRAME_DIRNAME, RAW_FRAME_DIRNAME
+from ...infrastructure.macros import is_path_accessible
 
 if TYPE_CHECKING:
     from cv2 import VideoCapture
@@ -34,7 +35,7 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
 
     @classmethod
     def contexted_poll(cls, context, prefs, props) -> bool:
-        if not props.dataset_accessor.do_all_details_match:
+        if not props.dataset_accessor.is_valid_media_directory:
             cls._poll_error_msg_list.append(
                 "Ensure that frame count, width, and height of all media files within current media directory match."
             )
@@ -53,9 +54,9 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
                 f"Start frame for '{prop_name}' must be less than end frame."
             )
 
-        if end >= props.dataset_accessor.common_frame_count:
+        if end >= props.dataset_accessor.median_frame_count:
             cls._poll_error_msg_list.append(
-                f"End frame must be less than '{props.dataset_accessor.get_prop_name('common_frame_count')}' of '{props.dataset_accessor.common_frame_count}' frames."
+                f"End frame must be less than '{props.dataset_accessor.get_prop_name('median_frame_count')}' of '{props.dataset_accessor.median_frame_count}' frames."
             )
 
         max_frame_range = prefs.max_frame_range
@@ -141,7 +142,7 @@ def extract_frame_range_thread(
             frame_dir.mkdir(parents=True, exist_ok=True)
 
             frame_npy_filepath = frame_dir.joinpath(f"{RAW_FRAME_DIRNAME}.npy")
-            if not frame_npy_filepath.exists():
+            if not is_path_accessible(frame_npy_filepath):
                 _write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
 
             new_frame_range.end_frame = frame_idx

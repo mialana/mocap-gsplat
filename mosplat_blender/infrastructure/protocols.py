@@ -3,7 +3,7 @@ protocol classes for static-typing purposes.
 many exist to prevent escape of blender types into .infrastructure
 """
 
-from typing import Protocol, Any, TypeVar, Iterator
+from typing import Protocol, Any, TypeVar, Iterator, runtime_checkable
 
 
 class SupportsMosplat_AP_Global(Protocol):
@@ -39,6 +39,7 @@ class SupportsBpyContext(Protocol):
 T = TypeVar("T", covariant=True)
 
 
+@runtime_checkable
 class SupportsCollectionProperty(Protocol[T]):
     def __len__(self) -> int: ...
     def __iter__(self) -> Iterator[T]: ...
