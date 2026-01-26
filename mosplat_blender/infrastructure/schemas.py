@@ -82,7 +82,7 @@ class OperatorIDEnum(StrEnum):
     INITIALIZE_MODEL = auto()
     RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
-    CHECK_MEDIA_FRAME_COUNTS = auto()
+    VALIDATE_COMMON_MEDIA_DETAILS = auto()
     EXTRACT_FRAME_RANGE = auto()
 
 
@@ -151,7 +151,8 @@ class MediaProcessStatus:
     filepath: str
     is_valid: bool = False
     frame_count: int = -1
-    message: str = ""
+    width: int = -1
+    height: int = -1
     mod_time: float = -1.0
     file_size: int = -1
 
@@ -164,15 +165,25 @@ class MediaProcessStatus:
         *,
         is_valid: bool,
         frame_count: int,
-        message: str,
+        width: int,
+        height: int,
         mod_time: float,
         file_size: int,
     ):
         self.is_valid = is_valid
         self.frame_count = frame_count
-        self.message = message
+        self.width = width
+        self.height = height
         self.mod_time = mod_time
         self.file_size = file_size
+
+    def mark_invalid(self):
+        self.is_valid = False
+        self.frame_count = -1
+        self.width = -1
+        self.height = -1
+        self.mod_time = -1.0
+        self.file_size = -1
 
     @classmethod
     def as_lookup(
@@ -184,8 +195,10 @@ class MediaProcessStatus:
 @dataclass
 class MediaIOMetadata:
     base_directory: str
-    do_media_durations_all_match: bool = True
-    collective_media_frame_count: int = -1
+    do_all_details_match: bool = True
+    common_frame_count: int = -1
+    common_width: int = -1
+    common_height: int = -1
     media_process_statuses: List[MediaProcessStatus] = field(default_factory=list)
     processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)
 
@@ -223,6 +236,32 @@ class MediaIOMetadata:
                 json_path.unlink()  # delete the corrupted JSON
 
         return cls(base_directory=str(base_directory))
+
+    def synchronize_to_incoming(self, status: MediaProcessStatus):
+        self.common_frame_count = status.frame_count
+        self.common_width = status.width
+        self.common_height = status.height
+
+    def accumulate_media_status(self, status: MediaProcessStatus) -> None:
+        def _create_target(common: int, incoming: int) -> int:
+            return incoming if common == -1 else common
+
+        target_frame_count = _create_target(self.common_frame_count, status.frame_count)
+        target_width = _create_target(self.common_width, status.width)
+        target_height = _create_target(self.common_height, status.height)
+
+        self.do_all_details_match = (
+            self.do_all_details_match
+            and status.is_valid
+            and target_frame_count == status.frame_count
+            and target_width == status.width
+            and target_height == status.height
+        )
+
+        if self.do_all_details_match:
+            self.synchronize_to_incoming(status)
+        else:
+            self.common_frame_count = self.common_width = self.common_height = -1
 
 
 @dataclass

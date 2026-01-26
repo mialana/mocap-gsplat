@@ -48,7 +48,7 @@ def update_json_logging(self: Mosplat_AP_Global, _: Context):
 
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
-    OperatorIDEnum.run(bpy.ops, OperatorIDEnum.CHECK_MEDIA_FRAME_COUNTS)
+    OperatorIDEnum.run(bpy.ops, OperatorIDEnum.VALIDATE_COMMON_MEDIA_DETAILS)
     self.logger().info(f"'{self.get_prop_name('media_extensions')}' updated.")
 
 
