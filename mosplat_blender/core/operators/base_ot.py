@@ -1,6 +1,16 @@
 from bpy.types import Context, WindowManager, Timer, Event, Operator
 
-from typing import Set, TYPE_CHECKING, TypeAlias, Optional, Generic, TypeVar, Any
+from typing import (
+    Set,
+    TYPE_CHECKING,
+    TypeAlias,
+    Optional,
+    Generic,
+    TypeVar,
+    Any,
+    ClassVar,
+    List,
+)
 
 from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
@@ -50,6 +60,8 @@ class MosplatOperatorBase(
     __timer: Optional[Timer] = None
     __metadata_dc: Optional[MediaIOMetadata] = None
 
+    _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
+
     @classmethod
     def at_registration(cls):
         super().at_registration()
@@ -65,10 +77,15 @@ class MosplatOperatorBase(
             or context.window_manager is None
         ):
             return False
+
+        overrideable_return = cls.contexted_poll(context, prefs, props)
+
+        if len(cls._poll_error_msg_list) > 0:
+            cls.poll_message_set("\n".join(cls._poll_error_msg_list))
+
         return (
             overrideable_return
-            if (overrideable_return := cls.contexted_poll(context, prefs, props))
-            is not None
+            if overrideable_return is not None
             else True  # if not implemented return true
         )
 

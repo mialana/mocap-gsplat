@@ -36,7 +36,12 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
 
         if start >= end:
             cls._poll_error_msg_list.append(
-                f"Start component for '{prop_name}' must be less than end component."
+                f"Start frame for '{prop_name}' must be less than end frame."
+            )
+
+        if end >= props.metadata_ptr.collective_media_frame_count:
+            cls._poll_error_msg_list.append(
+                f"End frame must be less than '{props.metadata_ptr.get_prop_name('collective_media_frame_count')}' of '{props.metadata_ptr.collective_media_frame_count}'."
             )
 
         max_frame_range = prefs.max_frame_range

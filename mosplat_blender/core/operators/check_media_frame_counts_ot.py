@@ -36,8 +36,6 @@ class Mosplat_OT_check_media_frame_counts(MosplatOperatorBase[Tuple[str]]):
             restore_metadata_from_json(props, prefs)  # try to restore from local JSON
 
             # try setting all the properties that are needed for the op
-            self._media_extensions_set: Set[str] = prefs.media_extensions_set
-            self._data_output_dirpath: Path = props.data_output_dirpath(prefs)
             self._media_files: List[Path] = props.media_files(prefs)
             return self.execute(context)
         except UserFacingError as e:

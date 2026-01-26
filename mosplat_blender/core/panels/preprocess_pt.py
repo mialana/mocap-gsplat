@@ -37,9 +37,6 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
                     "media_process_statuses"
                 )
             )
-            media_box.alert = (
-                not props.current_media_io_metadata.do_media_durations_all_match
-            )
             for item in props.current_media_io_metadata.media_process_statuses:
                 media: Mosplat_PG_MediaProcessStatus = item
                 item_basename = Path(media.filepath).name
@@ -48,6 +45,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
                 sub = row.row()
                 sub.alignment = "RIGHT"
                 sub.label(text=str(media.frame_count))
+                sub.alert = not media.is_valid
 
         box.row().prop(props, "current_frame_range")
 
