@@ -23,13 +23,18 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 @persistent
 def handle_restore_from_json(scene: Scene):
     """entrypoint for `bpy.app.handlers.load_post`"""
-    props = check_propertygroup(scene)
-    restore_dataset_from_json(props)
+
+    bpy.app.timers.register(
+        lambda: handle_restore_from_json_timer_entrypoint(scene),
+        first_interval=0,
+    )
 
 
-def handle_restore_from_json_timer_entrypoint():
+def handle_restore_from_json_timer_entrypoint(scene: Optional[Scene] = None) -> None:
     """entrypoint for `bpy.app.timers`"""
-    return handle_restore_from_json(bpy.context.scene)
+    scene = scene or bpy.context.scene
+    props = check_propertygroup(scene)
+    return restore_dataset_from_json(props)
 
 
 def restore_dataset_from_json(

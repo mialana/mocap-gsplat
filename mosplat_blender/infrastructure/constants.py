@@ -13,8 +13,11 @@ from __future__ import annotations
 from typing import Any, Final, TYPE_CHECKING, TypeAlias
 from pathlib import Path
 from string import capwords
+import tempfile
 
 _MISSING_: Any = object()  # sentinel variable
+
+_TIMER_INTERVAL_: Final[float] = 0.1
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {
@@ -59,6 +62,8 @@ ADDON_BASE_ID: Final[str] = ADDON_PREFERENCES_ID.rpartition(".")[-1]
 ADDON_HUMAN_READABLE: Final[str] = capwords(ADDON_BASE_ID.replace("_", " "))
 ADDON_SHORTNAME: Final[str] = ADDON_BASE_ID.partition("_")[0]
 
+ADDON_TEMP_DIRPATH: Final[Path] = Path(tempfile.mkdtemp(prefix=ADDON_PREFERENCES_ID))
+
 """
 the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
 `bpy.context.scene` object for convenient access in operators, panels, etc.
@@ -86,3 +91,11 @@ MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
 
 PER_FRAME_DIRNAME = "frame_{:04d}"
 RAW_FRAME_DIRNAME = "raw"
+
+
+DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH: Final[Path] = (
+    Path(__file__)
+    .resolve()
+    .parent.parent.joinpath("bin")
+    .joinpath("download_hf_with_progress.py")
+)
