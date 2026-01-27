@@ -38,4 +38,6 @@ def unregister():
     unregister_addon()
 
     MosplatLoggingInterface.cleanup()
-    clear_terminal()  # for dev QOL
+
+    if "MOSPLAT_TESTING" in os.environ:
+        clear_terminal()  # for dev QOL

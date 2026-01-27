@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, cast, Tuple, TYPE_CHECKING, Union
+from typing import Dict, List, cast, Tuple, TYPE_CHECKING, Union, NamedTuple
 from dataclasses import dataclass, field, asdict
 import json
 from enum import StrEnum, auto

@@ -165,7 +165,11 @@ class MosplatOperatorBase(
 
     def modal(self, context, event) -> OperatorReturnItemsSet:
         with self.encapsulated_context_block(context):
-            if event.type in {"RIGHTMOUSE", "ESC"}:
+            if (
+                event.type in {"RIGHTMOUSE", "ESC"}
+                or self.worker is not None
+                and self.worker.was_cancelled()
+            ):
                 self.cleanup(context)
                 return {"CANCELLED"}
             elif event.type != "TIMER":

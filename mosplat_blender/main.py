@@ -8,15 +8,18 @@ import bpy
 from typing import Type, Sequence, Union
 
 from . import core
-from .interfaces import MosplatLoggingInterface, MosplatVGGTInterface
-from .infrastructure.mixins import MosplatEnforceAttributesMixin
+from .interfaces import MosplatLoggingInterface
+
 from .core.checks import check_addonpreferences
 from .core.handlers import (
     handle_restore_from_json,
     handle_restore_from_json_timer_entrypoint,
     handle_save_to_json,
 )
+
+from .infrastructure.mixins import MosplatEnforceAttributesMixin
 from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME, ADDON_HUMAN_READABLE
+from .infrastructure.schemas import UnexpectedError
 
 classes: Sequence[
     Union[
@@ -44,7 +47,7 @@ def register_addon():
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
         except (ValueError, RuntimeError, AttributeError):
-            logger.exception(f"Exception during registration: `{c.__name__=}`")
+            logger.error(f"Exception during registration: `{c.__name__=}`")
 
     setattr(
         bpy.types.Scene,
@@ -76,14 +79,19 @@ def unregister_addon():
         try:
             bpy.utils.unregister_class(c)
         except RuntimeError:
-            logger.exception(f"Exception during unregistration of `{c.__name__=}`")
+            logger.error(f"Exception during unregistration of `{c.__name__=}`")
 
     try:
         delattr(bpy.types.Scene, ADDON_PROPERTIES_ATTRIBNAME)
     except AttributeError:
-        logger.exception(f"Error during unregistration of add-on properties.")
+        logger.error(f"Error during unregistration of add-on properties.")
 
-    MosplatVGGTInterface.cleanup()
+    try:
+        from .interfaces import MosplatVGGTInterface
+
+        MosplatVGGTInterface.cleanup()
+    except UnexpectedError as e:
+        logger.error(f"Error during VGGT cleanup: {str(e)}")
 
     bpy.app.handlers.load_post.remove(handle_restore_from_json)
 

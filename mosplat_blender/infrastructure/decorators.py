@@ -23,6 +23,7 @@ from queue import Queue
 from threading import Event as ThreadingEvent
 
 from .schemas import DeveloperError
+from .constants import _TIMER_INTERVAL_
 
 if TYPE_CHECKING:
     from ..core.operators import MosplatOperatorBase
@@ -76,6 +77,7 @@ def no_instantiate(cls: T) -> T:
     return cls
 
 
+# TODO: make this useable as a class method, with the queue type derived from typevars
 def worker_fn_auto(
     fn: Callable[Concatenate[Queue, ThreadingEvent, P], None],
 ) -> Callable[Concatenate[MosplatOperatorBase, P], None]:
@@ -92,7 +94,9 @@ def worker_fn_auto(
         self.worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
         self.worker.start()
 
-        self.timer = self.wm.event_timer_add(time_step=0.1, window=self.context.window)
+        self.timer = self.wm.event_timer_add(
+            time_step=_TIMER_INTERVAL_, window=self.context.window
+        )
         self.wm.modal_handler_add(self)
 
     return wrapper

@@ -33,6 +33,9 @@ class MosplatWorkerInterface(Generic[QT]):
     def cancel(self):
         self._cancel_event.set()
 
+    def was_cancelled(self):
+        return self._cancel_event.is_set()
+
     def cleanup(self):
         self.cancel()
 
