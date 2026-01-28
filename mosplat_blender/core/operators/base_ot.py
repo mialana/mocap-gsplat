@@ -11,8 +11,14 @@ from typing import (
     TypeVar,
     ClassVar,
     List,
+    Callable,
+    Any,
+    Type,
+    ParamSpec,
 )
 import contextlib
+from queue import Queue
+import threading
 
 from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
@@ -21,13 +27,14 @@ from ...infrastructure.mixins import (
     MosplatAPAccessorMixin,
     MosplatEncapsulatedContextMixin,
 )
-
+from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.schemas import (
     UnexpectedError,
     OperatorIDEnum,
     MediaIODataset,
     DeveloperError,
 )
+from ...infrastructure.constants import DataclassInstance
 from ...interfaces.worker_interface import MosplatWorkerInterface
 
 if TYPE_CHECKING:
@@ -42,12 +49,14 @@ else:
 OperatorReturnItemsSet: TypeAlias = Set[_OperatorReturnItemsSafe]
 OptionalOperatorReturnItemsSet: TypeAlias = Optional[OperatorReturnItemsSet]
 
+
 Q = TypeVar("Q")  # the type of the elements in worker queue, if used
+K = TypeVar("K", bound=DataclassInstance)
 
 
 class MosplatOperatorBase(
+    Generic[Q, K],
     Operator,
-    Generic[Q],
     MosplatBlTypeMixin,
     MosplatPGAccessorMixin,
     MosplatAPAccessorMixin,
@@ -231,3 +240,12 @@ class MosplatOperatorBase(
         self.dataset_as_dc = (
             None  # dataset as dataclass is not guaranteed to be in-sync anymore
         )
+
+    @staticmethod
+    @worker_fn_auto
+    def operator_thread(
+        queue: Queue[Q],
+        cancel_event: threading.Event,
+        *,
+        _kwargs: K,
+    ): ...

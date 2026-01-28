@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from typing import Tuple, List
-import threading
-from queue import Queue
 from pathlib import Path
+from dataclasses import dataclass
 
 from .base_ot import (
     MosplatOperatorBase,
@@ -21,7 +20,15 @@ from ...infrastructure.schemas import (
 from ...infrastructure.decorators import worker_fn_auto
 
 
-class Mosplat_OT_validate_media_file_statuses(MosplatOperatorBase[Tuple[bool, str]]):
+@dataclass(frozen=True)
+class ThreadKwargs:
+    updated_media_files: List[Path]
+    dataset_as_dc: MediaIODataset
+
+
+class Mosplat_OT_validate_media_file_statuses(
+    MosplatOperatorBase[Tuple[bool, str], ThreadKwargs]
+):
     bl_idname = OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES
     bl_description = "Check frame count, width, and height of all media files found in current media directory."
 
@@ -39,10 +46,11 @@ class Mosplat_OT_validate_media_file_statuses(MosplatOperatorBase[Tuple[bool, st
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        validate_common_media_features_thread(
+        self.operator_thread(
             self,
-            updated_media_files=self._media_files,
-            dataset_as_dc=self.dataset_as_dc,
+            _kwargs=ThreadKwargs(
+                updated_media_files=self._media_files, dataset_as_dc=self.dataset_as_dc
+            ),
         )
 
         return {"RUNNING_MODAL"}
@@ -59,39 +67,36 @@ class Mosplat_OT_validate_media_file_statuses(MosplatOperatorBase[Tuple[bool, st
         # sync props regardless as the updated dataclass is still valid
         self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
 
+    @staticmethod
+    @worker_fn_auto
+    def operator_thread(queue, cancel_event, *, _kwargs):
+        dataset_as_dc = _kwargs.dataset_as_dc
+        status_lookup = MediaFileStatus.as_lookup(dataset_as_dc.media_file_statuses)
 
-@worker_fn_auto
-def validate_common_media_features_thread(
-    queue: Queue[Tuple[bool, str]],
-    cancel_event: threading.Event,
-    *,
-    updated_media_files: List[Path],
-    dataset_as_dc: MediaIODataset,
-):
-    status_lookup = MediaFileStatus.as_lookup(dataset_as_dc.media_file_statuses)
+        # clear the statuses as we've created a lookup table already
+        dataset_as_dc.media_file_statuses.clear()
+        dataset_as_dc.is_valid_media_directory = True  # start fresh
 
-    # clear the statuses as we've created a lookup table already
-    dataset_as_dc.media_file_statuses.clear()
-    dataset_as_dc.is_valid_media_directory = True  # start fresh
+        for file in _kwargs.updated_media_files:
+            if cancel_event.is_set():
+                return  # simply return as new queue items will not be read anymore
+            queue_item = (True, f"Validated media file: '{file}'")
 
-    for file in updated_media_files:
-        if cancel_event.is_set():
-            return  # simply return as new queue items will not be read anymore
-        queue_item = (True, f"Validated media file: '{file}'")
+            # check if the status for the file already exists, create new if not
+            status = status_lookup.get(str(file), MediaFileStatus(filepath=str(file)))
 
-        # check if the status for the file already exists, create new if not
-        status = status_lookup.get(str(file), MediaFileStatus(filepath=str(file)))
+            # if success is already valid skip new extraction
+            if status.needs_reextraction(dataset=dataset_as_dc):
+                try:
+                    status.extract_from_filepath()  # fill out the dataclass from set filepath
+                except UserFacingError as e:
+                    queue_item = (False, str(e))  # change queue item and give error msg
 
-        # if success is already valid skip new extraction
-        if status.needs_reextraction(dataset=dataset_as_dc):
-            try:
-                status.extract_from_filepath()  # fill out the dataclass from set filepath
-            except UserFacingError as e:
-                queue_item = (False, str(e))  # change queue item and give error msg
+            dataset_as_dc.accumulate_media_status(
+                status
+            )  # update dataset from new status
 
-        dataset_as_dc.accumulate_media_status(status)  # update dataset from new status
+            queue.put(queue_item)  # transmit that dataset has been updated
 
-        queue.put(queue_item)  # transmit that dataset has been updated
-
-    queue.put((True, "done"))  # signal done
-    return
+        queue.put((True, "done"))  # signal done
+        return

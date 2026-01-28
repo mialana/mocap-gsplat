@@ -77,7 +77,6 @@ def no_instantiate(cls: T) -> T:
     return cls
 
 
-# TODO: make this useable as a class method, with the queue type derived from typevars
 def worker_fn_auto(
     fn: Callable[Concatenate[Queue, ThreadingEvent, P], None],
 ) -> Callable[Concatenate[MosplatOperatorBase, P], None]:
@@ -85,8 +84,10 @@ def worker_fn_auto(
 
     from ..interfaces import MosplatWorkerInterface  # local import
 
+    @wraps(fn)
     def wrapper(
         self: MosplatOperatorBase,
+        /,
         *args: P.args,
         **kwargs: P.kwargs,
     ):

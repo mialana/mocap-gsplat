@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from typing import Tuple, List, TYPE_CHECKING
-import threading
-from queue import Queue
 from pathlib import Path
+from dataclasses import dataclass
 
 from .base_ot import (
     MosplatOperatorBase,
@@ -29,7 +28,17 @@ if TYPE_CHECKING:
     from cv2 import VideoCapture
 
 
-class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
+@dataclass(frozen=True)
+class ThreadKwargs:
+    updated_media_files: List[Path]
+    frame_range: Tuple[int, int]
+    data_output_dirpath: Path
+    dataset_as_dc: MediaIODataset
+
+
+class Mosplat_OT_extract_frame_range(
+    MosplatOperatorBase[str, ThreadKwargs],
+):
     bl_idname = OperatorIDEnum.EXTRACT_FRAME_RANGE
     bl_description = "Extract a frame range from all media files in media directory."
 
@@ -85,12 +94,14 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        extract_frame_range_thread(
+        self.operator_thread(
             self,
-            updated_media_files=self._media_files,
-            frame_range=self._frame_range,
-            data_output_dirpath=self._data_output_dirpath,
-            dataset_as_dc=self.dataset_as_dc,
+            _kwargs=ThreadKwargs(
+                updated_media_files=self._media_files,
+                frame_range=self._frame_range,
+                data_output_dirpath=self._data_output_dirpath,
+                dataset_as_dc=self.dataset_as_dc,
+            ),
         )
 
         return {"RUNNING_MODAL"}
@@ -106,54 +117,46 @@ class Mosplat_OT_extract_frame_range(MosplatOperatorBase[Tuple[str]]):
         # sync props regardless as the updated dataclass is still valid
         self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
 
+    @staticmethod
+    @worker_fn_auto
+    def operator_thread(queue, cancel_event, *, _kwargs):
+        import cv2
 
-@worker_fn_auto
-def extract_frame_range_thread(
-    queue: Queue[str],
-    cancel_event: threading.Event,
-    *,
-    updated_media_files: List[Path],
-    frame_range: Tuple[int, int],
-    data_output_dirpath: Path,
-    dataset_as_dc: MediaIODataset,
-):
-    import cv2
+        start, end = _kwargs.frame_range
+        caps: List[cv2.VideoCapture] = []
 
-    start, end = frame_range
-    caps: List[cv2.VideoCapture] = []
+        try:
+            for media in _kwargs.updated_media_files:
+                cap = cv2.VideoCapture(str(media))
+                if not cap.isOpened():
+                    raise UserFacingError(f"Could not open media file: {media}")
+                caps.append(cap)
 
-    try:
-        for media in updated_media_files:
-            cap = cv2.VideoCapture(str(media))
-            if not cap.isOpened():
-                raise UserFacingError(f"Could not open media file: {media}")
-            caps.append(cap)
+            # create a new frame range with both limits at start
+            new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
+            _kwargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
 
-        # create a new frame range with both limits at start
-        new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
-        dataset_as_dc.processed_frame_ranges.append(new_frame_range)
+            for frame_idx in range(start, end):
+                if cancel_event.is_set():
+                    return
+                frame_dir = _kwargs.data_output_dirpath.joinpath(
+                    PER_FRAME_DIRNAME.format(frame_idx)
+                )
+                frame_dir.mkdir(parents=True, exist_ok=True)
 
-        for frame_idx in range(start, end):
-            if cancel_event.is_set():
-                return
-            frame_dir = data_output_dirpath.joinpath(
-                PER_FRAME_DIRNAME.format(frame_idx)
-            )
-            frame_dir.mkdir(parents=True, exist_ok=True)
+                frame_npy_filepath = frame_dir.joinpath(f"{RAW_FRAME_DIRNAME}.npy")
+                if not is_path_accessible(frame_npy_filepath):
+                    _write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
 
-            frame_npy_filepath = frame_dir.joinpath(f"{RAW_FRAME_DIRNAME}.npy")
-            if not is_path_accessible(frame_npy_filepath):
-                _write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
+                new_frame_range.end_frame = frame_idx
+                queue.put("update")
+        except UserFacingError as e:
+            queue.put(str(e))  # exit early wherever error occurs and put error on queue
+        finally:
+            for cap in caps:
+                cap.release()
 
-            new_frame_range.end_frame = frame_idx
-            queue.put("update")
-    except UserFacingError as e:
-        queue.put(str(e))  # exit early wherever error occurs and put error on queue
-    finally:
-        for cap in caps:
-            cap.release()
-
-    queue.put("done")
+        queue.put("done")
 
 
 def _write_frame_data_to_npy(frame_idx: int, caps: List[VideoCapture], out_path: Path):

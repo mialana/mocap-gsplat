@@ -8,6 +8,7 @@ import subprocess
 import json
 import time
 import os
+from dataclasses import dataclass
 
 from ...infrastructure.macros import (
     tuple_matches_type_tuple,
@@ -28,7 +29,16 @@ from .base_ot import (
 )
 
 
-class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, int, int, str]]):
+@dataclass(frozen=True)
+class ThreadKwargs:
+    proc: subprocess.Popen
+    hf_id: str
+    model_cache_dir: Path
+
+
+class Mosplat_OT_initialize_model(
+    MosplatOperatorBase[Tuple[str, int, int, str], ThreadKwargs]
+):
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
     bl_description = (
         f"Install VGGT model weights from Hugging Face or load from cache if available."
@@ -108,48 +118,41 @@ class Mosplat_OT_initialize_model(MosplatOperatorBase[Tuple[str, int, int, str]]
 
         self.logger().info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
-        initialize_model_thread(
+        self.operator_thread(
             self,
-            proc=self._proc,
-            hf_id=prefs.vggt_hf_id,
-            model_cache_dir=prefs.vggt_model_dir,
+            _kwargs=ThreadKwargs(
+                proc=self._proc,
+                hf_id=prefs.vggt_hf_id,
+                model_cache_dir=prefs.vggt_model_dir,
+            ),
         )
 
-        self._progress_bar_started = False
         return {"RUNNING_MODAL"}
 
-    def cleanup(self, context):
-        self.wm.progress_end()  # stop progress
-        self.props.progress_in_use = False
-        self.props.operator_progress_current = -1
-        self.props.operator_progress_total = -1
-        return super().cleanup(context)
+    @staticmethod
+    @worker_fn_auto
+    def operator_thread(queue, cancel_event, *, _kwargs):
+        try:
+            _wait_and_update_queue_loop(_kwargs.proc, queue, cancel_event)
+        except SafeError:
+            # put on queue to stop modal just in case, though it probably will not be read
+            queue.put(
+                ("done", -1, -1, "Model init did not finish due to cancellation.")
+            )
+            return  # cancel event was set
 
+        from ...interfaces import MosplatVGGTInterface
 
-@worker_fn_auto
-def initialize_model_thread(
-    queue: Queue[Tuple[str, int, int, str]],
-    cancel_event: threading.Event,
-    *,
-    proc: subprocess.Popen,
-    hf_id: str,
-    model_cache_dir: Path,
-):
-    try:
-        _wait_and_update_queue_loop(proc, queue, cancel_event)
-    except SafeError:
-        # put on queue to stop modal just in case, though it probably will not be read
-        queue.put(("done", -1, -1, "Model init did not finish due to cancellation."))
-        return  # cancel event was set
+        try:
+            MosplatVGGTInterface.initialize_model(
+                _kwargs.hf_id, _kwargs.model_cache_dir, cancel_event
+            )
 
-    from ...interfaces import MosplatVGGTInterface
-
-    try:
-        MosplatVGGTInterface.initialize_model(hf_id, model_cache_dir, cancel_event)
-
-        queue.put(("done", -1, -1, "Successfully downloaded & initialized VGGT model!"))
-    except UnexpectedError as e:
-        queue.put(("error", -1, -1, str(e)))
+            queue.put(
+                ("done", -1, -1, "Successfully downloaded & initialized VGGT model!")
+            )
+        except UnexpectedError as e:
+            queue.put(("error", -1, -1, str(e)))
 
 
 def _wait_and_update_queue_loop(
