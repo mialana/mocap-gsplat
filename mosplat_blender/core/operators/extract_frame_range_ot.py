@@ -49,34 +49,9 @@ class Mosplat_OT_extract_frame_range(
                 "Ensure that frame count, width, and height of all media files within current media directory match."
             )
         else:
-            cls._validate_frame_range(prefs, props)
+            cls._poll_error_msg_list.extend(props.frame_range_err_list(prefs))
 
         return len(cls._poll_error_msg_list) == 0
-
-    @classmethod
-    def _validate_frame_range(cls, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
-        start, end = props.current_frame_range
-        prop_name = props.get_prop_name("current_frame_range")
-
-        if start >= end:
-            cls._poll_error_msg_list.append(
-                f"Start frame for '{prop_name}' must be less than end frame."
-            )
-
-        if end >= props.dataset_accessor.median_frame_count:
-            cls._poll_error_msg_list.append(
-                f"End frame must be less than '{props.dataset_accessor.get_prop_name('median_frame_count')}' of '{props.dataset_accessor.median_frame_count}' frames."
-            )
-
-        max_frame_range = prefs.max_frame_range
-        max_frame_range_name = prefs.get_prop_name("max_frame_range")
-        if max_frame_range != -1 and end - start > prefs.max_frame_range:
-            cls._poll_error_msg_list.append(
-                f"For best results, set '{prop_name}' to less than '{max_frame_range}'.\n"
-                f"Customize this restriction in the addon's preferences under '{max_frame_range_name}'"
-            )
-
-        return
 
     def contexted_invoke(self, context, event) -> OperatorReturnItemsSet:
         prefs = self.prefs

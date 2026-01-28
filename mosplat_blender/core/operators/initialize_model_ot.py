@@ -154,6 +154,13 @@ class Mosplat_OT_initialize_model(
         except UnexpectedError as e:
             queue.put(("error", -1, -1, str(e)))
 
+    def cleanup(self, context):
+        self.wm.progress_end()  # stop progress
+        self.props.progress_in_use = False
+        self.props.operator_progress_current = -1
+        self.props.operator_progress_total = -1
+        return super().cleanup(context)
+
 
 def _wait_and_update_queue_loop(
     proc: subprocess.Popen,

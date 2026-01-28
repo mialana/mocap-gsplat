@@ -95,6 +95,7 @@ class OperatorIDEnum(StrEnum):
     OPEN_ADDON_PREFERENCES = auto()
     VALIDATE_MEDIA_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
+    RUN_PREPROCESS_SCRIPT = auto()
 
 
 class PanelIDEnum(StrEnum):

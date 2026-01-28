@@ -22,6 +22,7 @@ from .checks import (
     check_data_output_dirpath,
     check_data_json_filepath,
     check_current_media_dirpath,
+    check_frame_range_err_list,
 )
 
 from ..infrastructure.mixins import (
@@ -228,3 +229,6 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
 
     def media_files(self, prefs: Mosplat_AP_Global) -> List[Path]:
         return check_media_files(prefs, self)
+
+    def frame_range_err_list(self, prefs: Mosplat_AP_Global) -> List[str]:
+        return check_frame_range_err_list(prefs, self)

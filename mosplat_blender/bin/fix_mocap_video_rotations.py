@@ -43,17 +43,6 @@ def preprocess(
         containing the transformed image data.
     """
 
-    def _build_mask(media_file_names: List[str]) -> npt.NDArray[np.bool_]:
-        """creates a NumPy boolean array for masking out the images per frame that need to have a
-        180 degree transformation applied to them."""
-        cam_indices = np.array(
-            [int(name.replace("stream", "").split(".")[0]) for name in media_file_names]
-        )
-        return np.isin(cam_indices, [3, 4, 5, 6, 7])
-
-    def _rotate_180(x: np.ndarray) -> np.ndarray:
-        return x[:, ::-1, ::-1, :]
-
     global _IMAGES_MASK
 
     if _IMAGES_MASK is None:
@@ -61,3 +50,16 @@ def preprocess(
 
     images[_IMAGES_MASK] = _rotate_180(images[_IMAGES_MASK])  # rotate by 180 degrees
     return images
+
+
+def _rotate_180(x: np.ndarray) -> np.ndarray:
+    return x[:, ::-1, ::-1, :]
+
+
+def _build_mask(media_file_names: List[str]) -> npt.NDArray[np.bool_]:
+    """creates a NumPy boolean array for masking out the images per frame that need to have a
+    180 degree transformation applied to them."""
+    cam_indices = np.array(
+        [int(name.replace("stream", "").split(".")[0]) for name in media_file_names]
+    )
+    return np.isin(cam_indices, [3, 4, 5, 6, 7])
