@@ -1,3 +1,10 @@
+"""
+this script exists to be ran as a subprocess for downloading a model from huggingface.
+this is due to the size of the downloads being multiple gigabytes.
+running as a subprocess allows complete separation of concerns,
+and the process can even be completely killed if necessary.
+"""
+
 import sys
 import json
 import argparse
@@ -31,19 +38,21 @@ def make_tqdm_class():
         def __init__(self, *args, **kwargs):
             self._payload = SubprocessPayload()
             kwargs["disable"] = False
-
             super().__init__(*args, **kwargs)
 
-        def update(self, n=1):
+        def display(self, *args, **kwargs):
+
             if self.total:
                 self._payload.overwrite(
                     status="progress",
-                    current=int(self.n),
-                    total=int(self.total),
+                    current=int(float(self.n) / 100.0),  # convert from bytes to mb
+                    total=int(float(self.total) / 100.0),
                     msg="",
                 )
-                print(json.dumps(asdict(self._payload)), flush=True)
-            super().update(n)
+                self.sp(json.dumps(asdict(self._payload)))
+
+        def refresh(self, *args, **kwargs) -> None:
+            super().refresh(*args, **kwargs)
 
     return ProgressTqdm
 

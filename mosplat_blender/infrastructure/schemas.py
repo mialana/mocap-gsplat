@@ -356,4 +356,6 @@ class GlobalData:
     current_media_io_dataset: MediaIODataset = field(
         default_factory=lambda: MediaIODataset(base_directory=str(Path.home()))
     )
-    was_restored_from_json: bool = False
+    operator_progress_current: int = -1
+    operator_progress_total: int = -1
+    progress_in_use: bool = False

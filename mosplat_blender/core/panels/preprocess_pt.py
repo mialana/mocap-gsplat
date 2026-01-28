@@ -16,9 +16,14 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
     bl_parent_id = PanelIDEnum.MAIN
 
     def draw_with_layout(self, context, layout):
-        column = layout.column()
-
         props = self.props
+        column = layout.column()
+        init_model_box = column.box()
+        init_model_box.row().operator(OperatorIDEnum.INITIALIZE_MODEL)
+        prog_curr = props.operator_progress_current
+        prog_total = props.operator_progress_total
+        if prog_curr > 0 and prog_total > 0:
+            init_model_box.row().progress(factor=(float(prog_curr) / float(prog_total)))
 
         box = column.box()
         box.row().label(text=props.get_prop_name("current_media_dir"))
@@ -79,8 +84,6 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
         box.row().prop(props, "current_frame_range")
         box.row().operator(OperatorIDEnum.EXTRACT_FRAME_RANGE)
-
-        column.operator(OperatorIDEnum.INITIALIZE_MODEL)
 
         # column.separator()
 

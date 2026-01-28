@@ -12,6 +12,7 @@ from typing import (
     ClassVar,
     List,
 )
+import contextlib
 
 from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure.mixins import (
@@ -131,14 +132,24 @@ class MosplatOperatorBase(
             raise UnexpectedError("Poll-guard failed for window manager.")
         return wm
 
+    @contextlib.contextmanager
+    def safe_block(self, context):
+        """ensures clean up always runs even with exceptions"""
+        try:
+            yield
+        except BaseException as e:
+            self.logger().exception(str(e))
+            self.cleanup(context)
+
     def invoke(self, context, event) -> OperatorReturnItemsSet:
         with self.encapsulated_context_block(context):
-            return (
-                overrideable_return
-                if (overrideable_return := self.contexted_invoke(context, event))
-                is not None
-                else self.execute(context)  # if not implemented return execute
-            )
+            with self.safe_block(context):
+                return (
+                    overrideable_return
+                    if (overrideable_return := self.contexted_invoke(context, event))
+                    is not None
+                    else self.execute(context)  # if not implemented return execute
+                )
 
     def contexted_invoke(
         self, context: Context, event: Event
@@ -154,7 +165,8 @@ class MosplatOperatorBase(
             self.dataset_as_dc = (
                 self.props.dataset_accessor.to_dataclass()
             )  # set dataset as dataclass property beforehand
-            return self.contexted_execute(context)
+            with self.safe_block(context):
+                return self.contexted_execute(context)
 
     def contexted_execute(self, context: Context) -> OperatorReturnItemsSet:
         """
@@ -174,12 +186,12 @@ class MosplatOperatorBase(
                 return {"CANCELLED"}
             elif event.type != "TIMER":
                 return {"PASS_THROUGH"}
-
-            return (
-                optional_return
-                if (optional_return := self.contexted_modal(context, event))
-                else {"RUNNING_MODAL", "PASS_THROUGH"}
-            )
+            with self.safe_block(context):
+                return (
+                    optional_return
+                    if (optional_return := self.contexted_modal(context, event))
+                    else {"RUNNING_MODAL", "PASS_THROUGH"}
+                )
 
     def contexted_modal(
         self, context: Context, event: Event
@@ -189,7 +201,7 @@ class MosplatOperatorBase(
             try:
                 return self.queue_callback(context, event, next)
             finally:
-                if context.area:
+                if context.area:  # TODO: is redrawing spread out enough?
                     context.area.tag_redraw()  # redraw UI
 
     def queue_callback(

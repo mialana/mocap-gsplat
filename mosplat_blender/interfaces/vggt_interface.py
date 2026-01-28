@@ -4,7 +4,7 @@ provides the interface between the add-on and the VGGT model.
 
 from __future__ import annotations
 
-from typing import ClassVar, TYPE_CHECKING, final
+from typing import ClassVar, TYPE_CHECKING, final, Optional
 from pathlib import Path
 import threading
 import gc
@@ -20,7 +20,9 @@ if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
 @final
 @no_instantiate
 class MosplatVGGTInterface(MosplatLogClassMixin):
-    _model: ClassVar[VGGT | None] = None
+    model: ClassVar[Optional[VGGT]] = None
+    hf_id: ClassVar[Optional[str]] = None
+    cache_dir: ClassVar[Optional[Path]] = None
 
     @classmethod
     def initialize_model(
@@ -32,13 +34,15 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
         try:
             from vggt.models.vggt import VGGT
 
-            if cls._model:
+            if cls.model:
                 return  # initialization did not occur
 
             # initialize model from the downloaded local model cache
-            cls._model = VGGT.from_pretrained(
+            cls.model = VGGT.from_pretrained(
                 hf_id, cache_dir=model_cache_dir, local_files_only=True
             )
+            cls.hf_id = hf_id
+            cls.cache_dir = model_cache_dir  # store the values used for initialization
 
             if (
                 cancel_event.is_set()
@@ -52,12 +56,12 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
     def cleanup(cls):
         """clean up expensive resources"""
         try:
-            if cls._model is not None:
-                cls._model.to(
+            if cls.model is not None:
+                cls.model.to(
                     "cpu"
                 )  # force CUDA tensors to be released before we release our object
-                del cls._model
-                cls._model = None
+                del cls.model
+                cls.model = None
 
                 import torch
 
@@ -72,3 +76,7 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
             cls.logger().info("Cleaned up worker references")
         except Exception as e:
             raise UnexpectedError(str(e)) from e
+
+        cls.hf_id = None
+        cls.cache_dir = None
+        cls.logger().info("Removed initialization variables.")
