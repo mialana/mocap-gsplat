@@ -71,11 +71,7 @@ class Mosplat_OT_validate_media_file_statuses(
     @worker_fn_auto
     def operator_thread(queue, cancel_event, *, _kwargs):
         dataset_as_dc = _kwargs.dataset_as_dc
-        status_lookup = MediaFileStatus.as_lookup(dataset_as_dc.media_file_statuses)
-
-        # clear the statuses as we've created a lookup table already
-        dataset_as_dc.media_file_statuses.clear()
-        dataset_as_dc.is_valid_media_directory = True  # start fresh
+        status_lookup, accumulator = dataset_as_dc.status_accumulator()
 
         for file in _kwargs.updated_media_files:
             if cancel_event.is_set():
@@ -92,9 +88,7 @@ class Mosplat_OT_validate_media_file_statuses(
                 except UserFacingError as e:
                     queue_item = (False, str(e))  # change queue item and give error msg
 
-            dataset_as_dc.accumulate_media_status(
-                status
-            )  # update dataset from new status
+            accumulator(status)  # update dataset from new status
 
             queue.put(queue_item)  # transmit that dataset has been updated
 

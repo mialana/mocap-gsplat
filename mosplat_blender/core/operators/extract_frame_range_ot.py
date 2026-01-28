@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, List, TYPE_CHECKING
+from typing import Tuple, List, Generator, ClassVar, Optional
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -21,15 +21,12 @@ from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import PER_FRAME_DIRNAME, RAW_FRAME_DIRNAME
 from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
 
-if TYPE_CHECKING:
-    from cv2 import VideoCapture
-
 
 @dataclass(frozen=True)
 class ThreadKwargs:
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
-    data_output_dirpath: Path
+    npy_fp_generator: Generator[Path]
     dataset_as_dc: MediaIODataset
 
 
@@ -57,9 +54,12 @@ class Mosplat_OT_extract_frame_range(
             restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
             # try setting all the properties that are needed for the op
-            self._data_output_dirpath: Path = props.data_output_dirpath(prefs)
             self._media_files: List[Path] = props.media_files(prefs)
             self._frame_range: Tuple[int, int] = props.current_frame_range
+            self._npy_filepath_generator: Generator[Path] = (
+                props.generate_frame_range_npy_filepaths(prefs)
+            )
+
             return self.execute(context)
         except UserFacingError as e:
             self.logger().error(str(e))
@@ -71,7 +71,7 @@ class Mosplat_OT_extract_frame_range(
             _kwargs=ThreadKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
-                data_output_dirpath=self._data_output_dirpath,
+                npy_fp_generator=self._npy_filepath_generator,
                 dataset_as_dc=self.dataset_as_dc,
             ),
         )
@@ -94,7 +94,7 @@ class Mosplat_OT_extract_frame_range(
     def operator_thread(queue, cancel_event, *, _kwargs):
         import cv2
 
-        start, end = _kwargs.frame_range
+        start, _ = _kwargs.frame_range
         caps: List[cv2.VideoCapture] = []
 
         try:
@@ -108,20 +108,16 @@ class Mosplat_OT_extract_frame_range(
             new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
             _kwargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
 
-            for frame_idx in range(start, end):
+            for idx, npy_filepath in enumerate(_kwargs.npy_fp_generator):
                 if cancel_event.is_set():
                     return
-                frame_dir = _kwargs.data_output_dirpath / PER_FRAME_DIRNAME.format(
-                    frame_idx
-                )
 
-                frame_dir.mkdir(parents=True, exist_ok=True)
+                npy_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-                frame_npy_filepath = frame_dir / f"{RAW_FRAME_DIRNAME}.npy"
-                if not is_path_accessible(frame_npy_filepath):
-                    write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
+                if not is_path_accessible(npy_filepath):
+                    write_frame_data_to_npy(idx, caps, npy_filepath)
 
-                new_frame_range.end_frame = frame_idx
+                new_frame_range.end_frame = idx
                 queue.put("update")
         except UserFacingError as e:
             queue.put(str(e))  # exit early wherever error occurs and put error on queue

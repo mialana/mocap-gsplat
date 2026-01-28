@@ -13,7 +13,7 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar, TYPE_CHECKING, List, Tuple, Union
+from typing import Generic, TypeVar, TYPE_CHECKING, List, Tuple, Union, Generator
 
 from pathlib import Path
 
@@ -23,6 +23,7 @@ from .checks import (
     check_data_json_filepath,
     check_current_media_dirpath,
     check_frame_range_err_list,
+    check_frame_range_npy_filepaths,
 )
 
 from ..infrastructure.mixins import (
@@ -30,7 +31,7 @@ from ..infrastructure.mixins import (
     MosplatDataclassInteropMixin,
 )
 from ..infrastructure.protocols import SupportsCollectionProperty
-from ..infrastructure.constants import DataclassInstance
+from ..infrastructure.constants import DataclassInstance, RAW_FRAME_DIRNAME
 from ..infrastructure.schemas import (
     OperatorIDEnum,
     GlobalData,
@@ -39,6 +40,7 @@ from ..infrastructure.schemas import (
     ProcessedFrameRange,
     AppliedPreprocessScript,
 )
+from ..infrastructure.macros import try_access_path
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
@@ -232,3 +234,20 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
 
     def frame_range_err_list(self, prefs: Mosplat_AP_Global) -> List[str]:
         return check_frame_range_err_list(prefs, self)
+
+    def frame_range_npy_filepaths(self, prefs: Mosplat_AP_Global) -> List[Path]:
+        """
+        raises `UserFacingError` if one of the expected frames do not exist.
+        if the files are not expected to exist yet, use the generator fn below instead.
+        """
+        filepaths: List[Path] = []
+        for fp in check_frame_range_npy_filepaths(prefs, self, RAW_FRAME_DIRNAME):
+            try_access_path(fp)  # raises
+            filepaths.append(fp)
+        return filepaths
+
+    def generate_frame_range_npy_filepaths(
+        self, prefs: Mosplat_AP_Global
+    ) -> Generator[Path]:
+        """wrapper"""
+        return check_frame_range_npy_filepaths(prefs, self, RAW_FRAME_DIRNAME)

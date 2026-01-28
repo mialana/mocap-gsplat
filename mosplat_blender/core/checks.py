@@ -12,7 +12,7 @@ from bpy.types import Preferences, Scene, Context
 
 import os
 from pathlib import Path
-from typing import cast, TYPE_CHECKING, Optional, Set, List
+from typing import cast, TYPE_CHECKING, Optional, Set, List, Generator
 
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
@@ -21,7 +21,6 @@ from ..infrastructure.constants import (
     PER_FRAME_DIRNAME,
 )
 from ..infrastructure.schemas import UnexpectedError, SafeError, UserFacingError
-from ..infrastructure.macros import is_path_accessible
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -187,7 +186,7 @@ def check_frame_range_err_list(
             f"Customize this restriction in the addon's preferences under '{max_range_name}'"
         )
 
-    return err_list  # return even if empty if empty
+    return err_list  # return even if list if empty
 
 
 def check_frame_output_dirpath(
@@ -196,25 +195,18 @@ def check_frame_output_dirpath(
     return check_data_output_dirpath(prefs, props) / PER_FRAME_DIRNAME.format(frame)
 
 
-def check_frame_output_npy(
+def check_frame_npy_filepath(
     frame: int, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global, id: str
 ) -> Path:
-    return check_frame_output_dirpath(frame, prefs, props) / id / f"{id}.npy"
+    """raises `UserFacingError` if the NPY file doesn't exist"""
+
+    return check_frame_output_dirpath(frame, prefs, props) / f"{id}.npy"
 
 
-def check_frame_range_all_output_npy(
+def check_frame_range_npy_filepaths(
     prefs: Mosplat_AP_Global, props: Mosplat_PG_Global, id: str
-) -> bool:
+) -> Generator[Path]:
+    """generates the NPY file for all frames in curreng frame range"""
     start, end = props.current_frame_range
-
-    def accessible_or_raise(p: Path) -> bool:
-        if not is_path_accessible(p):
-            raise UserFacingError(f"'{p}' was not found.")
-        return True
-
-    return all(
-        [
-            accessible_or_raise(check_frame_output_npy(frame, prefs, props, id))
-            for frame in range(start, end)
-        ]
-    )
+    for frame in range(start, end):
+        yield check_frame_npy_filepath(frame, prefs, props, id)

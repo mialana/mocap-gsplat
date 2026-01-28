@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from typing import List
 from dataclasses import dataclass
+from pathlib import Path
 
 from .base_ot import (
     MosplatOperatorBase,
@@ -8,8 +10,9 @@ from .base_ot import (
     OptionalOperatorReturnItemsSet,
 )
 
-from ...infrastructure.schemas import OperatorIDEnum, UserFacingError
 from ..handlers import restore_dataset_from_json
+
+from ...infrastructure.schemas import OperatorIDEnum, UserFacingError
 from ...infrastructure.decorators import worker_fn_auto
 
 
@@ -40,6 +43,8 @@ class Mosplat_OT_run_preprocess_script(
         props = self.props
         try:
             restore_dataset_from_json(props, prefs)  # try to restore from local JSON
+
+            self._npy_files: List[Path] = props.frame_range_npy_filepaths(prefs)
 
             return self.execute(context)
         except UserFacingError as e:

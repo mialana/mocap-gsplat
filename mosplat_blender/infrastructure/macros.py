@@ -21,13 +21,27 @@ def append_if_not_equals(iter: List[T], *, item: T, target: T) -> None:
         iter.append(item)
 
 
-def is_path_accessible(p: Path) -> bool:
+def try_access_path(p: Path):
+    """raises `UserFacingError` on failure"""
+
+    from .schemas import UserFacingError  # keep import contained
+
     if not p.exists():
-        return False
+        raise UserFacingError(f"'{p}' does not exist.")
     try:
         p.stat()
+        return
+    except (PermissionError, OSError) as e:
+        raise UserFacingError(f"'{p}' is not accessible.") from e
+
+
+def is_path_accessible(p: Path) -> bool:
+    from .schemas import UserFacingError  # keep import contained
+
+    try:
+        try_access_path(p)
         return True
-    except (PermissionError, OSError):
+    except UserFacingError:
         return False
 
 

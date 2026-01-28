@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, cast, Tuple, TYPE_CHECKING, Union, NamedTuple
+from typing import Dict, List, cast, Tuple, TYPE_CHECKING, Union, Callable, Tuple
 from dataclasses import dataclass, field, asdict
 import json
 from enum import StrEnum, auto
@@ -281,7 +281,7 @@ class MediaFileStatus:
 @dataclass
 class MediaIODataset:
     base_directory: str
-    is_valid_media_directory: bool = True
+    is_valid_media_directory: bool = False
     median_frame_count: int = -1
     median_width: int = -1
     median_height: int = -1
@@ -337,7 +337,7 @@ class MediaIODataset:
         self.median_width = int_median(_widths)
         self.median_height = int_median(_heights)
 
-    def accumulate_media_status(self, status: MediaFileStatus) -> None:
+    def _accumulate_media_status(self, status: MediaFileStatus) -> None:
         self.media_file_statuses.append(status)
         self.synchronize_to_medians()
 
@@ -348,6 +348,23 @@ class MediaIODataset:
             and self.median_width == status.width
             and self.median_height == status.height
         )
+
+    def status_accumulator(
+        self,
+    ) -> Tuple[Dict[str, MediaFileStatus], Callable[[MediaFileStatus], None]]:
+        """
+        sets up state for a new status accumulation.
+        returns a lookup table that is created before current statuses are cleared,
+        and a callable that will handle adding a new status to the current known statuses.
+        """
+
+        status_lookup = MediaFileStatus.as_lookup(self.media_file_statuses)
+
+        # clear the statuses as we've created a lookup table already
+        self.media_file_statuses.clear()
+        self.is_valid_media_directory = True  # start fresh
+
+        return status_lookup, self._accumulate_media_status
 
 
 @dataclass
