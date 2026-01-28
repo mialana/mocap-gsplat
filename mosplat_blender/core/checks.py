@@ -18,8 +18,10 @@ from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_PROPERTIES_ATTRIBNAME,
     MEDIA_IO_DATASET_JSON_FILENAME,
+    PER_FRAME_DIRNAME,
 )
 from ..infrastructure.schemas import UnexpectedError, SafeError, UserFacingError
+from ..infrastructure.macros import is_path_accessible
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -186,3 +188,33 @@ def check_frame_range_err_list(
         )
 
     return err_list  # return even if empty if empty
+
+
+def check_frame_output_dirpath(
+    frame: int, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
+) -> Path:
+    return check_data_output_dirpath(prefs, props) / PER_FRAME_DIRNAME.format(frame)
+
+
+def check_frame_output_npy(
+    frame: int, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global, id: str
+) -> Path:
+    return check_frame_output_dirpath(frame, prefs, props) / id / f"{id}.npy"
+
+
+def check_frame_range_all_output_npy(
+    prefs: Mosplat_AP_Global, props: Mosplat_PG_Global, id: str
+) -> bool:
+    start, end = props.current_frame_range
+
+    def accessible_or_raise(p: Path) -> bool:
+        if not is_path_accessible(p):
+            raise UserFacingError(f"'{p}' was not found.")
+        return True
+
+    return all(
+        [
+            accessible_or_raise(check_frame_output_npy(frame, prefs, props, id))
+            for frame in range(start, end)
+        ]
+    )
