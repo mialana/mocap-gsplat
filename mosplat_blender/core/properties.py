@@ -194,6 +194,24 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         options={"SKIP_SAVE"},
     )
 
+    operator_progress_current: IntProperty(
+        name="Progress Current",
+        description="Singleton current progress of operators.",
+        default=-1,
+    )
+
+    operator_progress_total: IntProperty(
+        name="Progress Total",
+        description="Singleton total progress of operators.",
+        default=-1,
+    )
+
+    progress_in_use: BoolProperty(
+        name="Progress In Use",
+        description="Whether any operator is 'using' the progress-related properties.",
+        default=False,
+    )
+
     @property
     def dataset_accessor(self) -> Mosplat_PG_MediaIODataset:
         return self.current_media_io_dataset

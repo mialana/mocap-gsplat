@@ -7,7 +7,7 @@ from bpy.props import StringProperty, IntProperty
 
 from pathlib import Path
 import os
-from typing import Set, Optional, TYPE_CHECKING
+from typing import Set, TYPE_CHECKING
 
 from .checks import check_media_extensions_set
 from ..interfaces.logging_interface import MosplatLoggingInterface
@@ -21,7 +21,7 @@ from ..infrastructure.constants import (
     DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
     ADDON_SHORTNAME,
 )
-from ..infrastructure.schemas import OperatorIDEnum
+from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
@@ -50,12 +50,32 @@ def update_media_extensions(self: Mosplat_AP_Global, context: Context):
     self.logger().info(f"'{self.get_prop_name('media_extensions')}' updated.")
 
 
+def update_model_preferences(self: Mosplat_AP_Global, context: Context):
+    from ..interfaces.vggt_interface import MosplatVGGTInterface as interface
+
+    if interface.model is not None:
+        if interface.cache_dir != self.vggt_model_dir:
+            self.logger().warning(
+                "Changed model cache dir, next init will take a while."
+                "Change back to previous directory if this is not desired."
+            )
+        elif interface.hf_id != self.vggt_hf_id:
+            self.logger().warning(
+                "Changed Hugging Face ID for model, next init will take a while."
+                "Change back to previous ID if this is not desired."
+            )
+        else:
+            return  # prefs did not change from what is currently initialized with.
+        try:
+            interface.cleanup()
+        except UnexpectedError as e:
+            self.logger().warning(str(e))
+
+
 class Mosplat_AP_Global(
     AddonPreferences, MosplatBlPropertyAccessorMixin, MosplatPGAccessorMixin
 ):
     bl_idname = ADDON_PREFERENCES_ID
-
-    __media_extensions_set: Optional[Set[str]] = None
 
     cache_dir: StringProperty(
         name="Cache Directory",
@@ -66,7 +86,7 @@ class Mosplat_AP_Global(
     )
 
     json_log_subdir: StringProperty(
-        name="JSON Log Subdirectory",
+        name="JSON Log Cache Subdirectory",
         description="Subdirectory (relative to cache) for JSON logs",
         default="log",
         update=update_json_logging,
@@ -76,6 +96,7 @@ class Mosplat_AP_Global(
         name="Model Cache Subdirectory",
         description="Subdirectory where the VGGT model data will be stored",
         default="vggt",
+        update=update_model_preferences,
     )
 
     data_output_path: StringProperty(
@@ -149,6 +170,7 @@ class Mosplat_AP_Global(
         name="VGGT Hugging Face ID",
         description="ID of VGGT pre-trained model on Hugging Face",
         default="facebook/VGGT-1B",
+        update=update_model_preferences,
     )
 
     @property

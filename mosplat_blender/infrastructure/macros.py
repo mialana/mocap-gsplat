@@ -1,6 +1,7 @@
 from pathlib import Path
 from statistics import median
-from typing import Iterable, TypeVar, List, Tuple, TypeGuard, Type
+from typing import Iterable, TypeVar, List, Tuple
+import sys
 
 
 def int_median(iter: Iterable[int]) -> int:
@@ -29,3 +30,18 @@ def tuple_matches_type_tuple(value_tuple: Tuple, type_tuple: Tuple) -> bool:
     if len(value_tuple) != len(type_tuple):
         return False
     return all(isinstance(v, t) for v, t in zip(value_tuple, type_tuple))
+
+
+def kill_subprocess_cross_platform(pid: int):
+    if sys.platform != "win32":
+        os.killpg(pid, signal.SIGKILL)  # TODO: cross-platform check
+    else:
+        import psutil
+
+        try:
+            parent = psutil.Process(pid)
+            for child in parent.children(recursive=True):
+                child.kill()
+            parent.kill()
+        except psutil.NoSuchProcess:
+            pass
