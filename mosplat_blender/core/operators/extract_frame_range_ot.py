@@ -10,9 +10,6 @@ from .base_ot import (
     OptionalOperatorReturnItemsSet,
 )
 
-from ..preferences import Mosplat_AP_Global
-from ..properties import Mosplat_PG_Global
-
 from ...infrastructure.schemas import (
     OperatorIDEnum,
     UserFacingError,
@@ -22,7 +19,7 @@ from ...infrastructure.schemas import (
 from ..handlers import restore_dataset_from_json
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import PER_FRAME_DIRNAME, RAW_FRAME_DIRNAME
-from ...infrastructure.macros import is_path_accessible
+from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
 
 if TYPE_CHECKING:
     from cv2 import VideoCapture
@@ -114,14 +111,15 @@ class Mosplat_OT_extract_frame_range(
             for frame_idx in range(start, end):
                 if cancel_event.is_set():
                     return
-                frame_dir = _kwargs.data_output_dirpath.joinpath(
-                    PER_FRAME_DIRNAME.format(frame_idx)
+                frame_dir = _kwargs.data_output_dirpath / PER_FRAME_DIRNAME.format(
+                    frame_idx
                 )
+
                 frame_dir.mkdir(parents=True, exist_ok=True)
 
-                frame_npy_filepath = frame_dir.joinpath(f"{RAW_FRAME_DIRNAME}.npy")
+                frame_npy_filepath = frame_dir / f"{RAW_FRAME_DIRNAME}.npy"
                 if not is_path_accessible(frame_npy_filepath):
-                    _write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
+                    write_frame_data_to_npy(frame_idx, caps, frame_npy_filepath)
 
                 new_frame_range.end_frame = frame_idx
                 queue.put("update")
@@ -132,20 +130,3 @@ class Mosplat_OT_extract_frame_range(
                 cap.release()
 
         queue.put("done")
-
-
-def _write_frame_data_to_npy(frame_idx: int, caps: List[VideoCapture], out_path: Path):
-    import cv2
-    import numpy as np
-
-    images: List[cv2.typing.MatLike] = []
-    for cap in caps:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-        ret, frame = cap.read()
-        if not ret:
-            raise UserFacingError(f"Failed to read frame: {frame_idx}")
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # BGR to RGB
-        images.append(frame)
-
-    stacked = np.stack(images, axis=0)
-    np.save(out_path, stacked)

@@ -80,7 +80,7 @@ class Mosplat_AP_Global(
     cache_dir: StringProperty(
         name="Cache Directory",
         description="Cache directory on disk used by the addon",
-        default=str(Path.home().joinpath(".cache", ADDON_BASE_ID)),
+        default=str(Path.home() / ".cache" / ADDON_BASE_ID),
         subtype="DIR_PATH",
         update=update_json_logging,
     )
@@ -175,11 +175,11 @@ class Mosplat_AP_Global(
 
     @property
     def json_log_dir(self) -> Path:
-        return Path(self.cache_dir).joinpath(self.json_log_subdir)
+        return Path(self.cache_dir) / self.json_log_subdir
 
     @property
     def vggt_model_dir(self) -> Path:
-        return Path(self.cache_dir).joinpath(self.vggt_model_subdir)
+        return Path(self.cache_dir) / self.vggt_model_subdir
 
     @property
     def media_extensions_set(self) -> Set[str]:

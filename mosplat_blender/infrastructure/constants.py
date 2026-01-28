@@ -79,23 +79,17 @@ if TYPE_CHECKING:
 else:
     DataclassInstance: TypeAlias = Any
 
-# path location of the shipped preprocess script
-DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(
-    Path(__file__)
-    .resolve()
-    .parent.parent.joinpath("bin")
-    .joinpath("fix_mocap_video_rotations.py")
-)
-
 MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
 
 PER_FRAME_DIRNAME = "frame_{:04d}"
 RAW_FRAME_DIRNAME = "raw"
 
+# path location of the shipped preprocess script
+DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(
+    Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_video_rotations.py"
+)
 
+# path location of hf model download via subprocess script
 DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH: Final[Path] = (
-    Path(__file__)
-    .resolve()
-    .parent.parent.joinpath("bin")
-    .joinpath("download_hf_with_progress.py")
+    Path(__file__).resolve().parent.parent / "bin" / "download_hf_with_progress.py"
 )

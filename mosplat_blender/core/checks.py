@@ -99,7 +99,7 @@ def check_data_output_dirpath(
     if formatted_output_path.is_absolute():
         output = formatted_output_path
     else:
-        output = current_media_dirpath.joinpath(formatted_output_path)
+        output = current_media_dirpath / formatted_output_path
 
     try:
         os.makedirs(
@@ -114,9 +114,7 @@ def check_data_output_dirpath(
 
 
 def check_data_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
-    return check_data_output_dirpath(prefs, props).joinpath(
-        MEDIA_IO_DATASET_JSON_FILENAME
-    )
+    return check_data_output_dirpath(prefs, props) / MEDIA_IO_DATASET_JSON_FILENAME
 
 
 def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> List[Path]:
