@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, List, Generator, ClassVar, Optional
+from typing import Tuple, List, Generator, NamedTuple
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -18,12 +18,10 @@ from ...infrastructure.schemas import (
 )
 from ..handlers import restore_dataset_from_json
 from ...infrastructure.decorators import worker_fn_auto
-from ...infrastructure.constants import PER_FRAME_DIRNAME, RAW_FRAME_DIRNAME
 from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
 
 
-@dataclass(frozen=True)
-class ThreadKwargs:
+class ThreadKwargs(NamedTuple):
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
     npy_fp_generator: Generator[Path]
@@ -62,7 +60,7 @@ class Mosplat_OT_extract_frame_range(
 
             return self.execute(context)
         except UserFacingError as e:
-            self.logger().error(str(e))
+            self.logger.error(str(e))
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
@@ -84,7 +82,7 @@ class Mosplat_OT_extract_frame_range(
             return
 
         if next != "update":  # if sent an error message via queue
-            self.logger().warning(next)
+            self.logger.warning(next)
 
         # sync props regardless as the updated dataclass is still valid
         self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
@@ -119,7 +117,7 @@ class Mosplat_OT_extract_frame_range(
 
                 new_frame_range.end_frame = idx
                 queue.put("update")
-        except UserFacingError as e:
+        except (UserFacingError, OSError) as e:
             queue.put(str(e))  # exit early wherever error occurs and put error on queue
         finally:
             for cap in caps:

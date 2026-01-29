@@ -45,7 +45,7 @@ def check_propertygroup(
         return found_properties
     except AttributeError as e:
         raise UnexpectedError(
-            "Registration of addon properties was never successful. Cannot continue."
+            "Registration of addon properties was never successful. Cannot continue.", e
         ) from e
 
 
@@ -64,7 +64,7 @@ def check_addonpreferences(
         return found_preferences
     except KeyError as e:
         raise UnexpectedError(
-            "Registration of addon preferences was never successful. Cannot continue."
+            "Registration of addon prefs was never successful. Cannot continue.", e
         ) from e
 
 

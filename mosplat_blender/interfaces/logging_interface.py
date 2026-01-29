@@ -131,7 +131,7 @@ class MosplatLoggingInterface:
 
             return True
         except Exception as e:
-            raise UserFacingError("Configuration for STDOUT handler invalid.") from e
+            raise UserFacingError("Configuration for STDOUT handler invalid.", e) from e
 
     @classmethod
     def init_json_handler(
@@ -165,7 +165,7 @@ class MosplatLoggingInterface:
 
             return True
         except Exception as e:
-            raise UserFacingError("Configuration for JSON handler invalid.") from e
+            raise UserFacingError("Configuration for JSON handler invalid.", e) from e
 
     @classmethod
     def set_log_record_factory(cls):

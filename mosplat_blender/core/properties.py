@@ -39,6 +39,7 @@ from ..infrastructure.schemas import (
     MediaFileStatus,
     ProcessedFrameRange,
     AppliedPreprocessScript,
+    UserFacingError,
 )
 from ..infrastructure.macros import try_access_path
 
@@ -168,7 +169,7 @@ def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
         bpy.ops, OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT"
     )
 
-    self.logger().info(f"'{self.get_prop_name('current_media_dir')}' updated.")
+    self.logger.info(f"'{self.get_prop_name('current_media_dir')}' updated.")
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
@@ -235,15 +236,25 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     def frame_range_err_list(self, prefs: Mosplat_AP_Global) -> List[str]:
         return check_frame_range_err_list(prefs, self)
 
-    def frame_range_npy_filepaths(self, prefs: Mosplat_AP_Global) -> List[Path]:
+    def frame_range_npy_filepaths(
+        self, prefs: Mosplat_AP_Global, id: str
+    ) -> List[Path]:
         """
         raises `UserFacingError` if one of the expected frames do not exist.
         if the files are not expected to exist yet, use the generator fn below instead.
         """
         filepaths: List[Path] = []
-        for fp in check_frame_range_npy_filepaths(prefs, self, RAW_FRAME_DIRNAME):
-            try_access_path(fp)  # raises
-            filepaths.append(fp)
+
+        for fp in check_frame_range_npy_filepaths(prefs, self, id):
+            try:
+                try_access_path(fp)  # raises
+                filepaths.append(fp)
+            except (OSError, PermissionError, FileNotFoundError) as e:
+                raise UserFacingError(
+                    f"Expected to find an extracted NPY file at '{fp}'."
+                    "Re-extract the frame range if necessary.",
+                    e,
+                )  # convert now to a `UserFacingError`
         return filepaths
 
     def generate_frame_range_npy_filepaths(

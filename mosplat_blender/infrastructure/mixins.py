@@ -39,13 +39,13 @@ class MosplatLogClassMixin:
     and more importantly which is erroring out if it occurs.
     """
 
-    _logger: ClassVar[logging.Logger] = _MISSING_
+    class_logger: ClassVar[logging.Logger] = _MISSING_
 
     @classmethod
     def _create_logger_for_class(cls):
         from ..interfaces import MosplatLoggingInterface
 
-        cls._logger = MosplatLoggingInterface.configure_logger_instance(
+        cls.class_logger = MosplatLoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{cls.__qualname__}"
         )
 
@@ -55,11 +55,12 @@ class MosplatLogClassMixin:
 
         cls._create_logger_for_class()  # create logger for subclasses
 
-    @classmethod
-    def logger(cls) -> logging.Logger:
-        if not cls._logger:
+    @property
+    def logger(self) -> logging.Logger:
+        cls = self.__class__
+        if cls.class_logger is _MISSING_:
             cls._create_logger_for_class()
-        return cls._logger
+        return cls.class_logger
 
 
 class MosplatEnforceAttributesMixin:
@@ -173,7 +174,7 @@ class MosplatAPAccessorMixin(MosplatLogClassMixin):
 
         context = getattr(self, "context", None)
         if context is None:
-            self.logger().warning("Using fallback context for prefs.")
+            self.logger.warning("Using fallback context for prefs.")
             from bpy import context as fallback_context
 
             context = fallback_context
@@ -195,7 +196,7 @@ class MosplatPGAccessorMixin(MosplatLogClassMixin):
 
         context = getattr(self, "context", None)
         if context is None:
-            self.logger().warning("Using fallback context for props.")
+            self.logger.warning("Using fallback context for props.")
             from bpy import context as fallback_context
 
             context = fallback_context
@@ -215,7 +216,7 @@ class MosplatBlPropertyAccessorMixin(
         try:
             return cls.bl_rna.properties[prop_attrname].name
         except KeyError:
-            cls.logger().exception(
+            cls.class_logger.exception(
                 f"Tried to retrieve RNA of non-existing property '{prop_attrname}'."
             )
             return f"KEY ERROR. Class: {cls.__qualname__}. Property: {prop_attrname}."  # make error visible and traceable

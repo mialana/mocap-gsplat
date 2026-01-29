@@ -6,10 +6,11 @@ and the process can even be completely killed if necessary.
 """
 
 import sys
-import json
 import argparse
 from pathlib import Path
+import json
 from dataclasses import dataclass, asdict
+from typing import Tuple, TypedDict, Type
 
 if "--" in sys.argv:  # parse original subprocess call
     ARGV = sys.argv[sys.argv.index("--") + 1 :]
@@ -30,6 +31,9 @@ class SubprocessPayload:
         self.total = total
         self.msg = msg
 
+    def values_tuple(self) -> Tuple[str, int, int, str]:
+        return tuple(asdict(self).values())
+
 
 def make_tqdm_class():
     from huggingface_hub.utils.tqdm import tqdm
@@ -49,12 +53,19 @@ def make_tqdm_class():
                     total=int(float(self.total) / 100.0),
                     msg="",
                 )
-                self.sp(json.dumps(asdict(self._payload)))
+                self.sp(str(self._payload.values_tuple()))
 
         def refresh(self, *args, **kwargs) -> None:
             super().refresh(*args, **kwargs)
 
     return ProgressTqdm
+
+
+class DownloadArgs(TypedDict):
+    repo_id: str
+    filename: str
+    cache_dir: str
+    # tqdm_class: type
 
 
 def main():
@@ -68,14 +79,16 @@ def main():
     args = p.parse_args(ARGV)
     repo_id, cache_dir = args.repo_id, args.cache_dir
 
-    hf_hub_download(
-        repo_id=repo_id,
-        filename=SAFETENSORS_SINGLE_FILE,
-        cache_dir=cache_dir,
-        tqdm_class=make_tqdm_class(),
+    dl_args = DownloadArgs(
+        repo_id=repo_id, filename=SAFETENSORS_SINGLE_FILE, cache_dir=str(cache_dir)
     )
 
-    print(json.dumps(asdict(SubprocessPayload("ok"))), flush=True)
+    hf_hub_download(**dl_args, tqdm_class=make_tqdm_class())
+
+    print(
+        str(SubprocessPayload("ok", msg=str(json.dumps(dl_args))).values_tuple()),
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

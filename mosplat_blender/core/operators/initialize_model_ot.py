@@ -1,24 +1,23 @@
 import bpy
 
 from pathlib import Path
-import threading
 from queue import Queue
-from typing import Tuple
+from typing import Tuple, NamedTuple, Final, Optional
 import subprocess
-import json
-import time
 import os
-from dataclasses import dataclass
+import ast
+from functools import partial
+import time
 
 from ...infrastructure.macros import (
-    tuple_matches_type_tuple,
+    tuple_type_matches_known_tuple_type,
     kill_subprocess_cross_platform,
 )
-from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError, SafeError
+from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import (
-    DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH,
-    _TIMER_INTERVAL_,
+    DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
+    _TIMEOUT_INTERVAL_,
 )
 from ...infrastructure.macros import is_path_accessible
 
@@ -28,9 +27,10 @@ from .base_ot import (
     OptionalOperatorReturnItemsSet,
 )
 
+QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime checking
 
-@dataclass(frozen=True)
-class ThreadKwargs:
+
+class ThreadKwargs(NamedTuple):
     proc: subprocess.Popen
     hf_id: str
     model_cache_dir: Path
@@ -72,26 +72,27 @@ class Mosplat_OT_initialize_model(
 
             self.wm.progress_update(current)
             self.props.operator_progress_current = current
+            self.logger.debug(f"{current} / {total}")
         else:
             fmt = f"QUEUE {status.upper()} - {msg}"
             if status == "error":
                 self.cleanup(context)
-                self.logger().error(fmt)
+                self.logger.error(fmt)
                 return {"CANCELLED"}
             elif status == "warning":
-                self.logger().warning(fmt)
+                self.logger.warning(fmt)
             elif status == "debug":
-                self.logger().debug(fmt)
+                self.logger.debug(fmt)
             else:
-                self.logger().info(fmt)
+                self.logger.info(fmt)
             if status == "done":
                 self.cleanup(context)
                 return {"FINISHED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
-        if not is_path_accessible(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH):
-            self.logger().error(
-                f"'{DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH}' script file not found at expected location."
+        if not is_path_accessible(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT):
+            self.logger.error(
+                f"'{DOWNLOAD_HF_WITH_PROGRESS_SCRIPT}' script file not found at expected location."
             )
             return {"CANCELLED"}
 
@@ -104,7 +105,7 @@ class Mosplat_OT_initialize_model(
                 "--factory-startup",
                 "-b",
                 "--python",
-                DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH,
+                DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
                 "--",
                 prefs.vggt_hf_id,
                 str(prefs.vggt_model_dir),
@@ -112,11 +113,12 @@ class Mosplat_OT_initialize_model(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            universal_newlines=True,
             encoding="utf-8",
             preexec_fn=getattr(os, "setsid", None),  # TODO: cross-platform check
         )
 
-        self.logger().info(f"Downloading model from subprocess. PID: {self._proc.pid}")
+        self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
         self.operator_thread(
             self,
@@ -129,17 +131,41 @@ class Mosplat_OT_initialize_model(
 
         return {"RUNNING_MODAL"}
 
+    def contexted_modal(self, context, event):
+        # check cancellation on timer callback, kill subprocess if needed
+        if self.worker and self.worker.was_cancelled():
+            kill_subprocess_cross_platform(self._proc.pid)
+        super().contexted_modal(context, event)
+
+    def cleanup(self, context):
+        self.wm.progress_end()  # stop progress
+        self.props.progress_in_use = False
+        self.props.operator_progress_current = -1
+        self.props.operator_progress_total = -1
+
+        """
+        register a timer that will kill the subprocess with the saved pid
+        (operator itself will leave the scope before then)
+        this ensures that cancellation that never reaches the next modal call still cleans up the subprocess
+        """
+        if hasattr(self, "_proc"):
+            bpy.app.timers.register(
+                partial(kill_subprocess_cross_platform, self._proc.pid),
+                first_interval=_TIMEOUT_INTERVAL_,  # no orphaned processes here!
+            )
+        return super().cleanup(context)
+
     @staticmethod
     @worker_fn_auto
     def operator_thread(queue, cancel_event, *, _kwargs):
         try:
-            _wait_and_update_queue_loop(_kwargs.proc, queue, cancel_event)
-        except SafeError:
+            _wait_and_update_queue_loop(_kwargs.proc, queue)
+        except (subprocess.CalledProcessError, UnexpectedError) as e:
             # put on queue to stop modal just in case, though it probably will not be read
-            queue.put(
-                ("done", -1, -1, "Model init did not finish due to cancellation.")
-            )
-            return  # cancel event was set
+            queue.put(("error", -1, -1, str(e)))
+            return  # do not continue
+        if cancel_event.is_set():
+            return  # do not continue
 
         from ...interfaces import MosplatVGGTInterface
 
@@ -148,51 +174,38 @@ class Mosplat_OT_initialize_model(
                 _kwargs.hf_id, _kwargs.model_cache_dir, cancel_event
             )
 
-            queue.put(
-                ("done", -1, -1, "Successfully downloaded & initialized VGGT model!")
-            )
+            queue.put(("done", -1, -1, "Successfully downloaded & init VGGT model!"))
         except UnexpectedError as e:
             queue.put(("error", -1, -1, str(e)))
 
-    def cleanup(self, context):
-        self.wm.progress_end()  # stop progress
-        self.props.progress_in_use = False
-        self.props.operator_progress_current = -1
-        self.props.operator_progress_total = -1
-        return super().cleanup(context)
-
 
 def _wait_and_update_queue_loop(
-    proc: subprocess.Popen,
-    queue: Queue[Tuple[str, int, int, str]],
-    cancel_event: threading.Event,
+    proc: subprocess.Popen, queue: Queue[Tuple[str, int, int, str]]
 ):
-    TYPE_TUPLE = (str, int, int, str)  # for runtime checking
+    if proc.stdout is None:
+        return
 
-    def check():
-        if cancel_event.is_set():
-            kill_subprocess_cross_platform(proc.pid)
-            raise SafeError
+    ret: Optional[int] = None
+    while True:  # exits only when subprocess has exited
+        if (ret := proc.poll()) is not None:
+            if ret != 0:
+                e = subprocess.CalledProcessError(ret, proc.args)
+                e.add_note("Note: this is expected if operator is cancelled.")
+            else:
+                return  # proc existed successfully
+        for line in proc.stdout:  # continues until EOF has been reached
+            try:
+                converted = ast.literal_eval(line)
+                if isinstance(converted, tuple) and tuple_type_matches_known_tuple_type(
+                    converted, QUEUE_DEFAULT_TUPLE
+                ):
+                    queue.put(converted)  # good to go
+                    continue
+            except (ValueError, SyntaxError, TypeError):
+                pass
 
-    while True:
-        check()
+            if isinstance(line, str) and (stripped := line.strip()):
+                # place other output in queue under msg
+                queue.put(("debug", -1, -1, stripped))
 
-        if proc.stdout is not None:
-            for line in proc.stdout:
-                check()
-                try:
-                    converted = tuple(dict(json.loads(line)).values())
-                    if tuple_matches_type_tuple(converted, TYPE_TUPLE):
-                        queue.put(converted)  # good to go
-                        continue
-                except json.JSONDecodeError:
-                    pass
-
-                if isinstance(line, str) and (stripped := line.strip()):
-                    # place other output in queue under msg
-                    queue.put(("debug", -1, -1, stripped))
-
-        if proc.poll() is not None:
-            return
-
-        time.sleep(_TIMER_INTERVAL_)
+        time.sleep(_TIMEOUT_INTERVAL_)

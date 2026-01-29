@@ -18,6 +18,7 @@ import tempfile
 _MISSING_: Any = object()  # sentinel variable
 
 _TIMER_INTERVAL_: Final[float] = 0.1
+_TIMEOUT_INTERVAL_: Final[float] = 15.0  # amount of time to wait before timeout
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {
@@ -85,11 +86,11 @@ PER_FRAME_DIRNAME = "frame_{:04d}"
 RAW_FRAME_DIRNAME = "raw"
 
 # path location of the shipped preprocess script
-DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE: Final[str] = str(
+DEFAULT_PREPROCESS_MEDIA_SCRIPT: Final[str] = str(
     Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_video_rotations.py"
 )
 
 # path location of hf model download via subprocess script
-DOWNLOAD_HF_WITH_PROGRESS_SCRIPT_PATH: Final[Path] = (
-    Path(__file__).resolve().parent.parent / "bin" / "download_hf_with_progress.py"
+DOWNLOAD_HF_WITH_PROGRESS_SCRIPT: Final[Path] = (
+    Path(__file__).resolve().parent.parent / "lib" / "download_hf_with_progress.py"
 )

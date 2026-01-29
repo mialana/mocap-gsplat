@@ -38,9 +38,7 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
                 return  # initialization did not occur
 
             # initialize model from the downloaded local model cache
-            cls.model = VGGT.from_pretrained(
-                hf_id, cache_dir=model_cache_dir, local_files_only=True
-            )
+            cls.model = VGGT.from_pretrained(hf_id, cache_dir=model_cache_dir)
             cls.hf_id = hf_id
             cls.cache_dir = model_cache_dir  # store the values used for initialization
 
@@ -50,7 +48,7 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
                 cls.cleanup()
         except Exception as e:
             cls.cleanup()
-            raise UnexpectedError(str(e)) from e
+            raise UnexpectedError("Error while initializing model.", e) from e
 
     @classmethod
     def cleanup(cls):
@@ -71,12 +69,12 @@ class MosplatVGGTInterface(MosplatLogClassMixin):
                 torch.cuda.empty_cache()  # only effective when all torch resources have been released
                 gc.collect()
 
-                cls.logger().info("Cleaned up VGGT model.")
+                cls.class_logger.info("Cleaned up VGGT model.")
 
-            cls.logger().info("Cleaned up worker references")
+            cls.class_logger.info("Cleaned up worker references")
         except Exception as e:
-            raise UnexpectedError(str(e)) from e
+            raise UnexpectedError("Error while cleaning up model.", e) from e
 
         cls.hf_id = None
         cls.cache_dir = None
-        cls.logger().info("Removed initialization variables.")
+        cls.class_logger.info("Removed initialization variables.")

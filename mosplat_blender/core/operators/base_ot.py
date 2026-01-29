@@ -11,10 +11,7 @@ from typing import (
     TypeVar,
     ClassVar,
     List,
-    Callable,
-    Any,
-    Type,
-    ParamSpec,
+    NamedTuple,
 )
 import contextlib
 from queue import Queue
@@ -34,7 +31,6 @@ from ...infrastructure.schemas import (
     MediaIODataset,
     DeveloperError,
 )
-from ...infrastructure.constants import DataclassInstance
 from ...interfaces.worker_interface import MosplatWorkerInterface
 
 if TYPE_CHECKING:
@@ -51,7 +47,7 @@ OptionalOperatorReturnItemsSet: TypeAlias = Optional[OperatorReturnItemsSet]
 
 
 Q = TypeVar("Q")  # the type of the elements in worker queue, if used
-K = TypeVar("K", bound=DataclassInstance)
+K = TypeVar("K", bound=NamedTuple)
 
 
 class MosplatOperatorBase(
@@ -147,7 +143,7 @@ class MosplatOperatorBase(
         try:
             yield
         except BaseException as e:
-            self.logger().exception(str(e))
+            self.logger.exception(str(e))
             self.cleanup(context)
 
     def invoke(self, context, event) -> OperatorReturnItemsSet:
@@ -186,10 +182,8 @@ class MosplatOperatorBase(
 
     def modal(self, context, event) -> OperatorReturnItemsSet:
         with self.encapsulated_context_block(context):
-            if (
-                event.type in {"RIGHTMOUSE", "ESC"}
-                or self.worker is not None
-                and self.worker.was_cancelled()
+            if event.type in {"RIGHTMOUSE", "ESC"} or (
+                self.worker is not None and self.worker.was_cancelled()
             ):
                 self.cleanup(context)
                 return {"CANCELLED"}
@@ -231,11 +225,11 @@ class MosplatOperatorBase(
         if self.timer:
             self.wm.event_timer_remove(self.timer)
             self.timer = None
-            self.logger().debug("Timer cleaned up")
+            self.logger.debug("Timer cleaned up")
         if self.worker:
             self.worker.cleanup()
             self.worker = None
-            self.logger().debug("Worker cleaned up")
+            self.logger.debug("Worker cleaned up")
 
         self.dataset_as_dc = (
             None  # dataset as dataclass is not guaranteed to be in-sync anymore

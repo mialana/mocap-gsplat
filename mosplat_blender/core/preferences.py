@@ -18,10 +18,11 @@ from ..infrastructure.mixins import (
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_BASE_ID,
-    DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
+    DEFAULT_PREPROCESS_MEDIA_SCRIPT,
     ADDON_SHORTNAME,
 )
-from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError
+from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
+from ..infrastructure.macros import try_access_path
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
@@ -32,7 +33,7 @@ def update_stdout_logging(self: Mosplat_AP_Global, _: Context):
         log_fmt=self.stdout_log_format,
         log_date_fmt=self.stdout_date_log_format,
     ):
-        self.logger().info("STDOUT logging updated.")
+        self.logger.info("STDOUT logging updated.")
 
 
 def update_json_logging(self: Mosplat_AP_Global, _: Context):
@@ -42,12 +43,12 @@ def update_json_logging(self: Mosplat_AP_Global, _: Context):
         outdir=self.json_log_dir,
         file_fmt=self.json_log_filename_format,
     ):
-        self.logger().info("JSON logging updated.")
+        self.logger.info("JSON logging updated.")
 
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
     OperatorIDEnum.run(bpy.ops, OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES)
-    self.logger().info(f"'{self.get_prop_name('media_extensions')}' updated.")
+    self.logger.info(f"'{self.get_prop_name('media_extensions')}' updated.")
 
 
 def update_model_preferences(self: Mosplat_AP_Global, context: Context):
@@ -55,12 +56,12 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
 
     if interface.model is not None:
         if interface.cache_dir != self.vggt_model_dir:
-            self.logger().warning(
+            self.logger.warning(
                 "Changed model cache dir, next init will take a while."
                 "Change back to previous directory if this is not desired."
             )
         elif interface.hf_id != self.vggt_hf_id:
-            self.logger().warning(
+            self.logger.warning(
                 "Changed Hugging Face ID for model, next init will take a while."
                 "Change back to previous ID if this is not desired."
             )
@@ -69,7 +70,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
         try:
             interface.cleanup()
         except UnexpectedError as e:
-            self.logger().warning(str(e))
+            self.logger.warning(str(e))
 
 
 class Mosplat_AP_Global(
@@ -112,7 +113,7 @@ class Mosplat_AP_Global(
         description=f"A file containing a Python script that will be applied to the contents of the selected media directory before individual frames are extracted.\n"
         "See '{DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE}' for details on the expected format of the file.\n"
         "If an empty path is entered no pre-processing will be performed.",
-        default=DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE,
+        default=DEFAULT_PREPROCESS_MEDIA_SCRIPT,
         subtype="FILE_PATH",
     )
 
@@ -180,6 +181,19 @@ class Mosplat_AP_Global(
     @property
     def vggt_model_dir(self) -> Path:
         return Path(self.cache_dir) / self.vggt_model_subdir
+
+    @property
+    def preprocess_media_script_filepath(self) -> Path:
+        """raises `UserFacingError` if the script is not accessible."""
+        filepath = Path(self.preprocess_media_script_file)
+
+        try:
+            try_access_path(filepath)
+            return filepath
+        except (OSError, PermissionError, FileNotFoundError) as e:
+            raise UserFacingError(
+                f"Given preprocess script file is not accessible: '{filepath}'", e
+            ) from e  # convert now to a `UserFacingError`
 
     @property
     def media_extensions_set(self) -> Set[str]:

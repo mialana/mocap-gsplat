@@ -1,9 +1,25 @@
+"""functions here should raise standard library error types."""
+
 from __future__ import annotations
 
+from os import stat_result
 from pathlib import Path
 from statistics import median
-from typing import Iterable, TypeVar, List, Tuple, TYPE_CHECKING
+from typing import (
+    Iterable,
+    TypeVar,
+    List,
+    Tuple,
+    TYPE_CHECKING,
+    Optional,
+    Callable,
+    TypeGuard,
+)
+from importlib.util import spec_from_file_location, module_from_spec
+from importlib.machinery import ModuleSpec
+from types import ModuleType
 import sys
+
 
 if TYPE_CHECKING:
     import cv2
@@ -21,34 +37,39 @@ def append_if_not_equals(iter: List[T], *, item: T, target: T) -> None:
         iter.append(item)
 
 
-def try_access_path(p: Path):
-    """raises `UserFacingError` on failure"""
-
-    from .schemas import UserFacingError  # keep import contained
+def try_access_path(p: Path) -> stat_result:
+    """
+    will raise `FileNotFoundError`, `OSError`, or `PermissionError`.
+    returns the stat result of the file IF it is accessible.
+    """
 
     if not p.exists():
-        raise UserFacingError(f"'{p}' does not exist.")
+        raise FileNotFoundError(f"'{p}' does not exist.")
+
     try:
-        p.stat()
-        return
-    except (PermissionError, OSError) as e:
-        raise UserFacingError(f"'{p}' is not accessible.") from e
+        return p.stat()  # will raise either `OSError` or `PermissionError`
+    except (OSError, PermissionError) as e:
+        e.add_note(f"'{e}' was found but could not retrieve a stat result.")
+        raise
 
 
 def is_path_accessible(p: Path) -> bool:
-    from .schemas import UserFacingError  # keep import contained
-
     try:
         try_access_path(p)
         return True
-    except UserFacingError:
+    except (OSError, PermissionError, FileNotFoundError):
         return False
 
 
-def tuple_matches_type_tuple(value_tuple: Tuple, type_tuple: Tuple) -> bool:
-    if len(value_tuple) != len(type_tuple):
+TT = TypeVar("TT", bound=Tuple)
+
+
+def tuple_type_matches_known_tuple_type(
+    unknown_tuple: Tuple, known_tuple: TT
+) -> TypeGuard[TT]:
+    if len(unknown_tuple) != len(known_tuple):
         return False
-    return all(isinstance(v, t) for v, t in zip(value_tuple, type_tuple))
+    return all(type(v) == type(t) for v, t in zip(unknown_tuple, known_tuple))
 
 
 def kill_subprocess_cross_platform(pid: int):
@@ -63,25 +84,52 @@ def kill_subprocess_cross_platform(pid: int):
                 child.kill()
             parent.kill()
         except psutil.NoSuchProcess:
-            pass
+            pass  # this requires no exception-raising
 
 
 def write_frame_data_to_npy(
     frame_idx: int, caps: List[cv2.VideoCapture], out_path: Path
 ):
+    """raises `OSError` if `cv2` could not read any frame."""
     import cv2
     import numpy as np
-
-    from .schemas import UserFacingError  # keep import contained
 
     images: List[cv2.typing.MatLike] = []
     for cap in caps:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ret, frame = cap.read()
         if not ret:
-            raise UserFacingError(f"Failed to read frame: {frame_idx}")
+            raise OSError(f"Failed to read frame: '{frame_idx}'")
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # BGR to RGB
         images.append(frame)
 
     stacked = np.stack(images, axis=0)
     np.save(out_path, stacked)
+
+
+def import_module_from_path_dynamic(path: Path) -> ModuleType:
+    """raises `ImportError` if a specification could not be loaded from the given path"""
+    path = path.resolve()
+
+    spec: Optional[ModuleSpec] = spec_from_file_location(path.stem, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from '{path}'")
+
+    module: ModuleType = module_from_spec(spec)
+    sys.modules[path.stem] = module  # add to current sys modules
+    spec.loader.exec_module(module)  # get the
+
+    return module
+
+
+def get_required_function(module: ModuleType, name: str) -> Callable:
+    try:
+        fn = getattr(module, name)
+    except AttributeError as e:
+        e.add_note(f"Module {module.__name__} has no function '{name}'")
+        raise
+
+    if not isinstance(fn, Callable):
+        raise TypeError(f"'{name}' exists but is not callable")
+
+    return fn

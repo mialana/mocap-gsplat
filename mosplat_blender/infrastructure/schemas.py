@@ -1,14 +1,37 @@
+"""
+defines native errors and dataclasses.
+dataclass member methods should raise standard library error types.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, cast, Tuple, TYPE_CHECKING, Union, Callable, Tuple
+from typing import (
+    Dict,
+    List,
+    cast,
+    Tuple,
+    TYPE_CHECKING,
+    Union,
+    Callable,
+    Tuple,
+    Optional,
+    ClassVar,
+)
+from typing_extensions import override
 from dataclasses import dataclass, field, asdict
 import json
 from enum import StrEnum, auto
 from string import capwords
+from abc import ABC
 
 from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX
-from .macros import append_if_not_equals, int_median, is_path_accessible
+from .macros import (
+    append_if_not_equals,
+    int_median,
+    try_access_path,
+    is_path_accessible,
+)
 
 
 if TYPE_CHECKING:
@@ -16,44 +39,61 @@ if TYPE_CHECKING:
     from ..core.properties import Mosplat_PG_MediaIODataset
 
 
-class UserFacingError(RuntimeError):
+class CustomError(ABC, RuntimeError):
+    base_msg: ClassVar[str]
+
+    def __init__(
+        self,
+        custom_msg: str,
+        orig: Optional[BaseException],
+        show_orig_msg: bool,
+    ):
+        orig_type = f" ({type(orig).__name__})" if orig else ""
+        msg = f": {custom_msg}" if custom_msg else ""
+        orig_msg = (
+            f"\nORIGINAL ERROR MSG: {str(orig)}" if orig and show_orig_msg else ""
+        )
+        super().__init__(f"{self.base_msg}{orig_type}{msg}{orig_msg}")
+
+
+class UserFacingError(CustomError):
     """a custom `RuntimeError` for errors that are user-caused and user-facing (i.e. should be visible to user)."""
 
-    def __init__(self, msg: str = ""):
-        self.message = "USER ERROR"
-        if msg != "":
-            self.message += f": {msg}"
-        super().__init__(self.message)
+    base_msg: ClassVar[str] = "USER ERROR"
+
+    @override
+    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
+        super().__init__(custom_msg, orig, show_orig_msg)
 
 
-class DeveloperError(RuntimeWarning):
+class DeveloperError(CustomError):
     """a custom `RuntimeError` for developer logic errors."""
 
-    def __init__(self, msg: str = ""):
-        self.message = f"Developer error (you are doing something wrong)"  # you = I
-        if msg != "":
-            self.message += f": {msg}"
-        super().__init__(self.message)
+    base_msg: ClassVar[str] = "Developer error (you are doing something wrong)"
+
+    @override
+    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
+        super().__init__(custom_msg, orig, show_orig_msg)
 
 
-class UnexpectedError(RuntimeError):
+class UnexpectedError(CustomError):
     """a custom `RuntimeError` for errors that actually should never occur."""
 
-    def __init__(self, msg: str = ""):
-        self.message = f"Something went wrong"
-        if msg != "":
-            self.message += f": {msg}"
-        super().__init__(self.message)
+    base_msg: ClassVar[str] = "Something went wrong"
+
+    @override
+    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
+        super().__init__(custom_msg, orig, show_orig_msg)
 
 
-class SafeError(RuntimeError):
+class SafeError(CustomError):
     """a custom `RuntimeError` for errors that are real but are safe."""
 
-    def __init__(self, msg: str = ""):
-        self.message = f"A safe error occured"
-        if msg != "":
-            self.message += f": {msg}"
-        super().__init__(self.message)
+    base_msg: ClassVar[str] = f"A non-fatal error occured"
+
+    @override
+    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
+        super().__init__(custom_msg, orig, show_orig_msg)
 
 
 """Enum Convenience Classes"""
@@ -136,9 +176,7 @@ class AppliedPreprocessScript:
     @classmethod
     def from_script_path(cls, script_path: str) -> AppliedPreprocessScript:
         script_filepath = Path(script_path)
-        if not is_path_accessible(script_filepath):
-            raise UserFacingError(f"Script path does not exist: '{script_path}'")
-        stat = script_filepath.stat()
+        stat = try_access_path(script_filepath)
 
         return cls(
             script_path=script_path, mod_time=stat.st_mtime, file_size=stat.st_size
@@ -230,7 +268,7 @@ class MediaFileStatus:
         cap = cv2.VideoCapture(self.filepath)
         if not cap.isOpened():
             self.mark_invalid()
-            raise UserFacingError(f"Could not open media file: '{self.filepath}'")
+            raise OSError(f"Could not open media file: '{self.filepath}'")
 
         stat = Path(self.filepath).stat()
 

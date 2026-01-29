@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, List
+from typing import Tuple, List, NamedTuple
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -20,8 +20,7 @@ from ...infrastructure.schemas import (
 from ...infrastructure.decorators import worker_fn_auto
 
 
-@dataclass(frozen=True)
-class ThreadKwargs:
+class ThreadKwargs(NamedTuple):
     updated_media_files: List[Path]
     dataset_as_dc: MediaIODataset
 
@@ -42,7 +41,7 @@ class Mosplat_OT_validate_media_file_statuses(
             self._media_files: List[Path] = props.media_files(prefs)
             return self.execute(context)
         except UserFacingError as e:
-            self.logger().error(str(e))
+            self.logger.error(str(e))
             return {"CANCELLED"}
 
     def contexted_execute(self, context) -> OperatorReturnItemsSet:
@@ -62,7 +61,7 @@ class Mosplat_OT_validate_media_file_statuses(
             return
 
         # branch on `is_ok`
-        self.logger().info(msg) if is_ok else self.logger().warning(msg)
+        self.logger.info(msg) if is_ok else self.logger.warning(msg)
 
         # sync props regardless as the updated dataclass is still valid
         self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
@@ -85,7 +84,7 @@ class Mosplat_OT_validate_media_file_statuses(
             if status.needs_reextraction(dataset=dataset_as_dc):
                 try:
                     status.extract_from_filepath()  # fill out the dataclass from set filepath
-                except UserFacingError as e:
+                except OSError as e:
                     queue_item = (False, str(e))  # change queue item and give error msg
 
             accumulator(status)  # update dataset from new status
