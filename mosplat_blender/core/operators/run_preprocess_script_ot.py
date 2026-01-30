@@ -5,8 +5,6 @@ from pathlib import Path
 
 from .base_ot import MosplatOperatorBase
 
-from ..handlers import restore_dataset_from_json
-
 from ...infrastructure.schemas import OperatorIDEnum, MediaIODataset
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import RAW_FRAME_DIRNAME
@@ -35,8 +33,6 @@ class Mosplat_OT_run_preprocess_script(
     def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
         props = pkg.props
-
-        restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
         self._preprocess_script = prefs.preprocess_media_script_filepath
         self._npy_filepaths: List[Path] = props.frame_range_npy_filepaths(

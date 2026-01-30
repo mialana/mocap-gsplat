@@ -4,7 +4,6 @@ from typing import Tuple, List, NamedTuple
 from pathlib import Path
 
 from .base_ot import MosplatOperatorBase
-from ..handlers import restore_dataset_from_json
 
 from ...infrastructure.schemas import (
     OperatorIDEnum,
@@ -28,8 +27,6 @@ class Mosplat_OT_validate_media_file_statuses(
     def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
         props = pkg.props
-
-        restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)

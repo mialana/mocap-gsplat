@@ -9,6 +9,7 @@ import contextlib
 from queue import Queue
 import threading
 
+from ..handlers import load_dataset_property_group_from_json
 from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
@@ -29,6 +30,9 @@ if TYPE_CHECKING:
     OpResultTuple: TypeAlias = Union[Tuple[OpResult, ...], OpResult]
 
     OpResultSetLike: TypeAlias = Union[OpResultTuple, OpResultSet]
+
+    from ..preferences import Mosplat_AP_Global
+    from ..properties import Mosplat_PG_Global
 
 Q = TypeVar("Q")  # the type of the elements in worker queue, if used
 K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
@@ -83,11 +87,11 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         return True  # if not overriden will return true
 
     def invoke(self, context, event) -> OpResultSet:
-        self.__invoke_called = True
-
         pkg = self.package(context)
         with self.CLEANUP_MANAGER(pkg):
             try:
+                self.__load_global_data(pkg.prefs, pkg.props)
+
                 wrapped_result: Final = im_to_set(self._contexted_invoke(pkg, event))
                 # if not implemented run and return execute
                 return wrapped_result
@@ -109,9 +113,6 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         return self.execute_with_package(self.package(context))
 
     def execute_with_package(self, pkg: CtxPackage) -> OpResultSet:
-        props = pkg.props
-        # set `data` property before execution
-        self.data = props.dataset_accessor.to_dataclass()
         with self.CLEANUP_MANAGER(pkg):
             try:
                 wrapped_result: Final = im_to_set(self._contexted_execute(pkg))
@@ -122,11 +123,10 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
                     e,
                 )
                 self.logger.error(msg)
-
                 self.cleanup(pkg)
                 return {"FINISHED"}  # finish because blender props changed
 
-            if not {"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result:  # intersection
+            if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result):  # intersection
                 self.cleanup(pkg)  # cleanup if not a modal operator
             return wrapped_result
 
@@ -155,7 +155,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
     def _contexted_modal(self, pkg: CtxPackage, event: Event) -> OpResultTuple:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
         if not self.worker:
-            self.logger.info("Modal callbacks stopped.")
+            self.logger.debug("Modal callbacks stopped.")
             return "FINISHED"
 
         if (next := self.worker.dequeue()) is not None:
@@ -193,7 +193,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
             self.worker = None
             self.logger.debug("Worker cleaned up")
 
-        self.data = None  # data is not guaranteed to be in-sync anymore
+        self.__data = None  # data is not guaranteed to be in-sync anymore
         self.logger.info("Operator cleaned up")
 
     @staticmethod
@@ -216,10 +216,11 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         try:
             yield
         except BaseException as e:
-            dev_err = DeveloperError("Uncaught exception during operator lifetime.", e)
-            self.logger.exception(str(dev_err))
+            msg = DeveloperError.make_msg(
+                "Uncaught exception during operator lifetime.", e
+            )
+            self.logger.exception(msg)
             self.cleanup(pkg)  # cleanup here
-            raise dev_err from e
 
     """instance properties backed by mangled class attributes"""
 
@@ -241,20 +242,25 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
 
     @property
     def data(self) -> MediaIODataset:
-        """dataset property group as a dataclass"""
+        """dataset property group as a dataclass."""
         if self.__data is None:
-            raise DeveloperError(
-                "Dataset as dataclass not available in this scope."
-                "Correct usage is to call setter beforehand."
-            )
+            raise DeveloperError("Dataset as dataclass not available in this scope.")
         else:
             return self.__data
-
-    @data.setter
-    def data(self, mta: Optional[MediaIODataset]):
-        self.__data = mta
 
     def wm(self, context: Context) -> WindowManager:
         if not (wm := context.window_manager):
             raise UnexpectedError("Poll-guard failed for window manager.")
         return wm
+
+    def __load_global_data(self, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
+        # try to restore both dataclass and property group from local JSON
+        # mangle so that only base class can access
+        try:
+            self.__data, load_msg = load_dataset_property_group_from_json(props, prefs)
+            self.logger.info(load_msg)  # log the load message
+        except UserWarning as e:  # raised if filesystem permission errors
+            self.__data = None
+            raise UserFacingError(
+                "Operator cannot continue with insufficient permissions.", e
+            ) from e

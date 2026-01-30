@@ -11,7 +11,6 @@ from ...infrastructure.schemas import (
     MediaIODataset,
     ProcessedFrameRange,
 )
-from ..handlers import restore_dataset_from_json
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
 
@@ -40,8 +39,6 @@ class Mosplat_OT_extract_frame_range(
     def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
         props = pkg.props
-
-        restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)

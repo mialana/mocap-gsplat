@@ -25,7 +25,7 @@ from enum import StrEnum, auto
 from string import capwords
 from abc import ABC
 
-from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX, _MISSING_
+from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX
 from .macros import (
     append_if_not_equals,
     int_median,
@@ -312,19 +312,28 @@ class MediaIODataset:
     media_file_statuses: List[MediaFileStatus] = field(default_factory=list)
     processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)
 
+    def load_from_dict(self, d: Dict) -> None:
+        """mutates an instance with data from a dict"""
+        self.base_directory = d["base_directory"]
+        self.is_valid_media_directory = d["is_valid_media_directory"]
+        self.median_frame_count = d["median_frame_count"]
+        self.median_width = d["median_width"]
+        self.median_height = d["median_height"]
+
+        self.media_file_statuses = [
+            MediaFileStatus.from_dict(cast(Dict, m))
+            for m in d.get("media_file_statuses", [])
+        ]
+
+        self.processed_frame_ranges = [
+            ProcessedFrameRange.from_dict(cast(Dict, p))
+            for p in d.get("processed_frame_ranges", [])
+        ]
+
     @classmethod
     def from_dict(cls, d: Dict) -> MediaIODataset:
-        instance = cls(**d)
-        instance.media_file_statuses = [
-            MediaFileStatus.from_dict(
-                cast(Dict, m)
-            )  # note that the underlying structure of `m` is still a dict after `cls(**d)`
-            for m in instance.media_file_statuses
-        ]
-        instance.processed_frame_ranges = [
-            ProcessedFrameRange.from_dict(cast(Dict, p))
-            for p in instance.processed_frame_ranges
-        ]
+        instance = cls(base_directory=d["base_directory"])
+        instance.load_from_dict(d)
         return instance
 
     def to_JSON(self, dest_path: Path):
@@ -334,18 +343,35 @@ class MediaIODataset:
         with dest_path.open("w", encoding="utf-8") as f:
             json.dump(as_dict, f, sort_keys=True, indent=4)
 
+    def load_from_JSON(self, *, json_path: Path) -> str:
+        try:
+            try_access_path(json_path)  # do not catch `OSError` and `PermissionError`
+        except FileNotFoundError as e:
+            return str(e)  # the file not existing is fine.
+        except (OSError, PermissionError) as e:
+            e.add_note(
+                "A permission error occured while trying to restore the cached data."
+                "Please double-check your machine's file system permissions before continuing."
+            )
+            raise UserWarning from e  # try to stick with native error classes here
+
+        try:
+            with json_path.open("r", encoding="utf-8") as f:
+                data: Dict = json.load(f)
+            self.load_from_dict(data)
+            return f"Cached data successfully loaded from '{json_path}'."
+
+        except (TypeError, json.JSONDecodeError):
+            json_path.unlink()  # delete the corrupted cached JSON
+            return f"The data cache existed at '{json_path}' but could not be loaded. Deleted the file and will build a new dataset from scratch."
+
     @classmethod
-    def from_JSON(cls, *, json_path: Path, base_directory: Path) -> MediaIODataset:
-        if is_path_accessible(json_path):
-            try:
-                with json_path.open("r", encoding="utf-8") as f:
-                    data: Dict = json.load(f)
-
-                return cls.from_dict(data)
-            except (TypeError, json.JSONDecodeError):
-                json_path.unlink()  # delete the corrupted JSON
-
-        return cls(base_directory=str(base_directory))
+    def from_JSON(
+        cls, *, json_path: Path, base_directory: Path
+    ) -> Tuple[MediaIODataset, str]:
+        instance = cls(base_directory=str(base_directory))
+        load_msg = instance.load_from_JSON(json_path=json_path)
+        return (instance, load_msg)
 
     def synchronize_to_medians(self):
         _frame_counts: List[int] = []

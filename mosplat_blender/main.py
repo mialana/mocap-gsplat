@@ -12,8 +12,8 @@ from .interfaces import MosplatLoggingInterface
 
 from .core.checks import check_addonpreferences
 from .core.handlers import (
-    handle_restore_from_json,
-    handle_restore_from_json_timer_entrypoint,
+    handle_load_from_json,
+    handle_load_from_json_timer_entrypoint,
     handle_save_to_json,
 )
 
@@ -66,8 +66,8 @@ def register_addon():
     MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
 
     # try load from JSON every file load and after registration occurs
-    bpy.app.handlers.load_post.append(handle_restore_from_json)
-    bpy.app.timers.register(handle_restore_from_json_timer_entrypoint, first_interval=0)
+    bpy.app.handlers.load_post.append(handle_load_from_json)
+    bpy.app.timers.register(handle_load_from_json_timer_entrypoint, first_interval=0)
 
     bpy.app.handlers.undo_post.append(handle_save_to_json)
     bpy.app.handlers.redo_post.append(handle_save_to_json)
@@ -96,6 +96,6 @@ def unregister_addon():
     except UnexpectedError as e:
         logger.error(f"Error during VGGT cleanup: {str(e)}")
 
-    bpy.app.handlers.load_post.remove(handle_restore_from_json)
+    bpy.app.handlers.load_post.remove(handle_load_from_json)
 
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon unregistration completed.")
