@@ -11,7 +11,6 @@ from ...infrastructure.schemas import (
     MediaIODataset,
     ProcessedFrameRange,
 )
-from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
 
 
@@ -50,10 +49,9 @@ class Mosplat_OT_extract_frame_range(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        self._operator_thread(
-            self,
+        self.launch_thread(
             pkg.context,
-            _kwargs=ThreadKwargs(
+            twargs=ThreadKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 npy_fp_generator=self._npy_filepath_generator,
@@ -76,15 +74,14 @@ class Mosplat_OT_extract_frame_range(
         return "RUNNING_MODAL"
 
     @staticmethod
-    @worker_fn_auto
-    def _operator_thread(queue, cancel_event, *, _kwargs):
+    def _operator_thread(queue, cancel_event, *, twargs):
         import cv2
 
-        start, _ = _kwargs.frame_range
+        start, _ = twargs.frame_range
         caps: List[cv2.VideoCapture] = []
 
         try:
-            for media in _kwargs.updated_media_files:
+            for media in twargs.updated_media_files:
                 cap = cv2.VideoCapture(str(media))
                 if not cap.isOpened():
                     raise UserFacingError(f"Could not open media file: {media}")
@@ -92,9 +89,9 @@ class Mosplat_OT_extract_frame_range(
 
             # create a new frame range with both limits at start
             new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
-            _kwargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
+            twargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
 
-            for idx, npy_filepath in enumerate(_kwargs.npy_fp_generator):
+            for idx, npy_filepath in enumerate(twargs.npy_fp_generator):
                 if cancel_event.is_set():
                     return
 

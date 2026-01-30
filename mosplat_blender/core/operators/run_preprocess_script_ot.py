@@ -42,10 +42,9 @@ class Mosplat_OT_run_preprocess_script(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        self._operator_thread(
-            self,
+        self.launch_thread(
             pkg.context,
-            _kwargs=ThreadKwargs(
+            twargs=ThreadKwargs(
                 preprocess_script=self._preprocess_script,
                 raw_npy_filepaths=self._npy_filepaths,
                 dataset_as_dc=self.data,
@@ -67,9 +66,8 @@ class Mosplat_OT_run_preprocess_script(
         return "RUNNING_MODAL"
 
     @staticmethod
-    @worker_fn_auto
-    def _operator_thread(queue, cancel_event, *, _kwargs):
-        preprocess_script = _kwargs.preprocess_script
+    def _operator_thread(queue, cancel_event, *, twargs):
+        preprocess_script = twargs.preprocess_script
 
-        for fp in _kwargs.raw_npy_filepaths:
+        for fp in twargs.raw_npy_filepaths:
             pass

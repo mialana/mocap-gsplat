@@ -13,7 +13,6 @@ from ...infrastructure.macros import (
     kill_subprocess_cross_platform,
 )
 from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
-from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import (
     DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
     _TIMEOUT_INTERVAL_,
@@ -122,10 +121,9 @@ class Mosplat_OT_initialize_model(
 
         self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
-        self._operator_thread(
-            self,
+        self.launch_thread(
             pkg.context,
-            _kwargs=ThreadKwargs(
+            twargs=ThreadKwargs(
                 proc=self._proc,
                 hf_id=prefs.vggt_hf_id,
                 model_cache_dir=prefs.vggt_model_dir,
@@ -160,10 +158,9 @@ class Mosplat_OT_initialize_model(
         return super().cleanup(pkg)
 
     @staticmethod
-    @worker_fn_auto
-    def _operator_thread(queue, cancel_event, *, _kwargs):
+    def _operator_thread(queue, cancel_event, *, twargs):
         try:
-            _wait_and_update_queue_loop(_kwargs.proc, queue)
+            _wait_and_update_queue_loop(twargs.proc, queue)
         except (subprocess.CalledProcessError, UnexpectedError) as e:
             # put on queue to stop modal just in case, though it probably will not be read
             queue.put(("error", -1, -1, str(e)))
@@ -175,7 +172,7 @@ class Mosplat_OT_initialize_model(
 
         try:
             MosplatVGGTInterface.initialize_model(
-                _kwargs.hf_id, _kwargs.model_cache_dir, cancel_event
+                twargs.hf_id, twargs.model_cache_dir, cancel_event
             )
 
             queue.put(("done", -1, -1, "Successfully downloaded & init VGGT model!"))

@@ -33,10 +33,9 @@ class Mosplat_OT_validate_media_file_statuses(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        self._operator_thread(
-            self,
+        self.launch_thread(
             pkg.context,
-            _kwargs=ThreadKwargs(
+            twargs=ThreadKwargs(
                 updated_media_files=self._media_files, dataset_as_dc=self.data
             ),
         )
@@ -56,12 +55,11 @@ class Mosplat_OT_validate_media_file_statuses(
         return "RUNNING_MODAL"
 
     @staticmethod
-    @worker_fn_auto
-    def _operator_thread(queue, cancel_event, *, _kwargs):
-        dataset_as_dc = _kwargs.dataset_as_dc
+    def _operator_thread(queue, cancel_event, *, twargs):
+        dataset_as_dc = twargs.dataset_as_dc
         status_lookup, accumulator = dataset_as_dc.status_accumulator()
 
-        for file in _kwargs.updated_media_files:
+        for file in twargs.updated_media_files:
             if cancel_event.is_set():
                 return  # simply return as new queue items will not be read anymore
             queue_item = (True, f"Validated media file: '{file}'")

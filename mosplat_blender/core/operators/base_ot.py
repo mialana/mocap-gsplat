@@ -3,17 +3,19 @@ from __future__ import annotations
 from bpy.types import Context, WindowManager, Timer, Event, Operator
 
 from typing import TYPE_CHECKING, Optional, Union, TypeVar, ClassVar, TypeAlias, Final
-from typing import List, Set, Tuple, NamedTuple, Generic
+from typing import List, Set, Tuple, NamedTuple, Generic, Unpack
 
 import contextlib
 from queue import Queue
 import threading
+from functools import partial
 
 from ..handlers import load_dataset_property_group_from_json
 from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
 from ...infrastructure.decorators import worker_fn_auto
+from ...infrastructure.constants import _TIMER_INTERVAL_
 from ...infrastructure.schemas import (
     UnexpectedError,
     DeveloperError,
@@ -148,6 +150,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         with self.CLEANUP_MANAGER(pkg):
             wrapped_result: Final = im_to_set(self._contexted_modal(pkg, event))
             if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result) and self.worker:
+                self.logger.debug("Modal callbacks stopped.")
                 # cleanup if a non-looping result was returned and worker is not None
                 self.cleanup(pkg)
             return wrapped_result
@@ -155,7 +158,6 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
     def _contexted_modal(self, pkg: CtxPackage, event: Event) -> OpResultTuple:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
         if not self.worker:
-            self.logger.debug("Modal callbacks stopped.")
             return "FINISHED"
 
         if (next := self.worker.dequeue()) is not None:
@@ -196,14 +198,22 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         self.__data = None  # data is not guaranteed to be in-sync anymore
         self.logger.info("Operator cleaned up")
 
+    def launch_thread(self, context: Context, *, twargs: K):
+        """`twargs` as in keyword args made of a immutable tuple"""
+
+        worker_fn = partial(self._operator_thread, twargs=twargs)
+
+        self.worker = MosplatWorkerInterface(worker_fn)
+        self.worker.start()
+
+        wm = self.wm(context)
+        self.timer = wm.event_timer_add(
+            time_step=_TIMER_INTERVAL_, window=context.window
+        )
+        wm.modal_handler_add(self)
+
     @staticmethod
-    @worker_fn_auto
-    def _operator_thread(
-        queue: Queue[Q],
-        cancel_event: threading.Event,
-        *,
-        _kwargs: K,
-    ):
+    def _operator_thread(queue: Queue[Q], cancel_event: threading.Event, *, twargs: K):
         """
         this function is required IF it's a modal operator.
         otherwise, the `NotImplementedError` pathway will never be seen.
