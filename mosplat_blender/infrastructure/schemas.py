@@ -347,6 +347,7 @@ class MediaIODataset:
         try:
             try_access_path(json_path)  # do not catch `OSError` and `PermissionError`
         except FileNotFoundError as e:
+            e.add_note("Dataclasses fields will stay as is.")
             return str(e)  # the file not existing is fine.
         except (OSError, PermissionError) as e:
             e.add_note(

@@ -2,23 +2,12 @@
 
 from __future__ import annotations
 
-from functools import wraps, partial
-from typing import Callable, ParamSpec, TypeVar, Type, Concatenate, TYPE_CHECKING
-
-from queue import Queue
-from threading import Event as ThreadingEvent
-
+from functools import wraps
+from typing import Callable, ParamSpec, TypeVar, Type
 from .schemas import DeveloperError
-from .constants import _TIMER_INTERVAL_
-
-if TYPE_CHECKING:
-    from ..core.operators import MosplatOperatorBase
-    from bpy.types import Context
 
 
-P = ParamSpec(
-    "P"
-)  # maintains original callable's signature for `run_once` and `worker_fn`
+P = ParamSpec("P")  # maintains original callable's signature for `run_once`
 R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
 T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
 
@@ -53,32 +42,3 @@ def no_instantiate(cls: T) -> T:
 
     cls.__new__ = staticmethod(__new__)
     return cls
-
-
-def worker_fn_auto(
-    fn: Callable[Concatenate[Queue, ThreadingEvent, P], None],
-) -> Callable[Concatenate[MosplatOperatorBase, Context, P], None]:
-    """a decorator that creates a closure of the worker creation and other abstractable setup"""
-
-    from ..interfaces import MosplatWorkerInterface  # local import
-
-    @wraps(fn)
-    def wrapper(
-        self: MosplatOperatorBase,
-        context: Context,
-        /,
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ):
-
-        self.worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
-        self.worker.start()
-
-        wm = self.wm(context)
-
-        self.timer = wm.event_timer_add(
-            time_step=_TIMER_INTERVAL_, window=context.window
-        )
-        wm.modal_handler_add(self)
-
-    return wrapper

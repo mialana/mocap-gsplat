@@ -10,7 +10,6 @@ from ...infrastructure.schemas import (
     MediaIODataset,
     MediaFileStatus,
 )
-from ...infrastructure.decorators import worker_fn_auto
 
 
 class ThreadKwargs(NamedTuple):
@@ -48,7 +47,7 @@ class Mosplat_OT_validate_media_file_statuses(
             return "FINISHED"
 
         # branch on `is_ok`
-        self.logger.info(msg) if is_ok else self.logger.warning(msg)
+        self.info(msg) if is_ok else self.warn(msg)
 
         # sync props from the dataclass that was updated within the thread
         pkg.props.dataset_accessor.from_dataclass(self.data)

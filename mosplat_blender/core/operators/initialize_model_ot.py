@@ -64,19 +64,19 @@ class Mosplat_OT_initialize_model(
 
             wm.progress_update(current)
             props.operator_progress_current = current
-            self.logger.debug(f"{current} / {total}")
+            self.debug(f"{current} / {total}")
         else:
             fmt = f"QUEUE {status.upper()} - {msg}"
             if status == "error":
-                self.logger.error(fmt)
+                self.error(fmt, "modal")
                 return "FINISHED"  # return finished as blender data has been modified
 
             elif status == "warning":
-                self.logger.warning(fmt)
+                self.warn(fmt)
             elif status == "debug":
-                self.logger.debug(fmt)
+                self.debug(fmt)
             else:
-                self.logger.info(fmt)
+                self.info(fmt)
             if status == "done":
                 return "FINISHED"  # finish
         return "RUNNING_MODAL"
@@ -119,7 +119,7 @@ class Mosplat_OT_initialize_model(
             preexec_fn=getattr(os, "setsid", None),  # TODO: cross-platform check
         )
 
-        self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
+        self.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
         self.launch_thread(
             pkg.context,

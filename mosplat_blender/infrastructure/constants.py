@@ -10,16 +10,26 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-from typing import Any, Final, TYPE_CHECKING, TypeAlias, Set, Optional, Tuple
+from typing import Any, Final, TypeAlias, Literal, Dict, TYPE_CHECKING, Set
 from pathlib import Path
 from string import capwords
 import tempfile
+
+if TYPE_CHECKING:
+    from bpy.stub_internal.rna_enums import WmReportItems
 
 
 _MISSING_: Any = object()  # sentinel variable
 
 _TIMER_INTERVAL_: Final[float] = 0.1
 _TIMEOUT_INTERVAL_: Final[float] = 15.0  # amount of time to wait before timeout
+
+OPERATOR_FRAME: TypeAlias = Literal["invoke", "execute", "modal"]
+OPERATOR_ERROR_MAP: Final[Dict[OPERATOR_FRAME, Set[WmReportItems]]] = {
+    "invoke": {"ERROR_INVALID_INPUT", "PROPERTY"},
+    "execute": {"ERROR_INVALID_CONTEXT"},
+    "modal": {"ERROR"},
+}
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {

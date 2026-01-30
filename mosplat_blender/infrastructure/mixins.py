@@ -168,9 +168,7 @@ class MosplatBlPropertyAccessorMixin(
 ):
     """a mixin class for easier access to Blender properties' RNA"""
 
-    from bpy.types import BlenderRNA  # local import
-
-    bl_rna: BlenderRNA = _MISSING_
+    bl_rna: ClassVar
 
     @classmethod
     def get_prop_name(cls, prop_attrname: str) -> str:

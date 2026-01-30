@@ -6,7 +6,6 @@ from pathlib import Path
 from .base_ot import MosplatOperatorBase
 
 from ...infrastructure.schemas import OperatorIDEnum, MediaIODataset
-from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import RAW_FRAME_DIRNAME
 
 
@@ -58,7 +57,7 @@ class Mosplat_OT_run_preprocess_script(
             return "FINISHED"
 
         if next != "update":  # if sent an error message via queue
-            self.logger.warning(next)
+            self.warn(next)
 
         # sync props regardless as the updated dataclass is still valid
         pkg.props.dataset_accessor.from_dataclass(self.data)
