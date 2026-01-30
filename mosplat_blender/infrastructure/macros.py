@@ -59,7 +59,7 @@ def try_access_path(p: Path) -> stat_result:
     try:
         return p.stat()  # will raise either `OSError` or `PermissionError`
     except (OSError, PermissionError) as e:
-        e.add_note(f"'{e}' was found but could not retrieve a stat result.")
+        e.add_note(f"NOTE: '{e}' was found but could not retrieve a stat result.")
         raise
 
 
@@ -133,7 +133,7 @@ def get_required_function(module: ModuleType, name: str) -> Callable:
     try:
         fn = getattr(module, name)
     except AttributeError as e:
-        e.add_note(f"Module {module.__name__} has no function '{name}'")
+        e.add_note(f"NOTE: Module {module.__name__} has no function '{name}'")
         raise
 
     if not isinstance(fn, Callable):

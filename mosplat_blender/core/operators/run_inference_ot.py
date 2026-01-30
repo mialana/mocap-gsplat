@@ -11,5 +11,5 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
 
     _poll_error_msg_list: ClassVar[List[str]] = []
 
-    def contexted_execute(self, pkg):
+    def _contexted_execute(self, pkg):
         return "FINISHED"

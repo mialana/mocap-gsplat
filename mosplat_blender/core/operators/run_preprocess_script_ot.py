@@ -23,17 +23,16 @@ class Mosplat_OT_run_preprocess_script(
 ):
     bl_idname = OperatorIDEnum.RUN_PREPROCESS_SCRIPT
     bl_description = "Run current preprocess script on current frame range."
-    _requires_invoke_before_execute = True
 
     @classmethod
-    def contexted_poll(cls, pkg) -> bool:
+    def _contexted_poll(cls, pkg) -> bool:
         props = pkg.props
         cls._poll_error_msg_list.extend(props.is_valid_media_directory_poll_result)
         cls._poll_error_msg_list.extend(props.frame_range_poll_result(pkg.prefs))
 
         return len(cls._poll_error_msg_list) == 0
 
-    def contexted_invoke(self, pkg, event):
+    def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
         props = pkg.props
 
@@ -46,8 +45,8 @@ class Mosplat_OT_run_preprocess_script(
 
         return self.execute_with_package(pkg)
 
-    def contexted_execute(self, pkg):
-        self.operator_thread(
+    def _contexted_execute(self, pkg):
+        self._operator_thread(
             self,
             pkg.context,
             _kwargs=ThreadKwargs(
@@ -59,7 +58,7 @@ class Mosplat_OT_run_preprocess_script(
 
         return "RUNNING_MODAL"
 
-    def queue_callback(self, pkg, event, next):
+    def _queue_callback(self, pkg, event, next):
         if next == "done":
             return "FINISHED"
 
@@ -69,11 +68,11 @@ class Mosplat_OT_run_preprocess_script(
         # sync props regardless as the updated dataclass is still valid
         pkg.props.dataset_accessor.from_dataclass(self.data)
 
-        return ("RUNNING_MODAL", "PASS_THROUGH")
+        return "RUNNING_MODAL"
 
     @staticmethod
     @worker_fn_auto
-    def operator_thread(queue, cancel_event, *, _kwargs):
+    def _operator_thread(queue, cancel_event, *, _kwargs):
         preprocess_script = _kwargs.preprocess_script
 
         for fp in _kwargs.raw_npy_filepaths:

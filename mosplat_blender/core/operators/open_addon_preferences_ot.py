@@ -12,7 +12,7 @@ class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
         f"Quick navigation to '{ADDON_HUMAN_READABLE}' saved addon preferences."
     )
 
-    def contexted_execute(self, pkg):
+    def _contexted_execute(self, pkg):
         context = pkg.context
 
         bpy.ops.screen.userpref_show()

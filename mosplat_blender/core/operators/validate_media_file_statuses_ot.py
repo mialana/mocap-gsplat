@@ -24,9 +24,8 @@ class Mosplat_OT_validate_media_file_statuses(
 ):
     bl_idname = OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES
     bl_description = "Check frame count, width, and height of all media files found in current media directory."
-    _requires_invoke_before_execute = True
 
-    def contexted_invoke(self, pkg, event):
+    def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
         props = pkg.props
 
@@ -36,8 +35,8 @@ class Mosplat_OT_validate_media_file_statuses(
         self._media_files: List[Path] = props.media_files(prefs)
         return self.execute_with_package(pkg)
 
-    def contexted_execute(self, pkg):
-        self.operator_thread(
+    def _contexted_execute(self, pkg):
+        self._operator_thread(
             self,
             pkg.context,
             _kwargs=ThreadKwargs(
@@ -47,7 +46,7 @@ class Mosplat_OT_validate_media_file_statuses(
 
         return "RUNNING_MODAL"
 
-    def queue_callback(self, pkg, event, next):
+    def _queue_callback(self, pkg, event, next):
         is_ok, msg = next
         if msg == "done":
             return "FINISHED"
@@ -57,11 +56,11 @@ class Mosplat_OT_validate_media_file_statuses(
 
         # sync props from the dataclass that was updated within the thread
         pkg.props.dataset_accessor.from_dataclass(self.data)
-        return ("RUNNING_MODAL", "PASS_THROUGH")
+        return "RUNNING_MODAL"
 
     @staticmethod
     @worker_fn_auto
-    def operator_thread(queue, cancel_event, *, _kwargs):
+    def _operator_thread(queue, cancel_event, *, _kwargs):
         dataset_as_dc = _kwargs.dataset_as_dc
         status_lookup, accumulator = dataset_as_dc.status_accumulator()
 

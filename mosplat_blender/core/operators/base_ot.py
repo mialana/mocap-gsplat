@@ -36,10 +36,10 @@ K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
 
 class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
     bl_category: ClassVar[str] = OperatorIDEnum._category()
-    __id_enum_type__ = OperatorIDEnum
-    _requires_invoke_before_execute: ClassVar[bool] = False
+    bl_options = {"REGISTER", "UNDO"}  # all of our operators should support undo
 
-    __invoke_called = False
+    __id_enum_type__ = OperatorIDEnum
+
     __worker: Optional[MosplatWorkerInterface[Q]] = None
     __timer: Optional[Timer] = None
     __data: Optional[MediaIODataset] = None
@@ -70,7 +70,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         except UserFacingError as e:
             cls._poll_error_msg_list.append(str(e))
 
-        wrapped_result = cls.contexted_poll(cls.package(context))
+        wrapped_result = cls._contexted_poll(cls.package(context))
 
         if len(cls._poll_error_msg_list) > 0:  # set the poll msg based on the list
             cls.poll_message_set("\n".join(cls._poll_error_msg_list))
@@ -78,7 +78,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         return wrapped_result
 
     @classmethod
-    def contexted_poll(cls, pkg: CtxPackage) -> bool:
+    def _contexted_poll(cls, pkg: CtxPackage) -> bool:
         """an overrideable entrypoint for `poll` with access to prefs and props"""
         return True  # if not overriden will return true
 
@@ -88,7 +88,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         pkg = self.package(context)
         with self.CLEANUP_MANAGER(pkg):
             try:
-                wrapped_result: Final = im_to_set(self.contexted_invoke(pkg, event))
+                wrapped_result: Final = im_to_set(self._contexted_invoke(pkg, event))
                 # if not implemented run and return execute
                 return wrapped_result
             except UserFacingError as e:  # all errs here are expected to be user-facing
@@ -96,9 +96,9 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
                 self.logger.error(str(e))  # TODO: decide if needs to be `exception`
 
                 self.cleanup(pkg)
-                return {"CANCELLED"}
+                return {"FINISHED"}  # return finished as blender data was modified
 
-    def contexted_invoke(self, pkg: CtxPackage, event: Event) -> OpResultSetLike:
+    def _contexted_invoke(self, pkg: CtxPackage, event: Event) -> OpResultSetLike:
         """
         an overrideable entrypoint for `execute` that ensures context is available as a property
         so that subsequently `props` and `prefs` properties can be accessed
@@ -109,21 +109,28 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         return self.execute_with_package(self.package(context))
 
     def execute_with_package(self, pkg: CtxPackage) -> OpResultSet:
-        if self.__class__._requires_invoke_before_execute and not self.__invoke_called:
-            self.logger.error("This operator requires invocation before execution.")
-            self.cleanup(pkg)
-            return {"CANCELLED"}
-
         props = pkg.props
         # set `data` property before execution
         self.data = props.dataset_accessor.to_dataclass()
         with self.CLEANUP_MANAGER(pkg):
-            wrapped_result: Final = im_to_set(self.contexted_execute(pkg))
+            try:
+                wrapped_result: Final = im_to_set(self._contexted_execute(pkg))
+            except AttributeError as e:
+                msg = UserFacingError.make_msg(
+                    "This error occured during operator execution."
+                    "Are you aware this operator requires invocation before execution?",
+                    e,
+                )
+                self.logger.error(msg)
+
+                self.cleanup(pkg)
+                return {"FINISHED"}  # finish because blender props changed
+
             if not {"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result:  # intersection
                 self.cleanup(pkg)  # cleanup if not a modal operator
             return wrapped_result
 
-    def contexted_execute(self, pkg: CtxPackage) -> OpResultTuple:
+    def _contexted_execute(self, pkg: CtxPackage) -> OpResultTuple:
         """
         an overrideable entrypoint for `execute` that ensures context is available as a property
         so that subsequently `props` and `prefs` properties can be accessed
@@ -132,33 +139,35 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
 
     def modal(self, context, event) -> OpResultSet:
         pkg = self.package(context)
-        if event.type in {"RIGHTMOUSE", "ESC"} or (
-            self.worker is not None and self.worker.was_cancelled()
-        ):
+        if event.type in {"ESC"}:
+            self.logger.info("Operator cancelled by user.")
             self.cleanup(pkg)
-            return {"CANCELLED"}
+            return {"FINISHED"}  # user manually cancels through escape
         elif event.type != "TIMER":
-            return {"PASS_THROUGH"}
+            return {"PASS_THROUGH"}  # the event is not a timer callback
         with self.CLEANUP_MANAGER(pkg):
-            wrapped_result: Final = im_to_set(self.contexted_modal(pkg, event))
-            if {"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result:
-                # cleanup if a non-looping result was returned
-                self.cleanup(pkg)  # cleanup before
+            wrapped_result: Final = im_to_set(self._contexted_modal(pkg, event))
+            if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result) and self.worker:
+                # cleanup if a non-looping result was returned and worker is not None
+                self.cleanup(pkg)
             return wrapped_result
 
-    def contexted_modal(self, pkg: CtxPackage, event: Event) -> OpResultTuple:
+    def _contexted_modal(self, pkg: CtxPackage, event: Event) -> OpResultTuple:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
-        if self.worker is None:
-            raise UnexpectedError("Worker became unavailable during modal callback.")
-        while (next := self.worker.dequeue()) is not None:
-            try:
-                return self.queue_callback(pkg, event, next)
-            finally:
-                if pkg.context.area:  # TODO: is redrawing spread out enough?
-                    pkg.context.area.tag_redraw()  # redraw UI
-        return ("RUNNING_MODAL", "PASS_THROUGH")
+        if not self.worker:
+            self.logger.info("Modal callbacks stopped.")
+            return "FINISHED"
 
-    def queue_callback(self, pkg: CtxPackage, event: Event, next: Q) -> OpResultTuple:
+        if (next := self.worker.dequeue()) is not None:
+            try:
+                return self._queue_callback(pkg, event, next)
+            finally:
+                if pkg.context.area:
+                    pkg.context.area.tag_redraw()  # redraw after queue callback
+
+        return "RUNNING_MODAL"
+
+    def _queue_callback(self, pkg: CtxPackage, event: Event, next: Q) -> OpResultTuple:
         """
         an entrypoint for when a new element is placed in the queue during `modal`.
         this function is required IF it's a modal operator.
@@ -185,10 +194,11 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
             self.logger.debug("Worker cleaned up")
 
         self.data = None  # data is not guaranteed to be in-sync anymore
+        self.logger.info("Operator cleaned up")
 
     @staticmethod
     @worker_fn_auto
-    def operator_thread(
+    def _operator_thread(
         queue: Queue[Q],
         cancel_event: threading.Event,
         *,

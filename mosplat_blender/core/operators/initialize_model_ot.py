@@ -12,13 +12,13 @@ from ...infrastructure.macros import (
     tuple_type_matches_known_tuple_type,
     kill_subprocess_cross_platform,
 )
-from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError
+from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.constants import (
     DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
     _TIMEOUT_INTERVAL_,
 )
-from ...infrastructure.macros import is_path_accessible
+from ...infrastructure.macros import try_access_path
 
 from .base_ot import MosplatOperatorBase
 
@@ -38,7 +38,7 @@ class Mosplat_OT_initialize_model(
     bl_description = "Download or load VGGT model weights using Hugging Face."
 
     @classmethod
-    def contexted_poll(cls, pkg):
+    def _contexted_poll(cls, pkg):
         from ...interfaces import MosplatVGGTInterface
 
         if MosplatVGGTInterface.model is not None:
@@ -49,7 +49,7 @@ class Mosplat_OT_initialize_model(
             return False
         return True
 
-    def queue_callback(self, pkg, event, next):
+    def _queue_callback(self, pkg, event, next):
         status, current, total, msg = next
         props = pkg.props
         wm = self.wm(pkg.context)
@@ -70,7 +70,7 @@ class Mosplat_OT_initialize_model(
             fmt = f"QUEUE {status.upper()} - {msg}"
             if status == "error":
                 self.logger.error(fmt)
-                return "CANCELLED"  # finish
+                return "FINISHED"  # return finished as blender data has been modified
 
             elif status == "warning":
                 self.logger.warning(fmt)
@@ -80,16 +80,24 @@ class Mosplat_OT_initialize_model(
                 self.logger.info(fmt)
             if status == "done":
                 return "FINISHED"  # finish
-        return ("RUNNING_MODAL", "PASS_THROUGH")
+        return "RUNNING_MODAL"
 
-    def contexted_execute(self, pkg):
-        if not is_path_accessible(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT):
-            self.logger.error(
-                f"'{DOWNLOAD_HF_WITH_PROGRESS_SCRIPT}' script file not found at expected location."
-            )
+    def _contexted_invoke(self, pkg, event):
+        script = DOWNLOAD_HF_WITH_PROGRESS_SCRIPT
 
-            return "CANCELLED"
+        try:
+            try_access_path(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT)
+        except (FileNotFoundError, OSError, PermissionError) as e:
+            raise UserFacingError(
+                f"'{script} not accessible at runtime."
+                "This is a production-level script and should not be moved.",
+                e,
+            ) from e
+        else:
+            self._subprocess_script = script
+            return self.execute_with_package(pkg)
 
+    def _contexted_execute(self, pkg):
         prefs = pkg.prefs
 
         # start the model download from a separate subprocess
@@ -99,7 +107,7 @@ class Mosplat_OT_initialize_model(
                 "--factory-startup",
                 "-b",
                 "--python",
-                DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
+                self._subprocess_script,
                 "--",
                 prefs.vggt_hf_id,
                 str(prefs.vggt_model_dir),
@@ -114,7 +122,7 @@ class Mosplat_OT_initialize_model(
 
         self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
-        self.operator_thread(
+        self._operator_thread(
             self,
             pkg.context,
             _kwargs=ThreadKwargs(
@@ -126,11 +134,11 @@ class Mosplat_OT_initialize_model(
 
         return "RUNNING_MODAL"
 
-    def contexted_modal(self, pkg, event):
+    def _contexted_modal(self, pkg, event):
         # check cancellation on timer callback, kill subprocess if needed
         if self.worker and self.worker.was_cancelled():
             kill_subprocess_cross_platform(self._proc.pid)
-        return super().contexted_modal(pkg, event)
+        return super()._contexted_modal(pkg, event)
 
     def cleanup(self, pkg):
         self.wm(pkg.context).progress_end()  # stop progress
@@ -153,7 +161,7 @@ class Mosplat_OT_initialize_model(
 
     @staticmethod
     @worker_fn_auto
-    def operator_thread(queue, cancel_event, *, _kwargs):
+    def _operator_thread(queue, cancel_event, *, _kwargs):
         try:
             _wait_and_update_queue_loop(_kwargs.proc, queue)
         except (subprocess.CalledProcessError, UnexpectedError) as e:
@@ -199,7 +207,7 @@ def _wait_and_update_queue_loop(
     ret: int = proc.wait()
     if ret != 0:
         e = subprocess.CalledProcessError(ret, proc.args)
-        e.add_note("Note: ignore this if operator was deliberately cancelled.")
+        e.add_note("NOTE: ignore this if operator was deliberately cancelled.")
         raise e
 
     return  # proc existed successfully

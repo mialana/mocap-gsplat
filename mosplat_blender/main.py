@@ -47,8 +47,10 @@ def register_addon():
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
         except (ValueError, RuntimeError, AttributeError) as e:
-            de = DeveloperError(f"Exception during registration of `{c.__name__}`.", e)
-            logger.error(str(de))  # use str formatting of error but do not raise
+            msg = DeveloperError.make_msg(
+                f"Exception during registration of `{c.__name__}`.", e
+            )
+            logger.error(msg)  # use str formatting of error but do not raise
 
     setattr(
         bpy.types.Scene,

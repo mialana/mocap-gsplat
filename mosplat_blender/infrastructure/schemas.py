@@ -18,21 +18,20 @@ from typing import (
     Optional,
     ClassVar,
 )
-from typing_extensions import override
+
 from dataclasses import dataclass, field, asdict
 import json
 from enum import StrEnum, auto
 from string import capwords
 from abc import ABC
 
-from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX
+from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX, _MISSING_
 from .macros import (
     append_if_not_equals,
     int_median,
     try_access_path,
     is_path_accessible,
 )
-
 
 if TYPE_CHECKING:
     from cv2 import VideoCapture
@@ -42,48 +41,45 @@ if TYPE_CHECKING:
 class CustomError(ABC, RuntimeError):
     base_msg: ClassVar[str]
 
-    def __init__(
-        self,
-        custom_msg: str,
-        orig: Optional[BaseException],
-        show_orig_msg: bool,
-    ):
+    @classmethod
+    def make_msg(
+        cls,
+        custom_msg: str = "",
+        orig: Optional[BaseException] = None,
+        show_orig_msg: bool = True,
+    ) -> str:
         orig_type = f" ({type(orig).__name__})" if orig else ""
         msg = f": {custom_msg}" if custom_msg else ""
         orig_msg = (
             f"\nORIGINAL ERROR MSG: {str(orig)}" if orig and show_orig_msg else ""
         )
-        super().__init__(f"{self.base_msg}{orig_type}{msg}{orig_msg}")
+        return f"{cls.base_msg}{orig_type}{msg}{orig_msg}"
+
+    def __init__(
+        self,
+        custom_msg: str = "",
+        orig: Optional[BaseException] = None,
+        show_orig_msg: bool = True,
+    ):
+        super().__init__(self.make_msg(custom_msg, orig, show_orig_msg))
 
 
 class UserFacingError(CustomError):
     """a custom `RuntimeError` for errors that are user-caused and user-facing (i.e. should be visible to user)."""
 
-    base_msg: ClassVar[str] = "USER ERROR"
-
-    @override
-    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
-        super().__init__(custom_msg, orig, show_orig_msg)
+    base_msg = "USER ERROR"
 
 
 class DeveloperError(CustomError):
     """a custom `RuntimeError` for developer logic errors."""
 
-    base_msg: ClassVar[str] = "Developer error (you are doing something wrong)"
-
-    @override
-    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
-        super().__init__(custom_msg, orig, show_orig_msg)
+    base_msg = "Developer error (you are doing something wrong)"
 
 
 class UnexpectedError(CustomError):
     """a custom `RuntimeError` for errors that actually should never occur."""
 
-    base_msg: ClassVar[str] = "Something went wrong"
-
-    @override
-    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
-        super().__init__(custom_msg, orig, show_orig_msg)
+    base_msg = "Something went wrong"
 
 
 """Enum Convenience Classes"""
