@@ -35,9 +35,7 @@ class Mosplat_OT_initialize_model(
     MosplatOperatorBase[Tuple[str, int, int, str], ThreadKwargs]
 ):
     bl_idname = OperatorIDEnum.INITIALIZE_MODEL
-    bl_description = (
-        f"Install VGGT model weights from Hugging Face or load from cache if available."
-    )
+    bl_description = "Download or load VGGT model weights using Hugging Face."
 
     @classmethod
     def contexted_poll(cls, pkg):
@@ -82,6 +80,7 @@ class Mosplat_OT_initialize_model(
                 self.logger.info(fmt)
             if status == "done":
                 return "FINISHED"  # finish
+        return ("RUNNING_MODAL", "PASS_THROUGH")
 
     def contexted_execute(self, pkg):
         if not is_path_accessible(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT):
@@ -131,7 +130,7 @@ class Mosplat_OT_initialize_model(
         # check cancellation on timer callback, kill subprocess if needed
         if self.worker and self.worker.was_cancelled():
             kill_subprocess_cross_platform(self._proc.pid)
-        super().contexted_modal(pkg, event)
+        return super().contexted_modal(pkg, event)
 
     def cleanup(self, pkg):
         self.wm(pkg.context).progress_end()  # stop progress

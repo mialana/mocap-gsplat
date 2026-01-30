@@ -23,6 +23,7 @@ class Mosplat_OT_run_preprocess_script(
 ):
     bl_idname = OperatorIDEnum.RUN_PREPROCESS_SCRIPT
     bl_description = "Run current preprocess script on current frame range."
+    _requires_invoke_before_execute = True
 
     @classmethod
     def contexted_poll(cls, pkg) -> bool:
@@ -67,6 +68,8 @@ class Mosplat_OT_run_preprocess_script(
 
         # sync props regardless as the updated dataclass is still valid
         pkg.props.dataset_accessor.from_dataclass(self.data)
+
+        return ("RUNNING_MODAL", "PASS_THROUGH")
 
     @staticmethod
     @worker_fn_auto

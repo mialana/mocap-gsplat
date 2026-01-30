@@ -70,13 +70,14 @@ class Mosplat_OT_extract_frame_range(
     def queue_callback(self, pkg, event, next):
         if next == "done":
             self.cleanup(pkg)  # write props (as dataclass) to JSON
-            return
+            return "FINISHED"
 
         if next != "update":  # if sent an error message via queue
             self.logger.warning(next)
 
         # sync props regardless as the updated dataclass is still valid
         pkg.props.dataset_accessor.from_dataclass(self.data)
+        return ("RUNNING_MODAL", "PASS_THROUGH")
 
     @staticmethod
     @worker_fn_auto

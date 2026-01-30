@@ -30,20 +30,16 @@ L = TypeVar("L", bound=LiteralString)
 I = TypeVar("I")
 
 Immutable: TypeAlias = Union[Tuple[I, ...], I]
-ImmutableLike: TypeAlias = Union[Optional[Immutable[L]], Set[L]]
+
+# set is effectively immutable-like for our purposes
+ImmutableLike: TypeAlias = Union[Immutable[L], Set[L]]
 
 
-def immutable_like_to_optional_set(im: ImmutableLike[L]) -> Optional[Set[L]]:
-    if im is None:
-        return None
+def immutable_to_set(im: ImmutableLike[L]) -> Set[L]:
     if isinstance(im, set):
         return im
-    return immutable_to_set(im)
 
-
-def immutable_to_set(tup: Union[Tuple[L, ...], L]) -> Set[L]:
-
-    return set(tup) if isinstance(tup, tuple) else {tup}
+    return set(im) if isinstance(im, tuple) else {im}
 
 
 def append_if_not_equals(iter: List[T], *, item: T, target: T) -> None:

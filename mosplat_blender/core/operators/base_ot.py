@@ -3,7 +3,7 @@ from __future__ import annotations
 from bpy.types import Context, WindowManager, Timer, Event, Operator
 
 from typing import TYPE_CHECKING, Optional, Union, TypeVar, ClassVar, TypeAlias, Final
-from typing import List, Set, Tuple, NamedTuple, Generic, FrozenSet
+from typing import List, Set, Tuple, NamedTuple, Generic
 
 import contextlib
 from queue import Queue
@@ -11,10 +11,7 @@ import threading
 
 from ..checks import check_prefs_safe, check_props_safe
 from ...infrastructure import mixins
-from ...infrastructure.macros import (
-    immutable_like_to_optional_set as oim_to_oset,
-    immutable_to_set as im_to_set,
-)
+from ...infrastructure.macros import immutable_to_set as im_to_set
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.schemas import (
     UnexpectedError,
@@ -32,9 +29,7 @@ if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
 
     OpResultSet: TypeAlias = Set[OpResult]
-    OOpResultSet: TypeAlias = Optional[OpResultSet]
     OpResultTuple: TypeAlias = Union[Tuple[OpResult, ...], OpResult]
-    OOpResultTuple: TypeAlias = Optional[OpResultTuple]
 
     OpResultSetLike: TypeAlias = Union[OpResultTuple, OpResultSet]
 
@@ -158,14 +153,9 @@ class MosplatOperatorBase(
         pkg = self.package(context)
         with self.CLEANUP_MANAGER(pkg):
             try:
-                wrapped_result: Final = self.contexted_invoke(pkg, event)
-                wrapped_parsed: Final = (
-                    wrapped_result
-                    if isinstance(wrapped_result, set)
-                    else oim_to_oset(wrapped_result)
-                )
+                wrapped_result: Final = im_to_set(self.contexted_invoke(pkg, event))
                 # if not implemented run and return execute
-                return wrapped_parsed or self.execute(context)
+                return wrapped_result or self.execute(context)
             except UserFacingError as e:  # all errs here are expected to be user-facing
                 e.add_note("NOTE: Caught during operator invoke.")
                 self.logger.error(str(e))  # TODO: decide if needs to be `exception`
@@ -214,22 +204,25 @@ class MosplatOperatorBase(
         elif event.type != "TIMER":
             return {"PASS_THROUGH"}
         with self.CLEANUP_MANAGER(pkg):
-            wrapped_result = oim_to_oset(self.contexted_modal(pkg, event))
-            if wrapped_result and not (MODAL_FALLBACK_RESULT & wrapped_result):
+            wrapped_result = im_to_set(self.contexted_modal(pkg, event))
+            if MODAL_FALLBACK_RESULT & wrapped_result:
                 # cleanup if a non-looping result was returned
                 self.cleanup(pkg)  # cleanup before
-            return wrapped_result or MODAL_FALLBACK_RESULT
+            return wrapped_result
 
-    def contexted_modal(self, pkg: CtxPackage, event: Event) -> OOpResultTuple:
+    def contexted_modal(self, pkg: CtxPackage, event: Event) -> OpResultTuple:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
-        while self.worker is not None and (next := self.worker.dequeue()) is not None:
+        if self.worker is None:
+            raise UnexpectedError("Worker became unavailable during modal callback.")
+        while (next := self.worker.dequeue()) is not None:
             try:
                 return self.queue_callback(pkg, event, next)
             finally:
                 if pkg.context.area:  # TODO: is redrawing spread out enough?
                     pkg.context.area.tag_redraw()  # redraw UI
+        return ("RUNNING_MODAL", "PASS_THROUGH")
 
-    def queue_callback(self, pkg: CtxPackage, event: Event, next: Q) -> OOpResultTuple:
+    def queue_callback(self, pkg: CtxPackage, event: Event, next: Q) -> OpResultTuple:
         """an entrypoint for when a new element is placed in the queue during `modal`"""
         ...
 

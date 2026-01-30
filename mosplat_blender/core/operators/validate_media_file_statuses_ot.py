@@ -24,6 +24,7 @@ class Mosplat_OT_validate_media_file_statuses(
 ):
     bl_idname = OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES
     bl_description = "Check frame count, width, and height of all media files found in current media directory."
+    _requires_invoke_before_execute = True
 
     def contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
@@ -56,6 +57,7 @@ class Mosplat_OT_validate_media_file_statuses(
 
         # sync props from the dataclass that was updated within the thread
         pkg.props.dataset_accessor.from_dataclass(self.data)
+        return ("RUNNING_MODAL", "PASS_THROUGH")
 
     @staticmethod
     @worker_fn_auto
