@@ -9,7 +9,5 @@ class Mosplat_OT_run_inference(MosplatOperatorBase):
     bl_idname = OperatorIDEnum.RUN_INFERENCE
     bl_description = "Run inference on selected media directory."
 
-    _poll_error_msg_list: ClassVar[List[str]] = []
-
     def _contexted_execute(self, pkg):
         return "FINISHED"

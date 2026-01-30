@@ -1,7 +1,6 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
 
-import bpy
 from bpy.types import PropertyGroup, Context
 from bpy.props import (
     BoolProperty,
@@ -164,9 +163,7 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
 
 
 def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
-    OperatorIDEnum.run(
-        bpy.ops, OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT"
-    )
+    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT")
 
     self.logger.info(f"'{self.get_prop_name('current_media_dir')}' updated.")
 

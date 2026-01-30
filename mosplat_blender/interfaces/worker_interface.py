@@ -2,59 +2,14 @@ from __future__ import annotations
 
 import threading
 from queue import Queue, Empty
-from typing import Generic, TypeVar, Optional, Callable, Optional, ParamSpec, ClassVar
-from functools import wraps
-import time
+from typing import Generic, TypeVar, Optional, Callable, Optional
+
 from datetime import datetime
 
 QT = TypeVar("QT")  # types elements of worker queue
-P = ParamSpec("P")
-R = TypeVar("R")
 
 from ..infrastructure.mixins import MosplatLogClassMixin
-
-
-def record_work_time(
-    fn: Callable[P, R],
-    start_callback: Optional[Callable[[float], None]] = None,
-    end_callback: Optional[Callable[[float, float], None]] = None,
-) -> Callable[P, R]:
-    """
-    a decorator / function wrapper that will track execution time
-    and execute given callbacks.
-    `start_time` and `end_time` are float values determined using `datetime.now().timestamp()
-
-    Args:
-        fn: Any function, whose exact signature will be preserved.
-        start_callback:
-            def start_callback(start_time: float) -> None: ...
-        end_callback:
-            def end_callback(end_time: float, time_elapsed: float) -> None: ...
-
-    Returns:
-        Wrapped function (with exact signature).
-    """
-
-    @wraps(fn)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        start_time = datetime.now().timestamp()
-        start_counter = time.perf_counter()
-
-        if start_callback is not None:
-            start_callback(start_time)
-
-        ret = fn(*args, **kwargs)
-
-        end_time = datetime.now().timestamp()
-        end_counter = time.perf_counter()
-        time_elapsed = end_counter - start_counter
-
-        if end_callback is not None:
-            end_callback(end_time, time_elapsed)
-
-        return ret
-
-    return wrapper
+from ..infrastructure.decorators import record_work_time
 
 
 class MosplatWorkerInterface(Generic[QT], MosplatLogClassMixin):

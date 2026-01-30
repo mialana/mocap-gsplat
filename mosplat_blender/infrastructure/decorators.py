@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Callable, ParamSpec, TypeVar, Type
+from typing import Callable, ParamSpec, TypeVar, Type, Optional
 from .schemas import DeveloperError
 
-
-P = ParamSpec("P")  # maintains original callable's signature for `run_once`
-R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
-T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
+# maintains original callable's signature for `run_once` and `record_work_time`
+P = ParamSpec("P")
+# maintains orig callable's returntype  for `run_once`  and `record_work_time`
+R = TypeVar("R")
+# tracks decorated class for `no_instantiate`
+T = TypeVar("T", bound=Type)
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:
@@ -42,3 +44,48 @@ def no_instantiate(cls: T) -> T:
 
     cls.__new__ = staticmethod(__new__)
     return cls
+
+
+def record_work_time(
+    fn: Callable[P, R],
+    start_callback: Optional[Callable[[float], None]] = None,
+    end_callback: Optional[Callable[[float, float], None]] = None,
+) -> Callable[P, R]:
+    """
+    a decorator / function wrapper that will track execution time
+    and execute given callbacks.
+    `start_time` and `end_time` are float values determined using `datetime.now().timestamp()
+
+    Args:
+        fn: Any function, whose exact signature will be preserved.
+        start_callback:
+            def start_callback(start_time: float) -> None: ...
+        end_callback:
+            def end_callback(end_time: float, time_elapsed: float) -> None: ...
+
+    Returns:
+        Wrapped function (with exact signature).
+    """
+    from datetime import datetime
+    import time
+
+    @wraps(fn)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        start_time = datetime.now().timestamp()
+        start_counter = time.perf_counter()
+
+        if start_callback is not None:
+            start_callback(start_time)
+
+        ret = fn(*args, **kwargs)
+
+        end_time = datetime.now().timestamp()
+        end_counter = time.perf_counter()
+        time_elapsed = end_counter - start_counter
+
+        if end_callback is not None:
+            end_callback(end_time, time_elapsed)
+
+        return ret
+
+    return wrapper

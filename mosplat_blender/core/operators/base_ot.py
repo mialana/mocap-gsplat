@@ -122,7 +122,7 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
                 wrapped_result: Final = im_to_set(self._contexted_execute(pkg))
             except AttributeError as e:
                 msg = UserFacingError.make_msg(
-                    "This error occured during operator execution."
+                    "This error occured during operator execution.\n"
                     "Are you aware this operator requires invocation before execution?",
                     e,
                 )

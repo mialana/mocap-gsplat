@@ -10,17 +10,15 @@ import logging
 import datetime
 from pathlib import Path
 from typing import ClassVar, Callable, final
-from pythonjsonlogger.json import JsonFormatter
-import coloredlogs
-from humanfriendly.compat import coerce_string
-from humanfriendly.terminal import ansi_wrap
+from queue import Queue
+
 from ..infrastructure.constants import (
     COLORED_FORMATTER_FIELD_STYLES,
     COLORED_FORMATTER_LEVEL_STYLES,
 )
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
 from ..infrastructure.decorators import run_once, no_instantiate
-from ..infrastructure.schemas import UserFacingError
+from ..infrastructure.schemas import UserFacingError, OperatorIDEnum
 
 
 @final
@@ -33,13 +31,23 @@ class MosplatLoggingInterface:
 
     _old_factory: ClassVar[Callable[..., logging.LogRecord] | None] = None
 
+    _global_message_queue: Queue
+
+    # all non-standard lib modules should be nested locally
+    import coloredlogs
+    from pythonjsonlogger.json import JsonFormatter
+
     class MosplatStdoutFormatter(coloredlogs.ColoredFormatter):
+
         def __init__(self, **kwargs):
             kwargs["field_styles"] = COLORED_FORMATTER_FIELD_STYLES
             kwargs["level_styles"] = COLORED_FORMATTER_LEVEL_STYLES
             super().__init__(**kwargs)
 
         def format(self, record: logging.LogRecord) -> str:
+            from humanfriendly.compat import coerce_string
+            from humanfriendly.terminal import ansi_wrap
+
             style = self.nn.get(self.level_styles, record.levelname)
             # make custom level-aware record field that is first letter of log level
             if style:
@@ -201,3 +209,15 @@ class MosplatLoggingInterface:
         logger.propagate = True
 
         return logger
+
+    @classmethod
+    def drain_global_message_queue(cls):
+        while not cls._global_message_queue.empty():
+            level, msg = cls._global_message_queue.get_nowait()
+            OperatorIDEnum.run(
+                OperatorIDEnum.REPORT_GLOBAL_MESSAGES,
+                "INVOKE_DEFAULT",
+                level=level,
+                message=msg,
+            )
+        return None

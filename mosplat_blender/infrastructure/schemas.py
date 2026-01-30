@@ -17,6 +17,10 @@ from typing import (
     Tuple,
     Optional,
     ClassVar,
+    Literal,
+    Final,
+    get_args,
+    TypeAlias,
 )
 
 from dataclasses import dataclass, field, asdict
@@ -30,7 +34,6 @@ from .macros import (
     append_if_not_equals,
     int_median,
     try_access_path,
-    is_path_accessible,
 )
 
 if TYPE_CHECKING:
@@ -111,8 +114,10 @@ class OperatorIDEnum(StrEnum):
         return member.value.rpartition(".")[-1]
 
     @staticmethod
-    def run(bpy_ops, member: OperatorIDEnum, *args, **kwargs):
-        getattr(getattr(bpy_ops, member._category()), member.basename_factory(member))(
+    def run(member: OperatorIDEnum, *args, **kwargs):
+        from bpy import ops  # local import
+
+        getattr(getattr(ops, member._category()), member.basename_factory(member))(
             *args, **kwargs
         )
 
@@ -122,6 +127,7 @@ class OperatorIDEnum(StrEnum):
     VALIDATE_MEDIA_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()
+    REPORT_GLOBAL_MESSAGES = auto()
 
 
 class PanelIDEnum(StrEnum):
@@ -147,6 +153,35 @@ class PanelIDEnum(StrEnum):
 
     MAIN = auto()
     PREPROCESS = auto()
+
+
+WmReportItems: TypeAlias = Literal[
+    "DEBUG",
+    "INFO",
+    "OPERATOR",
+    "PROPERTY",
+    "WARNING",
+    "ERROR",
+    "ERROR_INVALID_INPUT",
+    "ERROR_INVALID_CONTEXT",
+    "ERROR_OUT_OF_MEMORY",
+]
+
+
+class WmReportItemsEnum(StrEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name.upper()
+
+    DEBUG = auto()
+    INFO = auto()
+    OPERATOR = auto()
+    PROPERTY = auto()
+    WARNING = auto()
+    ERROR = auto()
+    ERROR_INVALID_INPUT = auto()
+    ERROR_INVALID_CONTEXT = auto()
+    ERROR_OUT_OF_MEMORY = auto()
 
 
 @dataclass(frozen=True)
@@ -351,7 +386,7 @@ class MediaIODataset:
             return str(e)  # the file not existing is fine.
         except (OSError, PermissionError) as e:
             e.add_note(
-                "A permission error occured while trying to restore the cached data."
+                "A permission error occured while trying to restore the cached data.\n"
                 "Please double-check your machine's file system permissions before continuing."
             )
             raise UserWarning from e  # try to stick with native error classes here
