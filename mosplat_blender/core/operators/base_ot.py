@@ -10,7 +10,7 @@ from queue import Queue
 import threading
 
 from ..checks import check_prefs_safe, check_props_safe
-from ...infrastructure import mixins
+from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
 from ...infrastructure.decorators import worker_fn_auto
 from ...infrastructure.schemas import (
@@ -23,9 +23,6 @@ from ...infrastructure.schemas import (
 from ...interfaces.worker_interface import MosplatWorkerInterface
 
 if TYPE_CHECKING:
-    from ..preferences import Mosplat_AP_Global
-    from ..properties import Mosplat_PG_Global
-
     from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
 
     OpResultSet: TypeAlias = Set[OpResult]
@@ -37,22 +34,7 @@ Q = TypeVar("Q")  # the type of the elements in worker queue, if used
 K = TypeVar("K", bound=NamedTuple)
 
 
-MODAL_FALLBACK_RESULT: Final[OpResultSet] = {"RUNNING_MODAL", "PASS_THROUGH"}
-
-
-class CtxPackage(NamedTuple):
-    context: Context
-    prefs: Mosplat_AP_Global
-    props: Mosplat_PG_Global
-
-
-class MosplatOperatorBase(
-    Generic[Q, K],
-    Operator,
-    mixins.MosplatBlTypeMixin,
-    mixins.MosplatPGAccessorMixin,
-    mixins.MosplatAPAccessorMixin,
-):
+class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
     bl_category: ClassVar[str] = OperatorIDEnum._category()
     __id_enum_type__ = OperatorIDEnum
     _needs_invoke_before_execute: ClassVar[bool] = False
@@ -86,8 +68,8 @@ class MosplatOperatorBase(
             return False
 
         cls._poll_error_msg_list.clear()
-        wrapped_result = cls.contexted_poll(cls.package(context))
 
+        wrapped_result = cls.contexted_poll(cls.package(context))
         if len(cls._poll_error_msg_list) > 0:  # set the poll msg based on the list
             cls.poll_message_set("\n".join(cls._poll_error_msg_list))
 
@@ -97,55 +79,6 @@ class MosplatOperatorBase(
     def contexted_poll(cls, pkg: CtxPackage) -> bool:
         """an overrideable entrypoint for `poll` with access to prefs and props"""
         ...
-
-    """instance properties backed by mangled class attributes"""
-
-    @property
-    def worker(self) -> Optional[MosplatWorkerInterface[Q]]:
-        return self.__worker
-
-    @worker.setter
-    def worker(self, wkr: Optional[MosplatWorkerInterface[Q]]):
-        self.__worker = wkr
-
-    @property
-    def timer(self) -> Optional[Timer]:
-        return self.__timer
-
-    @timer.setter
-    def timer(self, tmr: Optional[Timer]):
-        self.__timer = tmr
-
-    @property
-    def data(self) -> MediaIODataset:
-        """dataset property group as a dataclass"""
-        if self.__data is None:
-            raise DeveloperError(
-                "Dataset as dataclass not available in this scope."
-                "Correct usage is to call setter beforehand."
-            )
-        else:
-            return self.__data
-
-    @data.setter
-    def data(self, mta: Optional[MediaIODataset]):
-        self.__data = mta
-
-    def wm(self, context: Context) -> WindowManager:
-        if not (wm := context.window_manager):
-            raise UnexpectedError("Poll-guard failed for window manager.")
-        return wm
-
-    @contextlib.contextmanager
-    def CLEANUP_MANAGER(self, pkg: CtxPackage):
-        """ensures clean up always runs even with uncaught exceptions"""
-        try:
-            yield
-        except BaseException as e:
-            dev_err = DeveloperError("Uncaught exception during operator lifetime.", e)
-            self.logger.exception(str(dev_err))
-            self.cleanup(pkg)  # cleanup here
-            raise dev_err from e
 
     def invoke(self, context, event) -> OpResultSet:
         self.__invoke_called = True
@@ -182,8 +115,8 @@ class MosplatOperatorBase(
         # set `data` property before execution
         self.data = props.dataset_accessor.to_dataclass()
         with self.CLEANUP_MANAGER(pkg):
-            wrapped_result = im_to_set(self.contexted_execute(pkg))
-            if not MODAL_FALLBACK_RESULT & wrapped_result:  # intersection
+            wrapped_result: Final = im_to_set(self.contexted_execute(pkg))
+            if not {"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result:  # intersection
                 self.cleanup(pkg)  # cleanup if not a modal operator
             return wrapped_result
 
@@ -204,8 +137,8 @@ class MosplatOperatorBase(
         elif event.type != "TIMER":
             return {"PASS_THROUGH"}
         with self.CLEANUP_MANAGER(pkg):
-            wrapped_result = im_to_set(self.contexted_modal(pkg, event))
-            if MODAL_FALLBACK_RESULT & wrapped_result:
+            wrapped_result: Final = im_to_set(self.contexted_modal(pkg, event))
+            if {"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result:
                 # cleanup if a non-looping result was returned
                 self.cleanup(pkg)  # cleanup before
             return wrapped_result
@@ -254,3 +187,52 @@ class MosplatOperatorBase(
         *,
         _kwargs: K,
     ): ...
+
+    @contextlib.contextmanager
+    def CLEANUP_MANAGER(self, pkg: CtxPackage):
+        """ensures clean up always runs even with uncaught exceptions"""
+        try:
+            yield
+        except BaseException as e:
+            dev_err = DeveloperError("Uncaught exception during operator lifetime.", e)
+            self.logger.exception(str(dev_err))
+            self.cleanup(pkg)  # cleanup here
+            raise dev_err from e
+
+    """instance properties backed by mangled class attributes"""
+
+    @property
+    def worker(self) -> Optional[MosplatWorkerInterface[Q]]:
+        return self.__worker
+
+    @worker.setter
+    def worker(self, wkr: Optional[MosplatWorkerInterface[Q]]):
+        self.__worker = wkr
+
+    @property
+    def timer(self) -> Optional[Timer]:
+        return self.__timer
+
+    @timer.setter
+    def timer(self, tmr: Optional[Timer]):
+        self.__timer = tmr
+
+    @property
+    def data(self) -> MediaIODataset:
+        """dataset property group as a dataclass"""
+        if self.__data is None:
+            raise DeveloperError(
+                "Dataset as dataclass not available in this scope."
+                "Correct usage is to call setter beforehand."
+            )
+        else:
+            return self.__data
+
+    @data.setter
+    def data(self, mta: Optional[MediaIODataset]):
+        self.__data = mta
+
+    def wm(self, context: Context) -> WindowManager:
+        if not (wm := context.window_manager):
+            raise UnexpectedError("Poll-guard failed for window manager.")
+        return wm

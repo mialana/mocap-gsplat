@@ -11,6 +11,7 @@ from typing import (
     Generic,
     TYPE_CHECKING,
     List,
+    NamedTuple,
 )
 from enum import StrEnum
 from dataclasses import fields
@@ -26,6 +27,11 @@ S = TypeVar("S")
 
 D = TypeVar("D", bound=SupportsDataclass)  # dataclass equivalent of the property group
 ChildD = TypeVar("ChildD", bound=SupportsDataclass)  # dataclass that is a property
+
+if TYPE_CHECKING:
+    from bpy.types import Context
+    from ..core.preferences import Mosplat_AP_Global
+    from ..core.properties import Mosplat_PG_Global
 
 
 class MosplatLogClassMixin:
@@ -175,6 +181,27 @@ class MosplatBlPropertyAccessorMixin(
                 f"Tried to retrieve RNA of non-existing property '{prop_attrname}'."
             )
             return f"KEY ERROR. Class: {cls.__qualname__}. Property: {prop_attrname}."  # make error visible and traceable
+
+
+class CtxPackage(NamedTuple):
+    context: Context
+    prefs: Mosplat_AP_Global
+    props: Mosplat_PG_Global
+
+
+class MosplatContextAccessorMixin(
+    MosplatBlTypeMixin, MosplatAPAccessorMixin, MosplatPGAccessorMixin
+):
+
+    if TYPE_CHECKING:
+        from bpy.types import Context
+
+    @classmethod
+    def package(cls, context: Context) -> CtxPackage:
+        """convenience method to package context"""
+        return CtxPackage(
+            context=context, prefs=cls.prefs(context), props=cls.props(context)
+        )
 
 
 class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):

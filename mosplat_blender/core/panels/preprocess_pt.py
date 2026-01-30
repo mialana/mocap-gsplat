@@ -15,8 +15,8 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
     bl_parent_id = PanelIDEnum.MAIN
 
-    def draw_with_layout(self, context, layout):
-        props = self.props
+    def draw_with_layout(self, pkg, layout):
+        props = pkg.props
         column = layout.column()
         init_model_box = column.box()
         init_model_box.row().operator(OperatorIDEnum.INITIALIZE_MODEL)

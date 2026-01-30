@@ -13,7 +13,7 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TypeVar, TYPE_CHECKING, List, Tuple, Union, Generator
+from typing import Generic, TYPE_CHECKING, List, Tuple, Union, Generator
 
 from pathlib import Path
 

@@ -5,12 +5,7 @@ from bpy.types import Panel, UILayout, Context
 from typing import Literal, TYPE_CHECKING, Optional
 
 from ..checks import check_prefs_safe, check_props_safe
-from ...infrastructure.mixins import (
-    MosplatBlTypeMixin,
-    MosplatPGAccessorMixin,
-    MosplatAPAccessorMixin,
-    MosplatEncapsulatedContextMixin,
-)
+from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.schemas import PanelIDEnum
 
 
@@ -18,13 +13,7 @@ if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems
 
 
-class MosplatPanelBase(
-    Panel,
-    MosplatEncapsulatedContextMixin,
-    MosplatBlTypeMixin,
-    MosplatPGAccessorMixin,
-    MosplatAPAccessorMixin,
-):
+class MosplatPanelBase(Panel, MosplatContextAccessorMixin):
     __id_enum_type__ = PanelIDEnum
 
     bl_space_type = "VIEW_3D"
@@ -62,9 +51,8 @@ class MosplatPanelBase(
         if not (layout := self.layout):
             return
 
-        with self.encapsulated_context_block(context):
-            self.draw_with_layout(context, layout)
+        self.draw_with_layout(self.package(context), layout)
 
-    def draw_with_layout(self, context: Context, layout: UILayout) -> None:
+    def draw_with_layout(self, pkg: CtxPackage, layout: UILayout) -> None:
         """layout will always exist with this function"""
         ...
