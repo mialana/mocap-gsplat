@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from functools import wraps
+from functools import wraps, update_wrapper, partial
 from typing import Callable, ParamSpec, TypeVar, Type, Optional
 from .schemas import DeveloperError
+from .constants import _MISSING_
 
 # maintains original callable's signature for `run_once` and `record_work_time`
 P = ParamSpec("P")
@@ -31,6 +32,36 @@ def run_once(f: Callable[P, R]) -> Callable[P, R]:
         return getattr(wrapper, "_result")
 
     return wrapper
+
+
+class run_once_per_instance(object):
+    """decorator class that runs a method only once per class instance."""
+
+    def __init__(self, fn):
+        update_wrapper(self, fn)
+        self.fn = fn
+
+        self._has_run_attr = f"__{fn.__name__}_has_run"
+        self._run_result_attr = f"__{fn.__name__}_run_result"
+
+    def __call__(self, instance, *args, **kwargs):
+        has_run = getattr(instance, self._has_run_attr, False)
+        result = getattr(instance, self._run_result_attr, _MISSING_)
+        if not has_run or result is _MISSING_:
+            result = self.fn(instance, *args, **kwargs)
+            setattr(instance, self._has_run_attr, True)
+            setattr(instance, self._run_result_attr, result)
+        return result
+
+    def __get__(self, instance, instancetype):
+        if instance is None:
+            return self
+
+        def bound(*args, **kwargs):
+            return self(instance, *args, **kwargs)
+
+        update_wrapper(bound, self.fn)
+        return bound
 
 
 def no_instantiate(cls: T) -> T:

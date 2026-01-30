@@ -143,7 +143,7 @@ class Mosplat_AP_Global(AddonPreferences, MosplatBlPropertyAccessorMixin):
 
     json_log_format: StringProperty(
         name="JSON Log Format",
-        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="%(asctime)s %(levelname)s %(name)s %(pathname)s %(classname)s %(funcName)s %(lineno)s %(thread)d %(message)s",
         update=update_json_logging,
     )
@@ -157,7 +157,7 @@ class Mosplat_AP_Global(AddonPreferences, MosplatBlPropertyAccessorMixin):
 
     stdout_log_format: StringProperty(
         name="STDOUT Log Format",
-        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface.set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
         update=update_stdout_logging,
     )
