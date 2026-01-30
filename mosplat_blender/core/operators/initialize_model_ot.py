@@ -2,12 +2,11 @@ import bpy
 
 from pathlib import Path
 from queue import Queue
-from typing import Tuple, NamedTuple, Final, Optional
+from typing import Tuple, NamedTuple, Final
 import subprocess
 import os
 import ast
 from functools import partial
-import time
 
 from ...infrastructure.macros import (
     tuple_type_matches_known_tuple_type,
@@ -21,13 +20,9 @@ from ...infrastructure.constants import (
 )
 from ...infrastructure.macros import is_path_accessible
 
-from .base_ot import (
-    MosplatOperatorBase,
-    OperatorReturnItemsSet,
-    OptionalOperatorReturnItemsSet,
-)
+from .base_ot import MosplatOperatorBase
 
-QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime checking
+QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown tuples
 
 
 class ThreadKwargs(NamedTuple):
@@ -45,40 +40,40 @@ class Mosplat_OT_initialize_model(
     )
 
     @classmethod
-    def contexted_poll(cls, context, prefs, props) -> bool:
+    def contexted_poll(cls, pkg):
         from ...interfaces import MosplatVGGTInterface
 
         if MosplatVGGTInterface.model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
-        if props.progress_in_use:
+        if pkg.props.progress_in_use:
             cls.poll_message_set("Wait until operators in-progress have completed.")
             return False
         return True
 
-    def queue_callback(self, context, event, next) -> OptionalOperatorReturnItemsSet:
+    def queue_callback(self, pkg, event, next):
         status, current, total, msg = next
-        props = self.props
-        wm = self.wm
+        props = pkg.props
+        wm = self.wm(pkg.context)
         if status == "progress":
             if not props.progress_in_use and total > 0:
                 wm.progress_begin(current, total)  # start progress bar if needed
                 props.progress_in_use = True  # mark usage of global progress props
                 props.operator_progress_total = total
-            if total != self.props.operator_progress_total:  # in case total changes
+            if total != props.operator_progress_total:  # in case total changes
                 wm.progress_end()
                 wm.progress_begin(current, total)
                 props.operator_progress_total = total
 
-            self.wm.progress_update(current)
-            self.props.operator_progress_current = current
+            wm.progress_update(current)
+            props.operator_progress_current = current
             self.logger.debug(f"{current} / {total}")
         else:
             fmt = f"QUEUE {status.upper()} - {msg}"
             if status == "error":
-                self.cleanup(context)
                 self.logger.error(fmt)
-                return {"CANCELLED"}
+                return "CANCELLED"  # finish
+
             elif status == "warning":
                 self.logger.warning(fmt)
             elif status == "debug":
@@ -86,17 +81,17 @@ class Mosplat_OT_initialize_model(
             else:
                 self.logger.info(fmt)
             if status == "done":
-                self.cleanup(context)
-                return {"FINISHED"}
+                return "FINISHED"  # finish
 
-    def contexted_execute(self, context) -> OperatorReturnItemsSet:
+    def contexted_execute(self, pkg):
         if not is_path_accessible(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT):
             self.logger.error(
                 f"'{DOWNLOAD_HF_WITH_PROGRESS_SCRIPT}' script file not found at expected location."
             )
-            return {"CANCELLED"}
 
-        prefs = self.prefs
+            return "CANCELLED"
+
+        prefs = pkg.prefs
 
         # start the model download from a separate subprocess
         self._proc: subprocess.Popen = subprocess.Popen(
@@ -122,6 +117,7 @@ class Mosplat_OT_initialize_model(
 
         self.operator_thread(
             self,
+            pkg.context,
             _kwargs=ThreadKwargs(
                 proc=self._proc,
                 hf_id=prefs.vggt_hf_id,
@@ -129,31 +125,32 @@ class Mosplat_OT_initialize_model(
             ),
         )
 
-        return {"RUNNING_MODAL"}
+        return "RUNNING_MODAL"
 
-    def contexted_modal(self, context, event):
+    def contexted_modal(self, pkg, event):
         # check cancellation on timer callback, kill subprocess if needed
         if self.worker and self.worker.was_cancelled():
             kill_subprocess_cross_platform(self._proc.pid)
-        super().contexted_modal(context, event)
+        super().contexted_modal(pkg, event)
 
-    def cleanup(self, context):
-        self.wm.progress_end()  # stop progress
-        self.props.progress_in_use = False
-        self.props.operator_progress_current = -1
-        self.props.operator_progress_total = -1
+    def cleanup(self, pkg):
+        self.wm(pkg.context).progress_end()  # stop progress
+        pkg.props.progress_in_use = False
+        pkg.props.operator_progress_current = -1
+        pkg.props.operator_progress_total = -1
 
         """
         register a timer that will kill the subprocess with the saved pid
         (operator itself will leave the scope before then)
-        this ensures that cancellation that never reaches the next modal call still cleans up the subprocess
+        this ensures that cancellation that never reaches the next modal call 
+        still cleans up the subprocess
         """
         if hasattr(self, "_proc"):
             bpy.app.timers.register(
                 partial(kill_subprocess_cross_platform, self._proc.pid),
                 first_interval=_TIMEOUT_INTERVAL_,  # no orphaned processes here!
             )
-        return super().cleanup(context)
+        return super().cleanup(pkg)
 
     @staticmethod
     @worker_fn_auto
@@ -183,29 +180,27 @@ def _wait_and_update_queue_loop(
     proc: subprocess.Popen, queue: Queue[Tuple[str, int, int, str]]
 ):
     if proc.stdout is None:
-        return
+        raise UnexpectedError("Process stdout pointer is not available.")
 
-    ret: Optional[int] = None
-    while True:  # exits only when subprocess has exited
-        if (ret := proc.poll()) is not None:
-            if ret != 0:
-                e = subprocess.CalledProcessError(ret, proc.args)
-                e.add_note("Note: this is expected if operator is cancelled.")
-            else:
-                return  # proc existed successfully
-        for line in proc.stdout:  # continues until EOF has been reached
-            try:
-                converted = ast.literal_eval(line)
-                if isinstance(converted, tuple) and tuple_type_matches_known_tuple_type(
-                    converted, QUEUE_DEFAULT_TUPLE
-                ):
-                    queue.put(converted)  # good to go
-                    continue
-            except (ValueError, SyntaxError, TypeError):
-                pass
+    for line in proc.stdout:  # continues until EOF has been reached
+        try:
+            converted = ast.literal_eval(line)
+            if isinstance(converted, tuple) and tuple_type_matches_known_tuple_type(
+                converted, QUEUE_DEFAULT_TUPLE
+            ):
+                queue.put(converted)  # good to go
+                continue
+        except (ValueError, SyntaxError, TypeError):
+            pass  # ignore errors raised from trying to evaluate the line as a tuple
+        if isinstance(line, str) and (stripped := line.strip()):
+            # place other output in queue under msg
+            queue.put(("debug", -1, -1, stripped))
 
-            if isinstance(line, str) and (stripped := line.strip()):
-                # place other output in queue under msg
-                queue.put(("debug", -1, -1, stripped))
+    # avoid concurrency issues with `poll` when stdout is released by process
+    ret: int = proc.wait()
+    if ret != 0:
+        e = subprocess.CalledProcessError(ret, proc.args)
+        e.add_note("Note: ignore this if operator was deliberately cancelled.")
+        raise e
 
-        time.sleep(_TIMEOUT_INTERVAL_)
+    return  # proc existed successfully

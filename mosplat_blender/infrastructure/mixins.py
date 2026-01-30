@@ -9,25 +9,23 @@ from typing import (
     TypeGuard,
     TypeVar,
     Generic,
-    Optional,
     TYPE_CHECKING,
-    Any,
-    TypeAlias,
     List,
 )
 from enum import StrEnum
 from dataclasses import fields
 import logging
 import inspect
-import contextlib
 
 
-from .protocols import SupportsCollectionProperty
-from .constants import _MISSING_, DataclassInstance
+from .protocols import SupportsCollectionProperty, SupportsDataclass
+from .constants import _MISSING_
 from .schemas import DeveloperError
 
 S = TypeVar("S")
-D = TypeVar("D", bound=DataclassInstance)
+
+D = TypeVar("D", bound=SupportsDataclass)  # dataclass equivalent of the property group
+ChildD = TypeVar("ChildD", bound=SupportsDataclass)  # dataclass that is a property
 
 
 class MosplatLogClassMixin:
@@ -106,7 +104,7 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
 
     bl_idname: str = _MISSING_
     bl_description: str = _MISSING_
-    __id_enum_type__: ClassVar = _MISSING_  # no literals here!
+    __id_enum_type__: ClassVar[type] = _MISSING_  # no literals here!
 
     @classmethod
     def at_registration(cls):
@@ -129,37 +127,6 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
         return True
 
 
-class MosplatEncapsulatedContextMixin:
-    """
-    a mixin that allows for a `context` property within desired instance methods.
-    when paired with `contextlib.contextmanager` functions can have a local updated `context` property
-    """
-
-    from bpy.types import Context  # local import
-
-    __context: Optional[Context] = None
-
-    @property
-    def context(self) -> Context:
-        if self.__context is None:  # protect against incorrect usage
-            raise DeveloperError("Context has not yet been set yet in this scope.")
-        else:
-            return self.__context
-
-    @context.setter
-    def context(self, context: Optional[Context]):
-        self.__context = context
-
-    @contextlib.contextmanager
-    def encapsulated_context_block(self, context: Context):
-        """ensures `context` is set for code wrapped in a `with` block"""
-        self.context = context  # update `context` before block starts
-        try:
-            yield  # run code in `with`
-        finally:  # set to `None` after block finishes
-            self.context = None
-
-
 class MosplatAPAccessorMixin(MosplatLogClassMixin):
     """a mixin class for any class that has access to global preferences"""
 
@@ -168,16 +135,9 @@ class MosplatAPAccessorMixin(MosplatLogClassMixin):
     if TYPE_CHECKING:
         from ..core.preferences import Mosplat_AP_Global
 
-    @property
-    def prefs(self) -> Mosplat_AP_Global:
+    @staticmethod
+    def prefs(context) -> Mosplat_AP_Global:
         from ..core.checks import check_addonpreferences
-
-        context = getattr(self, "context", None)
-        if context is None:
-            self.logger.warning("Using fallback context for prefs.")
-            from bpy import context as fallback_context
-
-            context = fallback_context
 
         return check_addonpreferences(context.preferences)
 
@@ -190,16 +150,9 @@ class MosplatPGAccessorMixin(MosplatLogClassMixin):
     if TYPE_CHECKING:
         from ..core.properties import Mosplat_PG_Global
 
-    @property
-    def props(self) -> Mosplat_PG_Global:
+    @staticmethod
+    def props(context: Context) -> Mosplat_PG_Global:
         from ..core.checks import check_propertygroup
-
-        context = getattr(self, "context", None)
-        if context is None:
-            self.logger.warning("Using fallback context for props.")
-            from bpy import context as fallback_context
-
-            context = fallback_context
 
         return check_propertygroup(context.scene)
 
@@ -209,7 +162,9 @@ class MosplatBlPropertyAccessorMixin(
 ):
     """a mixin class for easier access to Blender properties' RNA"""
 
-    bl_rna = _MISSING_
+    from bpy.types import BlenderRNA  # local import
+
+    bl_rna: BlenderRNA = _MISSING_
 
     @classmethod
     def get_prop_name(cls, prop_attrname: str) -> str:
@@ -262,9 +217,6 @@ class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):
 
     @staticmethod
     def collection_property_to_dataclass_list(
-        cp: SupportsCollectionProperty[MosplatDataclassInteropMixin[SD]],
-    ) -> List[SD]:
+        cp: SupportsCollectionProperty[MosplatDataclassInteropMixin[ChildD]],
+    ) -> List[ChildD]:
         return [v.to_dataclass() for v in cp]
-
-
-SD = TypeVar("SD", bound=DataclassInstance)

@@ -162,7 +162,7 @@ def check_current_media_dirpath(props: Mosplat_PG_Global):
     return dirpath
 
 
-def check_frame_range_err_list(
+def check_frame_range_poll_result(
     prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
 ) -> List[str]:
     err_list = []

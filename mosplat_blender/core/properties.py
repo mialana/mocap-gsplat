@@ -22,16 +22,17 @@ from .checks import (
     check_data_output_dirpath,
     check_data_json_filepath,
     check_current_media_dirpath,
-    check_frame_range_err_list,
+    check_frame_range_poll_result,
     check_frame_range_npy_filepaths,
 )
 
 from ..infrastructure.mixins import (
+    D,
     MosplatBlPropertyAccessorMixin,
     MosplatDataclassInteropMixin,
 )
 from ..infrastructure.protocols import SupportsCollectionProperty
-from ..infrastructure.constants import DataclassInstance, RAW_FRAME_DIRNAME
+from ..infrastructure.constants import RAW_FRAME_DIRNAME
 from ..infrastructure.schemas import (
     OperatorIDEnum,
     GlobalData,
@@ -45,8 +46,6 @@ from ..infrastructure.macros import try_access_path
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
-
-D = TypeVar("D", bound=DataclassInstance)
 
 
 class MosplatPropertyGroupBase(
@@ -233,8 +232,20 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     def media_files(self, prefs: Mosplat_AP_Global) -> List[Path]:
         return check_media_files(prefs, self)
 
-    def frame_range_err_list(self, prefs: Mosplat_AP_Global) -> List[str]:
-        return check_frame_range_err_list(prefs, self)
+    def frame_range_poll_result(self, prefs: Mosplat_AP_Global) -> List[str]:
+        return check_frame_range_poll_result(prefs, self)
+
+    @property
+    def is_valid_media_directory_poll_result(self) -> List[str]:
+        dataset = self.dataset_accessor
+
+        result = []
+        if not dataset.is_valid_media_directory:
+            result.append(
+                f"Ensure matching frame count, width, & height"
+                "of media in '{dataset.base_directory}'."
+            )
+        return result
 
     def frame_range_npy_filepaths(
         self, prefs: Mosplat_AP_Global, id: str

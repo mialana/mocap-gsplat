@@ -5,16 +5,10 @@ from __future__ import annotations
 from os import stat_result
 from pathlib import Path
 from statistics import median
-from typing import (
-    Iterable,
-    TypeVar,
-    List,
-    Tuple,
-    TYPE_CHECKING,
-    Optional,
-    Callable,
-    TypeGuard,
-)
+
+from typing import Iterable, List, Tuple, Set, LiteralString, TypeAlias
+from typing import TYPE_CHECKING, Optional, Callable, TypeGuard, TypeVar, Union
+
 from importlib.util import spec_from_file_location, module_from_spec
 from importlib.machinery import ModuleSpec
 from types import ModuleType
@@ -22,14 +16,34 @@ import sys
 
 
 if TYPE_CHECKING:
-    import cv2
+    import cv2  # static only import of risky module
+
+T = TypeVar("T")
+K = TypeVar("K", bound=Tuple)
 
 
 def int_median(iter: Iterable[int]) -> int:
     return int(round(median(iter))) if iter else -1
 
 
-T = TypeVar("T")
+L = TypeVar("L", bound=LiteralString)
+I = TypeVar("I")
+
+Immutable: TypeAlias = Union[Tuple[I, ...], I]
+ImmutableLike: TypeAlias = Union[Optional[Immutable[L]], Set[L]]
+
+
+def immutable_like_to_optional_set(im: ImmutableLike[L]) -> Optional[Set[L]]:
+    if im is None:
+        return None
+    if isinstance(im, set):
+        return im
+    return immutable_to_set(im)
+
+
+def immutable_to_set(tup: Union[Tuple[L, ...], L]) -> Set[L]:
+
+    return set(tup) if isinstance(tup, tuple) else {tup}
 
 
 def append_if_not_equals(iter: List[T], *, item: T, target: T) -> None:
@@ -61,12 +75,9 @@ def is_path_accessible(p: Path) -> bool:
         return False
 
 
-TT = TypeVar("TT", bound=Tuple)
-
-
 def tuple_type_matches_known_tuple_type(
-    unknown_tuple: Tuple, known_tuple: TT
-) -> TypeGuard[TT]:
+    unknown_tuple: Tuple, known_tuple: K
+) -> TypeGuard[K]:
     if len(unknown_tuple) != len(known_tuple):
         return False
     return all(type(v) == type(t) for v, t in zip(unknown_tuple, known_tuple))

@@ -2,13 +2,8 @@ from __future__ import annotations
 
 from typing import Tuple, List, Generator, NamedTuple
 from pathlib import Path
-from dataclasses import dataclass
 
-from .base_ot import (
-    MosplatOperatorBase,
-    OperatorReturnItemsSet,
-    OptionalOperatorReturnItemsSet,
-)
+from .base_ot import MosplatOperatorBase
 
 from ...infrastructure.schemas import (
     OperatorIDEnum,
@@ -33,59 +28,55 @@ class Mosplat_OT_extract_frame_range(
 ):
     bl_idname = OperatorIDEnum.EXTRACT_FRAME_RANGE
     bl_description = "Extract a frame range from all media files in media directory."
+    _requires_invoke_before_execute = True
 
     @classmethod
-    def contexted_poll(cls, context, prefs, props) -> bool:
-        if not props.dataset_accessor.is_valid_media_directory:
-            cls._poll_error_msg_list.append(
-                "Ensure that frame count, width, and height of all media files within current media directory match."
-            )
-        else:
-            cls._poll_error_msg_list.extend(props.frame_range_err_list(prefs))
+    def contexted_poll(cls, pkg) -> bool:
+        props = pkg.props
+        cls._poll_error_msg_list.extend(props.is_valid_media_directory_poll_result)
+        cls._poll_error_msg_list.extend(props.frame_range_poll_result(pkg.prefs))
 
         return len(cls._poll_error_msg_list) == 0
 
-    def contexted_invoke(self, context, event) -> OperatorReturnItemsSet:
-        prefs = self.prefs
-        props = self.props
-        try:
-            restore_dataset_from_json(props, prefs)  # try to restore from local JSON
+    def contexted_invoke(self, pkg, event):
+        prefs = pkg.prefs
+        props = pkg.props
 
-            # try setting all the properties that are needed for the op
-            self._media_files: List[Path] = props.media_files(prefs)
-            self._frame_range: Tuple[int, int] = props.current_frame_range
-            self._npy_filepath_generator: Generator[Path] = (
-                props.generate_frame_range_npy_filepaths(prefs)
-            )
+        restore_dataset_from_json(props, prefs)  # try to restore from local JSON
 
-            return self.execute(context)
-        except UserFacingError as e:
-            self.logger.error(str(e))
-            return {"CANCELLED"}
+        # try setting all the properties that are needed for the op
+        self._media_files: List[Path] = props.media_files(prefs)
+        self._frame_range: Tuple[int, int] = props.current_frame_range
+        self._npy_filepath_generator: Generator[Path] = (
+            props.generate_frame_range_npy_filepaths(prefs)
+        )
 
-    def contexted_execute(self, context) -> OperatorReturnItemsSet:
+        return self.execute(pkg)
+
+    def contexted_execute(self, pkg):
         self.operator_thread(
             self,
+            pkg.context,
             _kwargs=ThreadKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 npy_fp_generator=self._npy_filepath_generator,
-                dataset_as_dc=self.dataset_as_dc,
+                dataset_as_dc=self.data,
             ),
         )
 
-        return {"RUNNING_MODAL"}
+        return "RUNNING_MODAL"
 
-    def queue_callback(self, context, event, next) -> OptionalOperatorReturnItemsSet:
+    def queue_callback(self, pkg, event, next):
         if next == "done":
-            self.cleanup(context)  # write props (as dataclass) to JSON
+            self.cleanup(pkg)  # write props (as dataclass) to JSON
             return
 
         if next != "update":  # if sent an error message via queue
             self.logger.warning(next)
 
         # sync props regardless as the updated dataclass is still valid
-        self.props.dataset_accessor.from_dataclass(self.dataset_as_dc)
+        pkg.props.dataset_accessor.from_dataclass(self.data)
 
     @staticmethod
     @worker_fn_auto

@@ -3,21 +3,7 @@
 from __future__ import annotations
 
 from functools import wraps, partial
-from typing import (
-    Callable,
-    ParamSpec,
-    TypeVar,
-    Type,
-    Concatenate,
-    TYPE_CHECKING,
-    TypedDict,
-    Required,
-    NotRequired,
-    Unpack,
-    Union,
-    TypeAlias,
-    Any,
-)
+from typing import Callable, ParamSpec, TypeVar, Type, Concatenate, TYPE_CHECKING
 
 from queue import Queue
 from threading import Event as ThreadingEvent
@@ -27,11 +13,7 @@ from .constants import _TIMER_INTERVAL_
 
 if TYPE_CHECKING:
     from ..core.operators import MosplatOperatorBase
-    from ..core.panels import MosplatPanelBase
-    from bpy.types import Context, Event  # import `bpy` to enforce types
-else:
-    MosplatOperatorBase: TypeAlias = Any
-    MosplatPanelBase: TypeAlias = Any
+    from bpy.types import Context
 
 
 P = ParamSpec(
@@ -39,10 +21,6 @@ P = ParamSpec(
 )  # maintains original callable's signature for `run_once` and `worker_fn`
 R = TypeVar("R")  # maintains orig callable's returntype  for `run_once`
 T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
-
-OpT = TypeVar(
-    "OpT", bound=Union[MosplatOperatorBase, MosplatPanelBase]
-)  # types the `self` parameter for `worker_fn_auto` and `encapsulated_context`
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:
@@ -79,7 +57,7 @@ def no_instantiate(cls: T) -> T:
 
 def worker_fn_auto(
     fn: Callable[Concatenate[Queue, ThreadingEvent, P], None],
-) -> Callable[Concatenate[MosplatOperatorBase, P], None]:
+) -> Callable[Concatenate[MosplatOperatorBase, Context, P], None]:
     """a decorator that creates a closure of the worker creation and other abstractable setup"""
 
     from ..interfaces import MosplatWorkerInterface  # local import
@@ -87,6 +65,7 @@ def worker_fn_auto(
     @wraps(fn)
     def wrapper(
         self: MosplatOperatorBase,
+        context: Context,
         /,
         *args: P.args,
         **kwargs: P.kwargs,
@@ -95,32 +74,11 @@ def worker_fn_auto(
         self.worker = MosplatWorkerInterface(worker_fn=partial(fn, *args, **kwargs))
         self.worker.start()
 
-        self.timer = self.wm.event_timer_add(
-            time_step=_TIMER_INTERVAL_, window=self.context.window
+        wm = self.wm(context)
+
+        self.timer = wm.event_timer_add(
+            time_step=_TIMER_INTERVAL_, window=context.window
         )
-        self.wm.modal_handler_add(self)
-
-    return wrapper
-
-
-class WithContextKwargs(TypedDict):
-    context: Required[Context]
-    event: NotRequired[Event]
-
-
-def encapsulated_context(
-    fn: Callable[Concatenate[OpT, Context, ...], R],
-) -> Callable[Concatenate[OpT, Context, ...], R]:
-    """a decorator that sets `context` properties before function runs, and removes it when complete."""
-
-    def wrapper(self: OpT, *args, **kwargs: Unpack[WithContextKwargs]):
-
-        context = kwargs["context"]
-        self.context = context
-
-        try:
-            return fn(self, *args, **kwargs)
-        finally:
-            self.context = None
+        wm.modal_handler_add(self)
 
     return wrapper

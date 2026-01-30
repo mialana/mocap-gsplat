@@ -10,10 +10,11 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-from typing import Any, Final, TYPE_CHECKING, TypeAlias
+from typing import Any, Final, TYPE_CHECKING, TypeAlias, Set, Optional, Tuple
 from pathlib import Path
 from string import capwords
 import tempfile
+
 
 _MISSING_: Any = object()  # sentinel variable
 
@@ -73,12 +74,6 @@ ADDON_PROPERTIES_ATTRIBNAME: Final[str] = f"{ADDON_SHORTNAME}_props"
 
 OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME}."
 PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"
-
-# static typecheck-only abstraction
-if TYPE_CHECKING:
-    from _typeshed import DataclassInstance
-else:
-    DataclassInstance: TypeAlias = Any
 
 MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
 
