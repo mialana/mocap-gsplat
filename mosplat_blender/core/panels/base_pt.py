@@ -4,9 +4,9 @@ from bpy.types import Panel, UILayout, Context
 
 from typing import Literal, TYPE_CHECKING, Optional
 
-from ..checks import check_prefs_safe, check_props_safe
+from ..checks import check_addonpreferences, check_propertygroup
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
-from ...infrastructure.schemas import PanelIDEnum
+from ...infrastructure.schemas import PanelIDEnum, UserFacingError, UnexpectedError
 
 
 if TYPE_CHECKING:
@@ -28,10 +28,12 @@ class MosplatPanelBase(Panel, MosplatContextAccessorMixin):
 
     @classmethod
     def poll(cls, context) -> bool:
-        return (
-            check_prefs_safe(context) is not None
-            and check_props_safe(context) is not None
-        )
+        try:
+            check_addonpreferences(context.preferences)
+            check_propertygroup(context.scene)
+            return True
+        except (UserFacingError, UnexpectedError) as e:
+            return False
 
     @staticmethod
     def _col_factory(
@@ -49,6 +51,7 @@ class MosplatPanelBase(Panel, MosplatContextAccessorMixin):
 
     def draw(self, context: Context) -> None:
         if not (layout := self.layout):
+            self.logger.warning("Layout not available in draw function.")
             return
 
         self.draw_with_layout(self.package(context), layout)

@@ -86,16 +86,6 @@ class UnexpectedError(CustomError):
         super().__init__(custom_msg, orig, show_orig_msg)
 
 
-class SafeError(CustomError):
-    """a custom `RuntimeError` for errors that are real but are safe."""
-
-    base_msg: ClassVar[str] = f"A non-fatal error occured"
-
-    @override
-    def __init__(self, custom_msg="", orig=None, show_orig_msg=True):
-        super().__init__(custom_msg, orig, show_orig_msg)
-
-
 """Enum Convenience Classes"""
 
 

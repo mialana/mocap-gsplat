@@ -34,7 +34,7 @@ class Mosplat_OT_validate_media_file_statuses(
 
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)
-        return self.execute(pkg)
+        return self.execute_with_package(pkg)
 
     def contexted_execute(self, pkg):
         self.operator_thread(

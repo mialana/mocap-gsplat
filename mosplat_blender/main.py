@@ -19,7 +19,7 @@ from .core.handlers import (
 
 from .infrastructure.mixins import MosplatEnforceAttributesMixin
 from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME, ADDON_HUMAN_READABLE
-from .infrastructure.schemas import UnexpectedError
+from .infrastructure.schemas import DeveloperError, UnexpectedError
 
 classes: Sequence[
     Union[
@@ -46,8 +46,9 @@ def register_addon():
             if issubclass(c, MosplatEnforceAttributesMixin):
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
-        except (ValueError, RuntimeError, AttributeError):
-            logger.error(f"Exception during registration: `{c.__name__=}`")
+        except (ValueError, RuntimeError, AttributeError) as e:
+            de = DeveloperError(f"Exception during registration of `{c.__name__}`.", e)
+            logger.error(str(de))  # use str formatting of error but do not raise
 
     setattr(
         bpy.types.Scene,

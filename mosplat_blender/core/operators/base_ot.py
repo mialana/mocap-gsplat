@@ -9,7 +9,7 @@ import contextlib
 from queue import Queue
 import threading
 
-from ..checks import check_prefs_safe, check_props_safe
+from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
 from ...infrastructure.decorators import worker_fn_auto
@@ -31,13 +31,13 @@ if TYPE_CHECKING:
     OpResultSetLike: TypeAlias = Union[OpResultTuple, OpResultSet]
 
 Q = TypeVar("Q")  # the type of the elements in worker queue, if used
-K = TypeVar("K", bound=NamedTuple)
+K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
 
 
 class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
     bl_category: ClassVar[str] = OperatorIDEnum._category()
     __id_enum_type__ = OperatorIDEnum
-    _needs_invoke_before_execute: ClassVar[bool] = False
+    _requires_invoke_before_execute: ClassVar[bool] = False
 
     __invoke_called = False
     __worker: Optional[MosplatWorkerInterface[Q]] = None
@@ -54,31 +54,33 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
             cls.bl_label = OperatorIDEnum.label_factory(cls.bl_idname)
 
     @classmethod
-    def package(cls, context: Context) -> CtxPackage:
-        """convenience method to package context"""
-        return CtxPackage(
-            context=context, prefs=cls.prefs(context), props=cls.props(context)
-        )
-
-    @classmethod
     def poll(cls, context) -> bool:
-        prefs = check_prefs_safe(context)
-        props = check_props_safe(context)
-        if prefs is None or props is None or context.window_manager is None:
-            return False
-
         cls._poll_error_msg_list.clear()
 
+        try:
+            check_addonpreferences(context.preferences)
+        except (UserFacingError, UnexpectedError) as e:
+            cls._poll_error_msg_list.append(str(e))
+        try:
+            check_propertygroup(context.scene)
+        except (UserFacingError, UnexpectedError) as e:
+            cls._poll_error_msg_list.append(str(e))
+        try:
+            check_window_manager(context.window_manager)
+        except UserFacingError as e:
+            cls._poll_error_msg_list.append(str(e))
+
         wrapped_result = cls.contexted_poll(cls.package(context))
+
         if len(cls._poll_error_msg_list) > 0:  # set the poll msg based on the list
             cls.poll_message_set("\n".join(cls._poll_error_msg_list))
 
-        return wrapped_result or True  # if not implemented will return true
+        return wrapped_result
 
     @classmethod
     def contexted_poll(cls, pkg: CtxPackage) -> bool:
         """an overrideable entrypoint for `poll` with access to prefs and props"""
-        ...
+        return True  # if not overriden will return true
 
     def invoke(self, context, event) -> OpResultSet:
         self.__invoke_called = True
@@ -88,7 +90,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
             try:
                 wrapped_result: Final = im_to_set(self.contexted_invoke(pkg, event))
                 # if not implemented run and return execute
-                return wrapped_result or self.execute(context)
+                return wrapped_result
             except UserFacingError as e:  # all errs here are expected to be user-facing
                 e.add_note("NOTE: Caught during operator invoke.")
                 self.logger.error(str(e))  # TODO: decide if needs to be `exception`
@@ -101,13 +103,14 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         an overrideable entrypoint for `execute` that ensures context is available as a property
         so that subsequently `props` and `prefs` properties can be accessed
         """
-        ...
+        return self.execute_with_package(pkg)  # if not overriden will just execute
 
-    def execute(self, context, pkg: Optional[CtxPackage] = None) -> OpResultSet:
-        pkg = pkg or self.package(context)
+    def execute(self, context) -> OpResultSet:
+        return self.execute_with_package(self.package(context))
 
-        if self.__class__._needs_invoke_before_execute and not self.__invoke_called:
-            self.logger.error("This operator requires invokation.")
+    def execute_with_package(self, pkg: CtxPackage) -> OpResultSet:
+        if self.__class__._requires_invoke_before_execute and not self.__invoke_called:
+            self.logger.error("This operator requires invocation before execution.")
             self.cleanup(pkg)
             return {"CANCELLED"}
 
@@ -125,7 +128,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         an overrideable entrypoint for `execute` that ensures context is available as a property
         so that subsequently `props` and `prefs` properties can be accessed
         """
-        ...
+        raise NotImplementedError  # this function is required
 
     def modal(self, context, event) -> OpResultSet:
         pkg = self.package(context)
@@ -156,8 +159,12 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         return ("RUNNING_MODAL", "PASS_THROUGH")
 
     def queue_callback(self, pkg: CtxPackage, event: Event, next: Q) -> OpResultTuple:
-        """an entrypoint for when a new element is placed in the queue during `modal`"""
-        ...
+        """
+        an entrypoint for when a new element is placed in the queue during `modal`.
+        this function is required IF it's a modal operator.
+        otherwise, the `NotImplementedError` pathway will never be seen.
+        """
+        raise NotImplementedError
 
     def cancel(self, context):
         # no manager needed here as cleanup is non-blocking
@@ -186,7 +193,12 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         cancel_event: threading.Event,
         *,
         _kwargs: K,
-    ): ...
+    ):
+        """
+        this function is required IF it's a modal operator.
+        otherwise, the `NotImplementedError` pathway will never be seen.
+        """
+        raise NotImplementedError
 
     @contextlib.contextmanager
     def CLEANUP_MANAGER(self, pkg: CtxPackage):

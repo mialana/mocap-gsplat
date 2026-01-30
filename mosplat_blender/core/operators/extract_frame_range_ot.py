@@ -31,7 +31,7 @@ class Mosplat_OT_extract_frame_range(
     _requires_invoke_before_execute = True
 
     @classmethod
-    def contexted_poll(cls, pkg) -> bool:
+    def contexted_poll(cls, pkg):
         props = pkg.props
         cls._poll_error_msg_list.extend(props.is_valid_media_directory_poll_result)
         cls._poll_error_msg_list.extend(props.frame_range_poll_result(pkg.prefs))
@@ -51,7 +51,7 @@ class Mosplat_OT_extract_frame_range(
             props.generate_frame_range_npy_filepaths(prefs)
         )
 
-        return self.execute(pkg)
+        return self.execute_with_package(pkg)
 
     def contexted_execute(self, pkg):
         self.operator_thread(

@@ -44,7 +44,7 @@ class Mosplat_OT_run_preprocess_script(
             prefs, RAW_FRAME_DIRNAME
         )
 
-        return self.execute(pkg)
+        return self.execute_with_package(pkg)
 
     def contexted_execute(self, pkg):
         self.operator_thread(

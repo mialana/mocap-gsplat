@@ -8,11 +8,11 @@ we can operate with type-awareness in development.
 
 from __future__ import annotations
 
-from bpy.types import Preferences, Scene, Context
+from bpy.types import Preferences, Scene, Context, WindowManager
 
 import os
 from pathlib import Path
-from typing import cast, TYPE_CHECKING, Optional, Set, List, Generator
+from typing import cast, TYPE_CHECKING, Optional, Set, List, Generator, TypeGuard
 
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
@@ -20,7 +20,7 @@ from ..infrastructure.constants import (
     MEDIA_IO_DATASET_JSON_FILENAME,
     PER_FRAME_DIRNAME,
 )
-from ..infrastructure.schemas import UnexpectedError, SafeError, UserFacingError
+from ..infrastructure.schemas import UnexpectedError, UserFacingError
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ def check_propertygroup(
     scene: Optional[Scene],
 ) -> Mosplat_PG_Global:
     if scene is None:  # can occur if checked at the wrong time
-        raise SafeError("Blender scene unavailable in this context.")
+        raise UserFacingError("Blender scene unavailable in this context.")
     try:
         found_properties = getattr(scene, ADDON_PROPERTIES_ATTRIBNAME)
 
@@ -53,7 +53,7 @@ def check_addonpreferences(
     prefs_ctx: Optional[Preferences],
 ) -> Mosplat_AP_Global:
     if prefs_ctx is None:  # can occur if checked at the wrong time
-        raise SafeError("Blender preferences unavailable in this context.")
+        raise UserFacingError("Blender preferences unavailable in this context.")
 
     try:
         found_preferences = prefs_ctx.addons[ADDON_PREFERENCES_ID].preferences
@@ -68,22 +68,10 @@ def check_addonpreferences(
         ) from e
 
 
-def check_props_safe(context: Context) -> Optional[Mosplat_PG_Global]:
-    """provide a safe, non-throwing check that will log the stack trace but not raise"""
-    try:
-        return check_propertygroup(context.scene)
-    except SafeError as e:
-        logger.warning(str(e))
-        return None  # log stack trace but do not raise
-
-
-def check_prefs_safe(context: Context) -> Optional[Mosplat_AP_Global]:
-    """provide a safe, non-throwing check that will log the stack trace but not raise"""
-    try:
-        return check_addonpreferences(context.preferences)
-    except SafeError as e:
-        logger.warning(str(e))
-        return None  # log stack trace but do not raise
+def check_window_manager(wm: Optional[WindowManager]) -> TypeGuard[WindowManager]:
+    if wm is None:
+        raise UserFacingError("Window manager unavailable in this context.")
+    return True
 
 
 def check_data_output_dirpath(
