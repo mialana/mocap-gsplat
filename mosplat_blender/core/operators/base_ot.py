@@ -26,7 +26,7 @@ from ...infrastructure.schemas import (
     OperatorIDEnum,
     MediaIODataset,
 )
-from ...interfaces.worker_interface import MosplatWorkerInterface
+from ...interfaces.worker_interface import QT, MosplatWorkerInterface
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
@@ -39,17 +39,16 @@ if TYPE_CHECKING:
     from ..preferences import Mosplat_AP_Global
     from ..properties import Mosplat_PG_Global
 
-Q = TypeVar("Q")  # the type of the elements in worker queue, if used
 K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
 
 
-class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
+class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin):
     bl_category: ClassVar[str] = OperatorIDEnum._category()
     bl_options = {"REGISTER", "UNDO"}  # all of our operators should support undo
 
     __id_enum_type__ = OperatorIDEnum
 
-    __worker: Optional[MosplatWorkerInterface[Q]] = None
+    __worker: Optional[MosplatWorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
     __data: Optional[MediaIODataset] = None
 
@@ -173,7 +172,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
 
         return "RUNNING_MODAL"
 
-    def _queue_callback(self, pkg: CtxPackage, event: Event, next: Q) -> OpResultTuple:
+    def _queue_callback(self, pkg: CtxPackage, event: Event, next: QT) -> OpResultTuple:
         """
         an entrypoint for when a new element is placed in the queue during `modal`.
         this function is required IF it's a modal operator.
@@ -219,7 +218,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
 
         worker_fn = partial(self._operator_thread, twargs=twargs)
 
-        self.worker = MosplatWorkerInterface(worker_fn)
+        self.worker = MosplatWorkerInterface(self.bl_idname, worker_fn)
         self.worker.start()
 
         wm = self.wm(context)
@@ -229,7 +228,7 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
         wm.modal_handler_add(self)
 
     @staticmethod
-    def _operator_thread(queue: Queue[Q], cancel_event: threading.Event, *, twargs: K):
+    def _operator_thread(queue: Queue[QT], cancel_event: threading.Event, *, twargs: K):
         """
         this function is required IF it's a modal operator.
         otherwise, the `NotImplementedError` pathway will never be seen.
@@ -239,11 +238,11 @@ class MosplatOperatorBase(Generic[Q, K], Operator, MosplatContextAccessorMixin):
     """instance properties backed by mangled class attributes"""
 
     @property
-    def worker(self) -> Optional[MosplatWorkerInterface[Q]]:
+    def worker(self) -> Optional[MosplatWorkerInterface[QT]]:
         return self.__worker
 
     @worker.setter
-    def worker(self, wkr: Optional[MosplatWorkerInterface[Q]]):
+    def worker(self, wkr: Optional[MosplatWorkerInterface[QT]]):
         self.__worker = wkr
 
     @property
