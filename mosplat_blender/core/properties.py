@@ -13,9 +13,8 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TYPE_CHECKING, List, Tuple, Union, Generator, TypeAlias
+from typing import Generic, TYPE_CHECKING, List, Tuple, Union, Generator
 from typing import Final
-from string import capwords
 from pathlib import Path
 
 from .checks import (
@@ -184,12 +183,13 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
     __dataclass_type__ = LogEntry
 
     level: EnumProperty(
-        name="Log Level",
-        items=LogEntryEnumItems,
-        default=LogEntryLevelEnum.INFO.value,
-        options={"SKIP_SAVE"},
+        name="Log Level", items=LogEntryEnumItems, default=LogEntryLevelEnum.INFO.value
     )
     message: StringProperty(name="Message")
+
+    @property
+    def level_enum(self) -> LogEntryLevelEnum:
+        return LogEntryLevelEnum(self.level)
 
 
 class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
@@ -254,7 +254,18 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         options={"SKIP_SAVE"},
     )
 
-    current_log_entry_index: IntProperty(name="Current Log Entry Index", default=0)
+    current_log_entry_index: IntProperty(
+        name="Current Log Entry Index",
+        default=0,
+        options={"SKIP_SAVE"},
+    )
+
+    current_log_level_filter: EnumProperty(
+        name="Current Log Level Filter",
+        items=LogEntryEnumItems,
+        default=LogEntryLevelEnum._ALL.value,
+        options={"SKIP_SAVE"},
+    )
 
     @property
     def dataset_accessor(self) -> Mosplat_PG_MediaIODataset:
@@ -263,6 +274,10 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     @property
     def progress_accessor(self) -> Mosplat_PG_OperatorProgress:
         return self.current_operator_progress
+
+    @property
+    def log_level_filter_enum(self) -> LogEntryLevelEnum:
+        return LogEntryLevelEnum(self.current_log_level_filter)
 
     @property
     def logs_accessor(

@@ -47,10 +47,9 @@ def register_addon():
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
         except (ValueError, RuntimeError, AttributeError) as e:
-            msg = DeveloperError.make_msg(
+            raise DeveloperError(
                 f"Exception during registration of `{c.__name__}`.", e
-            )
-            logger.error(msg)  # use str formatting of error but do not raise
+            ) from e
 
     setattr(
         bpy.types.Scene,
@@ -73,6 +72,12 @@ def register_addon():
     bpy.app.handlers.redo_post.append(handle_save_to_json)
 
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon registration completed.")
+
+    logger.debug("this is debug")
+    logger.info("this is info")
+    logger.warning("this is warning")
+    logger.error("this is error")
+    logger.exception("this is exception")
 
 
 def unregister_addon():

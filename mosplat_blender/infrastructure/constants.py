@@ -38,8 +38,9 @@ COLORED_FORMATTER_LEVEL_STYLES = {
         "bold": True,
     },
     "error": {
-        "color": "red",
+        "color": "white",
         "bold": True,
+        "background": "red",
     },
 }
 
@@ -77,8 +78,10 @@ UI_LIST_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_UL_"
 
 MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
 
-PER_FRAME_DIRNAME = "frame_{:04d}"
-RAW_FRAME_DIRNAME = "raw"
+PER_FRAME_DIRNAME: Final[str] = "frame_{:04d}"
+RAW_FRAME_DIRNAME: Final[str] = "raw"
+
+MAX_LOG_ENTRIES_STORED: Final[int] = 24
 
 # path location of the shipped preprocess script
 DEFAULT_PREPROCESS_MEDIA_SCRIPT: Final[str] = str(

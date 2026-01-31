@@ -4,7 +4,7 @@ import os
 from ..properties import Mosplat_PG_MediaIODataset
 from ...infrastructure.schemas import PanelIDEnum, OperatorIDEnum, MediaFileStatus
 
-from .base_pt import MosplatPanelBase
+from .base_pt import MosplatPanelBase, column_factory
 
 _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")
 
@@ -51,13 +51,13 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         for s in statuses:
             _media_filename = Path(s.filepath).name
             _icon = "CON_TRANSFORM_CACHE" if s is _median_as_status else "FILE_MOVIE"
-            self._col_factory(grid, _media_filename, not s.is_valid, icon=_icon)
+            column_factory(grid, _media_filename, not s.is_valid, icon=_icon)
 
             fc_matches, w_matches, h_matches = s.matches_dataset(dataset)
 
-            self._col_factory(grid, f"F: {s.frame_count}", not fc_matches, pos="RIGHT")
-            self._col_factory(grid, f"W: {s.width}", not w_matches, pos="RIGHT")
-            self._col_factory(grid, f"H: {s.height}", not h_matches, pos="RIGHT")
+            column_factory(grid, f"F: {s.frame_count}", not fc_matches, pos="RIGHT")
+            column_factory(grid, f"W: {s.width}", not w_matches, pos="RIGHT")
+            column_factory(grid, f"H: {s.height}", not h_matches, pos="RIGHT")
 
         ranges = dataset.ranges_accessor
         if len(ranges) > 0:

@@ -16,6 +16,7 @@ from queue import Queue, Empty
 from ..infrastructure.constants import (
     COLORED_FORMATTER_FIELD_STYLES,
     COLORED_FORMATTER_LEVEL_STYLES,
+    MAX_LOG_ENTRIES_STORED,
 )
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
 from ..infrastructure.decorators import run_once_per_instance
@@ -23,7 +24,6 @@ from ..infrastructure.schemas import (
     UserFacingError,
     DeveloperError,
     UnexpectedError,
-    OperatorIDEnum,
     LogEntryLevelEnum,
 )
 
@@ -63,10 +63,6 @@ class MosplatLoggingInterface:
 
         self._root_logger = self.configure_logger_instance(root_module_name)
         self._root_logger.propagate = False  # prevent propogation to parent loggers
-
-        self._root_logger.info(
-            f"Local root logger configured with name: `{root_module_name}`."
-        )
 
         self._global_message_queue = Queue()
 
@@ -150,36 +146,46 @@ class MosplatLoggingInterface:
         raise DeveloperError("Logging needs to be initialized from root module.")
 
     def _init_handlers_from_addon_prefs(self, addon_prefs: SupportsMosplat_AP_Global):
-        stdout_result: bool = False
-        json_result: bool = False
-        blender_result: bool = False
+        stdout_ok: bool = False
+        json_ok: bool = False
+        blender_ok: bool = False
+
+        logger = self._root_logger
 
         ok_fmt = "'{handler_type}' logger initialized from addon prefs."
         error_fmt = "'{handler_type}' logger cannot be initialized from addon prefs."
 
         try:
-            stdout_result = self.init_stdout_handler(
+            stdout_ok = self.init_stdout_handler(
                 addon_prefs.stdout_log_format, addon_prefs.stdout_date_log_format
             )
-            json_result = self.init_json_handler(
+        except UserFacingError as e:
+            msg = UserFacingError.make_msg(
+                (ok_fmt if stdout_ok else error_fmt).format(handler_type="STDOUT"),
+                e,
+            )
+            logger.info(msg) if stdout_ok else logger.warning(msg)
+        try:
+            json_ok = self.init_json_handler(
                 log_fmt=addon_prefs.json_log_format,
                 log_date_fmt=addon_prefs.json_date_log_format,
                 outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
                 file_fmt=addon_prefs.json_log_filename_format,
             )
-            blender_result = self._init_blender_report_handler()
-        finally:
-            self._root_logger.info(
-                (ok_fmt if stdout_result else error_fmt).format(handler_type="STDOUT")
+        except UserFacingError as e:
+            msg = UserFacingError.make_msg(
+                (ok_fmt if json_ok else error_fmt).format(handler_type="JSON"),
+                e,
             )
-            self._root_logger.info(
-                (ok_fmt if json_result else error_fmt).format(handler_type="JSON")
+            logger.info(msg) if json_ok else logger.warning(msg)
+        try:
+            blender_ok = self._init_blender_report_handler()
+        except UserFacingError as e:
+            msg = UserFacingError.make_msg(
+                (ok_fmt if blender_ok else error_fmt).format(handler_type="BLENDER"),
+                e,
             )
-            self._root_logger.info(
-                (ok_fmt if blender_result else error_fmt).format(
-                    handler_type="Blender Report"
-                )
-            )
+            logger.info(msg) if blender_ok else logger.warning(msg)
 
     def _init_stdout_handler(self, log_fmt: str, log_date_fmt: str) -> bool:
         """set formatter of stdout logger and add as handler"""
@@ -287,7 +293,13 @@ class MosplatLoggingInterface:
                 entry = logs.add()
                 entry.level = level.value
                 entry.message = msg
-        except (UnexpectedError, UserFacingError) as e:
+
+                while len(logs) >= MAX_LOG_ENTRIES_STORED:
+                    logs.remove(0)
+
+                props.current_log_entry_index = len(logs) - 1
+
+        except (UnexpectedError, UserFacingError):
             pass
 
     def _add_global_message(self, msg: GlobalMessage):

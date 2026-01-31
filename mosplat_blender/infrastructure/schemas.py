@@ -130,7 +130,6 @@ class OperatorIDEnum(StrEnum):
     VALIDATE_MEDIA_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()
-    REPORT_GLOBAL_MESSAGES = auto()
 
 
 class PanelIDEnum(StrEnum):
@@ -140,7 +139,7 @@ class PanelIDEnum(StrEnum):
 
     @staticmethod
     def _category():
-        return ADDON_SHORTNAME
+        return ADDON_SHORTNAME.capitalize()
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
@@ -180,13 +179,14 @@ class LogEntryLevelEnum(StrEnum):
         return name.upper()
 
     def to_blender_enum_item(self) -> BlenderEnumItem:
-        return (self.value, self.value.lower(), "")
+        return (self.value, self.value.capitalize(), "")
 
     DEBUG = auto()
     INFO = auto()
     WARNING = auto()
     ERROR = auto()
     EXCEPTION = auto()
+    _ALL = auto()
 
     @classmethod
     def from_log_record(cls, levelname: str) -> Self:
@@ -489,3 +489,5 @@ class GlobalData:
         default_factory=OperatorProgress
     )
     current_log_entries: List[LogEntry] = field(default_factory=list)
+    current_log_level_index: int = 0
+    current_log_level_filter: str = LogEntryLevelEnum.INFO.value

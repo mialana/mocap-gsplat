@@ -174,23 +174,24 @@ class MosplatBlPropertyAccessorMixin(
     bl_rna: ClassVar[BlenderRNA]
 
     @classmethod
-    def get_prop_name(cls, prop_attrname: str) -> str:
+    def get_prop_name(cls, attrname: str) -> str:
         try:
-            return cls.bl_rna.properties[prop_attrname].name
+            property = cls.bl_rna.properties[attrname]
+            return property.name
         except KeyError:
-            cls.class_logger.error(
-                f"Tried to retrieve RNA name of non-existing prop: '{prop_attrname}'."
-            )
-            return f"KEY ERROR. Class: {cls.__qualname__}. Property: {prop_attrname}."  # make error visible and traceable
+            msg = f"Property '{attrname}' does not exist on '{cls.__qualname__}'"
+            cls.class_logger.error(msg)
+            return msg
 
     @classmethod
-    def unset_prop(cls, prop_attrname: str):
+    def get_prop_id(cls, attrname: str) -> str:
         try:
-            cls.bl_rna.property_unset(prop_attrname)
+            property = cls.bl_rna.properties[attrname]
+            return property.identifier
         except KeyError:
-            cls.class_logger.error(
-                f"Tried to retrieve RNA of non-existing property '{prop_attrname}'."
-            )
+            msg = f"Property '{attrname}' does not exist on '{cls.__qualname__}'"
+            cls.class_logger.error(msg)
+            return msg
 
 
 class CtxPackage(NamedTuple):

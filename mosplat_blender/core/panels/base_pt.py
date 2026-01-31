@@ -5,21 +5,36 @@ from bpy.types import Panel, UILayout, Context, UIList
 from typing import Literal, TYPE_CHECKING, Optional
 
 from ..checks import check_addonpreferences, check_propertygroup
-from ...infrastructure.mixins import (
-    CtxPackage,
-    MosplatContextAccessorMixin,
-    MosplatEnforceAttributesMixin,
+from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
+from ...infrastructure.schemas import (
+    PanelIDEnum,
+    UIListIDEnum,
+    UserFacingError,
+    UnexpectedError,
 )
-from ...infrastructure.schemas import PanelIDEnum, UserFacingError, UnexpectedError
-from ...infrastructure.constants import _MISSING_
 
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems
 
 
-class MosplatUIListBase(UIList, MosplatEnforceAttributesMixin):
-    bl_idname: str = _MISSING_
+def column_factory(
+    layout: UILayout,
+    text: str,
+    alert: bool = False,
+    icon: Optional[IconItems] = None,
+    pos: Optional[Literal["EXPAND", "LEFT", "CENTER", "RIGHT"]] = None,
+) -> UILayout:
+    col = layout.column()
+    if pos is not None:
+        col.alignment = pos
+    col.alert = alert
+    col.label(text=text, icon=icon) if icon else col.label(text=text)
+    return col
+
+
+class MosplatUIListBase(UIList, MosplatContextAccessorMixin):
+    __id_enum_type__ = UIListIDEnum
 
 
 class MosplatPanelBase(Panel, MosplatContextAccessorMixin):
