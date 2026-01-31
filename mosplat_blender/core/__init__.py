@@ -9,7 +9,7 @@ This is opposed to `infrastructure`, where `__init__.py` is empty, and individua
 from typing import List, Type
 
 from .operators import MosplatOperatorBase, all_operators
-from .panels import MosplatPanelBase, all_panels
+from .panels import MosplatPanelBase, MosplatUIListBase, all_panels, all_ui_lists
 from .preferences import Mosplat_AP_Global
 from .properties import (
     MosplatPropertyGroupBase,
@@ -17,6 +17,8 @@ from .properties import (
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,
+    Mosplat_PG_LogEntry,
+    Mosplat_PG_OperatorProgress,
     Mosplat_PG_Global,
 )
 
@@ -26,5 +28,7 @@ all_properties: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,
+    Mosplat_PG_LogEntry,
+    Mosplat_PG_OperatorProgress,
     Mosplat_PG_Global,
 ]

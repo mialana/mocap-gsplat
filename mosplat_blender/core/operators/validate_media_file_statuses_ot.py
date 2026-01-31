@@ -47,7 +47,7 @@ class Mosplat_OT_validate_media_file_statuses(
             return "FINISHED"
 
         # branch on `is_ok`
-        self.info(msg) if is_ok else self.warn(msg)
+        self.logger.info(msg) if is_ok else self.logger.warning(msg)
 
         # sync props from the dataclass that was updated within the thread
         pkg.props.dataset_accessor.from_dataclass(self.data)

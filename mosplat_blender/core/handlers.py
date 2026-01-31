@@ -35,6 +35,11 @@ def handle_load_from_json_timer_entrypoint(scene: Optional[Scene] = None) -> Non
     scene = scene or bpy.context.scene
     props = check_propertygroup(scene)
 
+    from ..interfaces import MosplatLoggingInterface
+    from ..infrastructure.schemas import LogEntryLevelEnum
+
+    MosplatLoggingInterface.add_global_message((LogEntryLevelEnum.WARNING, "testing"))
+
     try:
         # don't need dataclass anymore in this entrypoint pathway
         _, load_msg = load_dataset_property_group_from_json(props)

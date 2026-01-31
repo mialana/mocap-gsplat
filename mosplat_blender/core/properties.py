@@ -5,6 +5,7 @@ from bpy.types import PropertyGroup, Context
 from bpy.props import (
     BoolProperty,
     FloatProperty,
+    EnumProperty,
     IntProperty,
     StringProperty,
     CollectionProperty,
@@ -12,8 +13,9 @@ from bpy.props import (
     IntVectorProperty,
 )
 
-from typing import Generic, TYPE_CHECKING, List, Tuple, Union, Generator
-
+from typing import Generic, TYPE_CHECKING, List, Tuple, Union, Generator, TypeAlias
+from typing import Final
+from string import capwords
 from pathlib import Path
 
 from .checks import (
@@ -33,18 +35,34 @@ from ..infrastructure.mixins import (
 from ..infrastructure.protocols import SupportsCollectionProperty
 from ..infrastructure.constants import RAW_FRAME_DIRNAME
 from ..infrastructure.schemas import (
+    UserFacingError,
     OperatorIDEnum,
+    LogEntryLevelEnum,
+    BlenderEnumItem,
+)
+from ..infrastructure.schemas import (
     GlobalData,
+    OperatorProgress,
+    LogEntry,
     MediaIODataset,
     MediaFileStatus,
     ProcessedFrameRange,
     AppliedPreprocessScript,
-    UserFacingError,
 )
 from ..infrastructure.macros import try_access_path
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
+
+LogEntryEnumItems: Final[List[BlenderEnumItem]] = [
+    member.to_blender_enum_item() for member in LogEntryLevelEnum
+]
+
+
+def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
+    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT")
+
+    self.logger.info(f"'{self.get_prop_name('current_media_dir')}' updated.")
 
 
 class MosplatPropertyGroupBase(
@@ -162,10 +180,38 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
         return self.processed_frame_ranges
 
 
-def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
-    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT")
+class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
+    __dataclass_type__ = LogEntry
 
-    self.logger.info(f"'{self.get_prop_name('current_media_dir')}' updated.")
+    level: EnumProperty(
+        name="Log Level",
+        items=LogEntryEnumItems,
+        default=LogEntryLevelEnum.INFO.value,
+        options={"SKIP_SAVE"},
+    )
+    message: StringProperty(name="Message")
+
+
+class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
+    __dataclass_type__ = OperatorProgress
+
+    current: IntProperty(
+        name="Progress Current",
+        description="Singleton current progress of operators.",
+        default=-1,
+    )
+
+    total: IntProperty(
+        name="Progress Total",
+        description="Singleton total progress of operators.",
+        default=-1,
+    )
+
+    in_use: BoolProperty(
+        name="Progress In Use",
+        description="Whether any operator is 'using' the progress-related properties.",
+        default=False,
+    )
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
@@ -177,6 +223,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         default=str(Path.home()),
         subtype="DIR_PATH",
         update=update_current_media_dir,
+        options={"SKIP_SAVE"},
     )
 
     current_frame_range: IntVectorProperty(
@@ -185,6 +232,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         size=2,
         default=(0, 60),
         min=0,
+        options={"SKIP_SAVE"},
     )
 
     current_media_io_dataset: PointerProperty(
@@ -194,27 +242,33 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         options={"SKIP_SAVE"},
     )
 
-    operator_progress_current: IntProperty(
-        name="Progress Current",
-        description="Singleton current progress of operators.",
-        default=-1,
+    current_operator_progress: PointerProperty(
+        name="Current Operator Progress",
+        type=Mosplat_PG_OperatorProgress,
+        options={"SKIP_SAVE"},
     )
 
-    operator_progress_total: IntProperty(
-        name="Progress Total",
-        description="Singleton total progress of operators.",
-        default=-1,
+    current_log_entries: CollectionProperty(
+        name="Current Log Entries",
+        type=Mosplat_PG_LogEntry,
+        options={"SKIP_SAVE"},
     )
 
-    progress_in_use: BoolProperty(
-        name="Progress In Use",
-        description="Whether any operator is 'using' the progress-related properties.",
-        default=False,
-    )
+    current_log_entry_index: IntProperty(name="Current Log Entry Index", default=0)
 
     @property
     def dataset_accessor(self) -> Mosplat_PG_MediaIODataset:
         return self.current_media_io_dataset
+
+    @property
+    def progress_accessor(self) -> Mosplat_PG_OperatorProgress:
+        return self.current_operator_progress
+
+    @property
+    def logs_accessor(
+        self,
+    ) -> SupportsCollectionProperty[Mosplat_PG_LogEntry]:
+        return self.current_log_entries
 
     @property
     def current_media_dirpath(self) -> Path:

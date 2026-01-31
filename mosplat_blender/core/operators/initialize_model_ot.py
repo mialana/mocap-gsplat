@@ -43,7 +43,7 @@ class Mosplat_OT_initialize_model(
         if MosplatVGGTInterface.model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
-        if pkg.props.progress_in_use:
+        if pkg.props.progress_accessor.in_use:
             cls.poll_message_set("Wait until operators in-progress have completed.")
             return False
         return True
@@ -52,31 +52,32 @@ class Mosplat_OT_initialize_model(
         status, current, total, msg = next
         props = pkg.props
         wm = self.wm(pkg.context)
+        progress = props.progress_accessor
         if status == "progress":
-            if not props.progress_in_use and total > 0:
+            if not progress.in_use and total > 0:
                 wm.progress_begin(current, total)  # start progress bar if needed
-                props.progress_in_use = True  # mark usage of global progress props
-                props.operator_progress_total = total
-            if total != props.operator_progress_total:  # in case total changes
+                progress.in_use = True  # mark usage of global progress props
+                progress.total = total
+            if total != progress.total:  # in case total changes
                 wm.progress_end()
                 wm.progress_begin(current, total)
-                props.operator_progress_total = total
+                progress.total = total
 
             wm.progress_update(current)
-            props.operator_progress_current = current
-            self.debug(f"{current} / {total}")
+            progress.current = current
+            self.logger.debug(f"{current} / {total}")
         else:
             fmt = f"QUEUE {status.upper()} - {msg}"
             if status == "error":
-                self.error(fmt, "modal")
+                self.logger.error(fmt)
                 return "FINISHED"  # return finished as blender data has been modified
 
             elif status == "warning":
-                self.warn(fmt)
+                self.logger.warning(fmt)
             elif status == "debug":
-                self.debug(fmt)
+                self.logger.debug(fmt)
             else:
-                self.info(fmt)
+                self.logger.info(fmt)
             if status == "done":
                 return "FINISHED"  # finish
         return "RUNNING_MODAL"
@@ -119,7 +120,7 @@ class Mosplat_OT_initialize_model(
             preexec_fn=getattr(os, "setsid", None),  # TODO: cross-platform check
         )
 
-        self.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
+        self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
         self.launch_thread(
             pkg.context,
@@ -140,9 +141,10 @@ class Mosplat_OT_initialize_model(
 
     def cleanup(self, pkg):
         self.wm(pkg.context).progress_end()  # stop progress
-        pkg.props.progress_in_use = False
-        pkg.props.operator_progress_current = -1
-        pkg.props.operator_progress_total = -1
+        progress = pkg.props.progress_accessor
+        progress.in_use = False
+        progress.current = -1
+        progress.total = -1
 
         """
         register a timer that will kill the subprocess with the saved pid

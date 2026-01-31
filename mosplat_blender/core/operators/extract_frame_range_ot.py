@@ -67,7 +67,7 @@ class Mosplat_OT_extract_frame_range(
             return "FINISHED"
 
         if next != "update":  # if sent an error message via queue
-            self.warn(next)
+            self.logger.warning(next)
 
         # sync props regardless as the updated dataclass is still valid
         pkg.props.dataset_accessor.from_dataclass(self.data)

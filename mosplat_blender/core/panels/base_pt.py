@@ -1,16 +1,25 @@
 from __future__ import annotations
 
-from bpy.types import Panel, UILayout, Context
+from bpy.types import Panel, UILayout, Context, UIList
 
 from typing import Literal, TYPE_CHECKING, Optional
 
 from ..checks import check_addonpreferences, check_propertygroup
-from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
+from ...infrastructure.mixins import (
+    CtxPackage,
+    MosplatContextAccessorMixin,
+    MosplatEnforceAttributesMixin,
+)
 from ...infrastructure.schemas import PanelIDEnum, UserFacingError, UnexpectedError
+from ...infrastructure.constants import _MISSING_
 
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems
+
+
+class MosplatUIListBase(UIList, MosplatEnforceAttributesMixin):
+    bl_idname: str = _MISSING_
 
 
 class MosplatPanelBase(Panel, MosplatContextAccessorMixin):

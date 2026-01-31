@@ -17,7 +17,6 @@ from typing import (
     Tuple,
     Optional,
     ClassVar,
-    Literal,
     TypeAlias,
     Self,
 )
@@ -28,7 +27,12 @@ from enum import StrEnum, auto
 from string import capwords
 from abc import ABC
 
-from .constants import OPERATOR_ID_PREFIX, ADDON_SHORTNAME, PANEL_ID_PREFIX
+from .constants import (
+    OPERATOR_ID_PREFIX,
+    ADDON_SHORTNAME,
+    PANEL_ID_PREFIX,
+    UI_LIST_ID_PREFIX,
+)
 from .macros import (
     append_if_not_equals,
     int_median,
@@ -152,38 +156,40 @@ class PanelIDEnum(StrEnum):
 
     MAIN = auto()
     PREPROCESS = auto()
+    LOG_ENTRIES = auto()
 
 
-WmReportItems: TypeAlias = Literal[
-    "DEBUG",
-    "INFO",
-    "OPERATOR",
-    "PROPERTY",
-    "WARNING",
-    "ERROR",
-    "ERROR_INVALID_INPUT",
-    "ERROR_INVALID_CONTEXT",
-    "ERROR_OUT_OF_MEMORY",
-]
+class UIListIDEnum(StrEnum):
+    @staticmethod
+    def _prefix():
+        return UI_LIST_ID_PREFIX
+
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return f"{UI_LIST_ID_PREFIX}{name.lower()}"
+
+    LOG_ENTRIES = auto()
 
 
-class WmReportItemsEnum(StrEnum):
+BlenderEnumItem: TypeAlias = Tuple[str, str, str]  # this is (ID, Name, Description)
+
+
+class LogEntryLevelEnum(StrEnum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
         return name.upper()
 
+    def to_blender_enum_item(self) -> BlenderEnumItem:
+        return (self.value, self.value.lower(), "")
+
     DEBUG = auto()
     INFO = auto()
-    OPERATOR = auto()
-    PROPERTY = auto()
     WARNING = auto()
     ERROR = auto()
-    ERROR_INVALID_INPUT = auto()
-    ERROR_INVALID_CONTEXT = auto()
-    ERROR_OUT_OF_MEMORY = auto()
+    EXCEPTION = auto()
 
     @classmethod
-    def from_log_level(cls, levelname: str) -> Self:
+    def from_log_record(cls, levelname: str) -> Self:
         try:
             return cls[levelname.upper()]
         except KeyError:
@@ -460,12 +466,26 @@ class MediaIODataset:
 
 
 @dataclass
+class LogEntry:
+    level: str
+    message: str
+
+
+@dataclass
+class OperatorProgress:
+    current: int = -1
+    total: int = -1
+    in_use: bool = False
+
+
+@dataclass
 class GlobalData:
     current_media_dir: str = str(Path.home())
-    current_frame_range: Tuple[int, int] = field(default_factory=tuple[0, 6])
+    current_frame_range: Tuple[int, int] = field(default_factory=tuple[0, 60])
     current_media_io_dataset: MediaIODataset = field(
         default_factory=lambda: MediaIODataset(base_directory=str(Path.home()))
     )
-    operator_progress_current: int = -1
-    operator_progress_total: int = -1
-    progress_in_use: bool = False
+    current_operator_progress: OperatorProgress = field(
+        default_factory=OperatorProgress
+    )
+    current_log_entries: List[LogEntry] = field(default_factory=list)

@@ -18,23 +18,22 @@ from ..infrastructure.constants import (
     COLORED_FORMATTER_LEVEL_STYLES,
 )
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
-from ..infrastructure.decorators import run_once, run_once_per_instance
+from ..infrastructure.decorators import run_once_per_instance
 from ..infrastructure.schemas import (
     UserFacingError,
     DeveloperError,
     UnexpectedError,
     OperatorIDEnum,
-    WmReportItemsEnum,
+    LogEntryLevelEnum,
 )
 
-GlobalMessage: TypeAlias = Tuple[WmReportItemsEnum, str]
+GlobalMessage: TypeAlias = Tuple[LogEntryLevelEnum, str]
 
 
 class MosplatLoggingInterface:
-    instance: ClassVar[Optional[Self]] = None
+    instance: ClassVar[Optional[Self]]
     instance_name: ClassVar[str]
 
-    @run_once
     def __new__(cls, root_module_name: str) -> Self:
         """
         Expected usage is for only the top-level `__init__.py` of a package/program
@@ -73,21 +72,26 @@ class MosplatLoggingInterface:
 
     @classmethod
     def cleanup(cls):
-        """Remove handlers from the root logger on singleton instance. reset instance."""
-        self = cls.instance
-        if self is None:
+        "cleanup instance. reset instance."
+        if cls.instance is None:
             return
+        cls.instance._cleanup()
+        cls.instance = None
 
+    def _cleanup(self):
+        """Remove handlers from the root logger"""
         if self._stdout_log_handler:
             if self._root_logger:
                 self._root_logger.removeHandler(self._stdout_log_handler)
             self._stdout_log_handler.close()
-            del self._stdout_log_handler
         if self._json_log_handler:
             if self._root_logger:
                 self._root_logger.removeHandler(self._json_log_handler)
             self._json_log_handler.close()
-            del self._json_log_handler
+        if self._blender_report_handler:
+            if self._root_logger:
+                self._root_logger.removeHandler(self._blender_report_handler)
+            self._blender_report_handler.close()
 
         # drain message queue
         while True:
@@ -99,9 +103,6 @@ class MosplatLoggingInterface:
         if self._old_factory:
             # restore old logrecord factory
             logging.setLogRecordFactory(self._old_factory)
-            del self._old_factory
-
-        cls.instance = None
 
     @staticmethod
     def configure_logger_instance(name: str) -> logging.Logger:
@@ -153,47 +154,32 @@ class MosplatLoggingInterface:
         json_result: bool = False
         blender_result: bool = False
 
-        ok_fmt = "{handler_type} initialized from addon preferences."
-        error_fmt = "{handler_type} could not be initialized from addon preferences."
+        ok_fmt = "'{handler_type}' logger initialized from addon prefs."
+        error_fmt = "'{handler_type}' logger cannot be initialized from addon prefs."
 
         try:
             stdout_result = self.init_stdout_handler(
                 addon_prefs.stdout_log_format, addon_prefs.stdout_date_log_format
             )
-        finally:
-            self._root_logger.info(
-                (ok_fmt if stdout_result else error_fmt).format(handler_type="STDOUT")
-            )
-
-        try:
             json_result = self.init_json_handler(
                 log_fmt=addon_prefs.json_log_format,
                 log_date_fmt=addon_prefs.json_date_log_format,
                 outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,
                 file_fmt=addon_prefs.json_log_filename_format,
             )
-        finally:
-            self._root_logger.info(
-                (ok_fmt if json_result else error_fmt).format(handler_type="JSON")
-            )
-
-        try:
             blender_result = self._init_blender_report_handler()
         finally:
             self._root_logger.info(
-                (ok_fmt if blender_result else error_fmt).format(handler_type="JSON")
+                (ok_fmt if stdout_result else error_fmt).format(handler_type="STDOUT")
             )
-
-    def _init_blender_report_handler(self) -> bool:
-        saved_handler: Optional[MosplatBlenderReportHandler] = None
-        if self._blender_report_handler is not None:
-            saved_handler = self._blender_report_handler
-
-        try:
-            self._blender_report_handler = MosplatBlenderReportHandler()
-            return True
-        except Exception as e:
-            raise UserFacingError("Config for Blender handler failed.", e) from e
+            self._root_logger.info(
+                (ok_fmt if json_result else error_fmt).format(handler_type="JSON")
+            )
+            self._root_logger.info(
+                (ok_fmt if blender_result else error_fmt).format(
+                    handler_type="Blender Report"
+                )
+            )
 
     def _init_stdout_handler(self, log_fmt: str, log_date_fmt: str) -> bool:
         """set formatter of stdout logger and add as handler"""
@@ -246,6 +232,22 @@ class MosplatLoggingInterface:
         except Exception as e:
             raise UserFacingError("Configuration for JSON handler failed.", e) from e
 
+    def _init_blender_report_handler(self) -> bool:
+        saved_handler: Optional[MosplatBlenderReportHandler] = None
+        if self._blender_report_handler is not None:
+            saved_handler = self._blender_report_handler
+        try:
+            self._blender_report_handler = MosplatBlenderReportHandler()
+            self._root_logger.addHandler(self._blender_report_handler)
+
+            if saved_handler:
+                # remove and close the old handler on success
+                self._root_logger.removeHandler(saved_handler)
+                saved_handler.close()
+            return True
+        except Exception as e:
+            raise UserFacingError("Config for Blender handler failed.", e) from e
+
     @run_once_per_instance
     def _set_log_record_factory(self):
         """sets a custom log record factory. should be only ran once, as"""
@@ -272,31 +274,28 @@ class MosplatLoggingInterface:
         return self._old_factory
 
     def _drain_global_message_queue(self):
-        while not self._global_message_queue.empty():
-            level, msg = self._global_message_queue.get_nowait()
+        from bpy import context
+        from ..core.checks import check_propertygroup
 
-            try:
-                OperatorIDEnum.run(
-                    OperatorIDEnum.REPORT_GLOBAL_MESSAGES,
-                    "INVOKE_DEFAULT",
-                    level=level,
-                    message=msg,
-                )
-            except RuntimeError as e:
-                raise UnexpectedError(
-                    "An error occured while trying to report message to Blender.", e
-                ) from e
+        try:
+            props = check_propertygroup(context.scene)
+            logs = props.logs_accessor
+
+            while not self._global_message_queue.empty():
+                level, msg = self._global_message_queue.get_nowait()
+
+                entry = logs.add()
+                entry.level = level.value
+                entry.message = msg
+        except (UnexpectedError, UserFacingError) as e:
+            pass
 
     def _add_global_message(self, msg: GlobalMessage):
         self._global_message_queue.put(msg)
 
         from bpy.app import timers
 
-        timers.register(
-            self._drain_global_message_queue,
-            first_interval=0.0,
-            persistent=False,
-        )
+        timers.register(self._drain_global_message_queue, first_interval=0)
 
     # all non-standard lib modules should be nested locally
 
@@ -332,13 +331,12 @@ class MosplatLoggingInterface:
 
 
 class MosplatBlenderReportHandler(logging.Handler):
-
     def emit(self, record: logging.LogRecord):
         try:
             msg = self.format(record)
 
             levelname = record.levelname
-            item = WmReportItemsEnum.from_log_level(levelname)
+            item = LogEntryLevelEnum.from_log_record(levelname)
 
             MosplatLoggingInterface.add_global_message((item, msg))
 

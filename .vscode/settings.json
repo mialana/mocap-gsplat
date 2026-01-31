@@ -13,5 +13,5 @@
     "blender.addon.reloadOnSave": false,
     "blender.addon.logLevel": "info",
     "blender.addon.buildTaskName": "",
-    "blender.addon.justMyCode": true
+    "blender.addon.justMyCode": false
 }

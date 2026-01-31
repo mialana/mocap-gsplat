@@ -14,11 +14,7 @@ from ..handlers import load_dataset_property_group_from_json
 from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
-from ...infrastructure.constants import (
-    _TIMER_INTERVAL_,
-    OPERATOR_ERROR_MAP,
-    OPERATOR_FRAME,
-)
+from ...infrastructure.constants import _TIMER_INTERVAL_
 from ...infrastructure.schemas import (
     UnexpectedError,
     DeveloperError,
@@ -54,9 +50,9 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
 
     _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
 
-    @classmethod
-    def __init_subclass__(cls, **kwargs):
-        MosplatContextAccessorMixin.__init_subclass__(cls.bl_idname, **kwargs)
+    # @classmethod
+    # def __init_subclass__(cls, **kwargs):
+    #     MosplatContextAccessorMixin.__init_subclass__(cls.bl_idname, **kwargs)
 
     @classmethod
     def at_registration(cls):
@@ -106,7 +102,7 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
             except UserFacingError as e:  # all errs here are expected to be user-facing
                 e.add_note("NOTE: Caught during operator invoke.")
                 # only error as we have sufficiently covered the stack with messages
-                self.error(str(e), "invoke")
+                self.logger.error(str(e))
                 self.cleanup(pkg)
                 return {"FINISHED"}  # return finished as blender data was modified
 
@@ -130,12 +126,12 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
                     "Are you aware this operator requires invocation before execution?",
                     e,
                 )
-                self.error(msg, "execute")
+                self.logger.error(msg)
                 self.cleanup(pkg)
                 return {"FINISHED"}  # finish because blender props changed
 
             if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result):  # intersection
-                self.debug("Execution complete.")
+                self.logger.debug("Execution complete.")
                 self.cleanup(pkg)  # cleanup if not a modal operator
             return wrapped_result
 
@@ -149,7 +145,7 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
     def modal(self, context, event) -> OpResultSet:
         pkg = self.package(context)
         if event.type in {"ESC"}:
-            self.info("Operator cancelled by user.")
+            self.logger.info("Operator cancelled by user.")
             self.cleanup(pkg)
             return {"FINISHED"}  # user manually cancels through escape
         elif event.type != "TIMER":
@@ -157,7 +153,7 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
         with self.CLEANUP_MANAGER(pkg):
             wrapped_result: Final = im_to_set(self._contexted_modal(pkg, event))
             if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result) and self.worker:
-                self.debug("Modal callbacks stopped.")
+                self.logger.debug("Modal callbacks stopped.")
                 # cleanup if a non-looping result was returned and worker is not None
                 self.cleanup(pkg)
             return wrapped_result
@@ -196,14 +192,14 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
         if self.timer:
             self.wm(pkg.context).event_timer_remove(self.timer)
             self.timer = None
-            self.debug("Timer cleaned up")
+            self.logger.debug("Timer cleaned up")
         if self.worker:
             self.worker.cleanup()
             self.worker = None
-            self.debug("Worker cleaned up")
+            self.logger.debug("Worker cleaned up")
 
         self.__data = None  # data is not guaranteed to be in-sync anymore
-        self.info("Operator cleaned up")
+        self.logger.info("Operator cleaned up")
 
     @contextlib.contextmanager
     def CLEANUP_MANAGER(self, pkg: CtxPackage):
@@ -213,7 +209,7 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
             msg = DeveloperError.make_msg(
                 "Uncaught exception during operator lifetime.", e
             )
-            self.exception(msg)
+            self.logger.exception(msg)
             self.cleanup(pkg)  # cleanup here
 
         try:
@@ -277,34 +273,12 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
             raise UnexpectedError("Poll-guard failed for window manager.")
         return wm
 
-    """convenience functions to log and report"""
-
-    def debug(self, msg: str):
-        self.logger.debug(msg)
-        self.report({"DEBUG"}, msg)
-
-    def info(self, msg: str):
-        self.logger.info(msg)
-        self.report({"INFO"}, msg)
-
-    def warn(self, msg: str):
-        self.logger.warning(msg)
-        self.report({"WARNING"}, msg)
-
-    def error(self, msg: str, frame: OPERATOR_FRAME):
-        self.logger.error(msg)
-        self.report(OPERATOR_ERROR_MAP[frame], msg)
-
-    def exception(self, msg: str):
-        self.logger.exception(msg)
-        self.report({"ERROR"}, msg)
-
     def __load_global_data(self, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
         # try to restore both dataclass and property group from local JSON
         # mangle so that only base class can access
         try:
             self.__data, load_msg = load_dataset_property_group_from_json(props, prefs)
-            self.info(load_msg)  # log the load message
+            self.logger.info(load_msg)  # log the load message
         except UserWarning as e:  # raised if filesystem permission errors
             self.__data = None
             raise UserFacingError(

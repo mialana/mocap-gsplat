@@ -169,17 +169,28 @@ class MosplatBlPropertyAccessorMixin(
 ):
     """a mixin class for easier access to Blender properties' RNA"""
 
-    bl_rna: ClassVar
+    from bpy.types import BlenderRNA
+
+    bl_rna: ClassVar[BlenderRNA]
 
     @classmethod
     def get_prop_name(cls, prop_attrname: str) -> str:
         try:
             return cls.bl_rna.properties[prop_attrname].name
         except KeyError:
-            cls.class_logger.exception(
-                f"Tried to retrieve RNA of non-existing property '{prop_attrname}'."
+            cls.class_logger.error(
+                f"Tried to retrieve RNA name of non-existing prop: '{prop_attrname}'."
             )
             return f"KEY ERROR. Class: {cls.__qualname__}. Property: {prop_attrname}."  # make error visible and traceable
+
+    @classmethod
+    def unset_prop(cls, prop_attrname: str):
+        try:
+            cls.bl_rna.property_unset(prop_attrname)
+        except KeyError:
+            cls.class_logger.error(
+                f"Tried to retrieve RNA of non-existing property '{prop_attrname}'."
+            )
 
 
 class CtxPackage(NamedTuple):

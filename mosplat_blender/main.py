@@ -27,13 +27,13 @@ classes: Sequence[
         Type[core.MosplatPanelBase],
         Type[core.MosplatPropertyGroupBase],
         Type[core.Mosplat_AP_Global],
+        Type[core.MosplatUIListBase],
     ]
 ] = (
-    [
-        core.Mosplat_AP_Global,
-    ]
+    [core.Mosplat_AP_Global]
     + core.all_properties
     + core.all_operators
+    + core.all_ui_lists
     + core.all_panels
 )
 

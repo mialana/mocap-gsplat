@@ -20,8 +20,9 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         column = layout.column()
         init_model_box = column.box()
         init_model_box.row().operator(OperatorIDEnum.INITIALIZE_MODEL)
-        prog_curr = props.operator_progress_current
-        prog_total = props.operator_progress_total
+        progress = props.progress_accessor
+        prog_curr: int = progress.current
+        prog_total: int = progress.total
         if prog_curr > 0 and prog_total > 0:
             init_model_box.row().progress(factor=(float(prog_curr) / float(prog_total)))
 
