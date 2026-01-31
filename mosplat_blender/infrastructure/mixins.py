@@ -12,6 +12,7 @@ from typing import (
     TYPE_CHECKING,
     List,
     NamedTuple,
+    Optional,
 )
 from enum import StrEnum
 from dataclasses import fields
@@ -46,18 +47,18 @@ class MosplatLogClassMixin:
     class_logger: ClassVar[logging.Logger] = _MISSING_
 
     @classmethod
-    def _create_logger_for_class(cls):
+    def _create_logger_for_class(cls, label: Optional[str] = None):
         from ..interfaces import MosplatLoggingInterface
 
         cls.class_logger = MosplatLoggingInterface.configure_logger_instance(
-            f"{cls.__module__}.logclass{cls.__qualname__}"
+            f"{cls.__module__}.logclass{label if label else cls.__qualname__}"
         )
 
     @classmethod
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, label: Optional[str] = None, /, **kwargs):
         super().__init_subclass__(**kwargs)
 
-        cls._create_logger_for_class()  # create logger for subclasses
+        cls._create_logger_for_class(label)  # create logger for subclasses
 
     @property
     def logger(self) -> logging.Logger:

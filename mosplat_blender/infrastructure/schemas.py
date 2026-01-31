@@ -18,9 +18,8 @@ from typing import (
     Optional,
     ClassVar,
     Literal,
-    Final,
-    get_args,
     TypeAlias,
+    Self,
 )
 
 from dataclasses import dataclass, field, asdict
@@ -182,6 +181,13 @@ class WmReportItemsEnum(StrEnum):
     ERROR_INVALID_INPUT = auto()
     ERROR_INVALID_CONTEXT = auto()
     ERROR_OUT_OF_MEMORY = auto()
+
+    @classmethod
+    def from_log_level(cls, levelname: str) -> Self:
+        try:
+            return cls[levelname.upper()]
+        except KeyError:
+            return cls["INFO"]
 
 
 @dataclass(frozen=True)

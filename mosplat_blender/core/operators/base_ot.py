@@ -55,6 +55,10 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
     _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
 
     @classmethod
+    def __init_subclass__(cls, **kwargs):
+        MosplatContextAccessorMixin.__init_subclass__(cls.bl_idname, **kwargs)
+
+    @classmethod
     def at_registration(cls):
         super().at_registration()
 
@@ -204,14 +208,21 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
     @contextlib.contextmanager
     def CLEANUP_MANAGER(self, pkg: CtxPackage):
         """ensures clean up always runs even with uncaught exceptions"""
-        try:
-            yield
-        except BaseException as e:
+
+        def handle():
             msg = DeveloperError.make_msg(
                 "Uncaught exception during operator lifetime.", e
             )
             self.exception(msg)
             self.cleanup(pkg)  # cleanup here
+
+        try:
+            yield
+        except Exception as e:
+            handle()
+        except BaseException as e:
+            handle()
+            raise  # this needs to be raised
 
     def launch_thread(self, context: Context, *, twargs: K):
         """`twargs` as in keyword args made of a immutable tuple"""

@@ -2,8 +2,19 @@
 
 from __future__ import annotations
 
-from functools import wraps, update_wrapper, partial
-from typing import Callable, ParamSpec, TypeVar, Type, Optional
+from functools import wraps, update_wrapper
+from typing import (
+    Callable,
+    ParamSpec,
+    TypeVar,
+    Type,
+    Optional,
+    Generic,
+    Concatenate,
+    Self,
+)
+from typing import overload
+
 from .schemas import DeveloperError
 from .constants import _MISSING_
 
@@ -11,8 +22,9 @@ from .constants import _MISSING_
 P = ParamSpec("P")
 # maintains orig callable's returntype  for `run_once`  and `record_work_time`
 R = TypeVar("R")
-# tracks decorated class for `no_instantiate`
-T = TypeVar("T", bound=Type)
+
+T = TypeVar("T", bound=Type)  # tracks decorated class for `no_instantiate`
+I = TypeVar("I")  # tracks `instance` for `run_once_per_instance`
 
 
 def run_once(f: Callable[P, R]) -> Callable[P, R]:
@@ -34,17 +46,17 @@ def run_once(f: Callable[P, R]) -> Callable[P, R]:
     return wrapper
 
 
-class run_once_per_instance(object):
+class run_once_per_instance(Generic[I, P, R]):
     """decorator class that runs a method only once per class instance."""
 
-    def __init__(self, fn):
+    def __init__(self, fn: Callable[Concatenate[I, P], R]):
         update_wrapper(self, fn)
         self.fn = fn
 
         self._has_run_attr = f"__{fn.__name__}_has_run"
         self._run_result_attr = f"__{fn.__name__}_run_result"
 
-    def __call__(self, instance, *args, **kwargs):
+    def __call__(self, instance: I, *args: P.args, **kwargs: P.kwargs) -> R:
         has_run = getattr(instance, self._has_run_attr, False)
         result = getattr(instance, self._run_result_attr, _MISSING_)
         if not has_run or result is _MISSING_:
@@ -53,11 +65,17 @@ class run_once_per_instance(object):
             setattr(instance, self._run_result_attr, result)
         return result
 
-    def __get__(self, instance, instancetype):
+    @overload
+    def __get__(self, instance: None, owner: type[I]) -> Self: ...
+
+    @overload
+    def __get__(self, instance: I, owner: type[I]) -> Callable[P, R]: ...
+
+    def __get__(self, instance, owner) -> Self | Callable[P, R]:
         if instance is None:
             return self
 
-        def bound(*args, **kwargs):
+        def bound(*args: P.args, **kwargs: P.kwargs) -> R:
             return self(instance, *args, **kwargs)
 
         update_wrapper(bound, self.fn)

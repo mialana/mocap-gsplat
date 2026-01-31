@@ -11,6 +11,7 @@ class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
     bl_description = (
         f"Quick navigation to '{ADDON_HUMAN_READABLE}' saved addon preferences."
     )
+    bl_options = {"REGISTER", "MACRO"}
 
     def _contexted_execute(self, pkg):
         context = pkg.context
