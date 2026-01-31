@@ -186,6 +186,7 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
         name="Log Level", items=LogEntryEnumItems, default=LogEntryLevelEnum.INFO.value
     )
     message: StringProperty(name="Message")
+    full_message: StringProperty(name="Full Message")
 
     @property
     def level_enum(self) -> LogEntryLevelEnum:
@@ -263,7 +264,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     current_log_level_filter: EnumProperty(
         name="Current Log Level Filter",
         items=LogEntryEnumItems,
-        default=LogEntryLevelEnum._ALL.value,
+        default=LogEntryLevelEnum.ALL.value,
         options={"SKIP_SAVE"},
     )
 

@@ -73,12 +73,6 @@ def register_addon():
 
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon registration completed.")
 
-    logger.debug("this is debug")
-    logger.info("this is info")
-    logger.warning("this is warning")
-    logger.error("this is error")
-    logger.exception("this is exception")
-
 
 def unregister_addon():
     """essentially all operations here should be guarded with try blocks"""

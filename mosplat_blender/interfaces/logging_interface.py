@@ -27,7 +27,7 @@ from ..infrastructure.schemas import (
     LogEntryLevelEnum,
 )
 
-GlobalMessage: TypeAlias = Tuple[LogEntryLevelEnum, str]
+GlobalMessage: TypeAlias = Tuple[LogEntryLevelEnum, str, str]
 
 
 class MosplatLoggingInterface:
@@ -288,13 +288,14 @@ class MosplatLoggingInterface:
             logs = props.logs_accessor
 
             while not self._global_message_queue.empty():
-                level, msg = self._global_message_queue.get_nowait()
+                level, msg, full_msg = self._global_message_queue.get_nowait()
 
                 entry = logs.add()
                 entry.level = level.value
                 entry.message = msg
+                entry.full_message = full_msg
 
-                while len(logs) >= MAX_LOG_ENTRIES_STORED:
+                while len(logs) > MAX_LOG_ENTRIES_STORED:
                     logs.remove(0)
 
                 props.current_log_entry_index = len(logs) - 1
@@ -346,11 +347,20 @@ class MosplatBlenderReportHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         try:
             msg = self.format(record)
+            classname = getattr(record, "classname", None)
+            asctime = getattr(record, "asctime", None)
+
+            full_msg = msg
+            if classname and classname != "noclass":
+                full_msg += f"\n[{classname}]"
+            if asctime:
+                full_msg += f"\n({asctime})"
+            full_msg += "\n"  # skip a line
 
             levelname = record.levelname
             item = LogEntryLevelEnum.from_log_record(levelname)
 
-            MosplatLoggingInterface.add_global_message((item, msg))
+            MosplatLoggingInterface.add_global_message((item, msg, full_msg))
 
         except Exception:
             # logging handlers should never raise

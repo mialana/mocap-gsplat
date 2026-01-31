@@ -4,14 +4,14 @@ from bpy.types import bpy_prop_array
 
 from typing import TYPE_CHECKING, List, cast, Dict
 
-from ...infrastructure.constants import MAX_LOG_ENTRIES_STORED
+from ..properties import Mosplat_PG_LogEntry
+from ...infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
 from ...infrastructure.protocols import SupportsCollectionProperty
 from ...infrastructure.schemas import PanelIDEnum, UIListIDEnum, LogEntryLevelEnum
 
 from .base_pt import MosplatPanelBase, MosplatUIListBase
 
 if TYPE_CHECKING:
-    from ..properties import Mosplat_PG_LogEntry
     from bpy.stub_internal.rna_enums import IconItems
 
 LOG_LEVEL_ICON_MAP: Dict[LogEntryLevelEnum, IconItems] = {
@@ -48,16 +48,17 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
             log.level_enum == LogEntryLevelEnum.ERROR
             or log.level_enum == LogEntryLevelEnum.EXCEPTION
         )
-        split = row.split(factor=0.1, align=True)
-        split.label(text=str(index))
-
-        inner = split.split(factor=0.15, align=True)
-        inner.label(
+        split = row.split(factor=0.15, align=True)
+        split.label(
             text=log.level, icon=LOG_LEVEL_ICON_MAP[LogEntryLevelEnum[log.level]]
         )
 
-        sub = inner.row()
-        sub.label(text=log.message)
+        inner = split.split(factor=0.9, align=True)
+
+        inner.label(text=log.message)
+        sub = inner.row(align=True)
+        sub.alignment = "RIGHT"
+        sub.label(text=str(index))
 
     def filter_items(self, context, data, property):
         collection: SupportsCollectionProperty[Mosplat_PG_LogEntry] = getattr(
@@ -70,7 +71,7 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         flt_neworder: List[int] = []
 
         for idx, log in enumerate(collection):
-            if filter == LogEntryLevelEnum._ALL:
+            if filter == LogEntryLevelEnum.ALL:
                 flt_flags.append(self.bitflag_filter_item)
             elif log.level_enum == filter:
                 flt_flags.append(self.bitflag_filter_item)
@@ -102,7 +103,7 @@ class Mosplat_PT_LogEntries(MosplatPanelBase):
             props.get_prop_id("current_log_entries"),
             props,
             props.get_prop_id("current_log_entry_index"),
-            item_dyntip_propname="message",
-            rows=MAX_LOG_ENTRIES_STORED // 2,
+            item_dyntip_propname=Mosplat_PG_LogEntry.get_prop_id("full_message"),
+            rows=DEFAULT_LOG_ENTRY_ROWS,
             sort_lock=True,
         )

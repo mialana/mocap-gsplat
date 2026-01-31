@@ -186,7 +186,7 @@ class LogEntryLevelEnum(StrEnum):
     WARNING = auto()
     ERROR = auto()
     EXCEPTION = auto()
-    _ALL = auto()
+    ALL = auto()
 
     @classmethod
     def from_log_record(cls, levelname: str) -> Self:
@@ -469,6 +469,7 @@ class MediaIODataset:
 class LogEntry:
     level: str
     message: str
+    full_message: str
 
 
 @dataclass

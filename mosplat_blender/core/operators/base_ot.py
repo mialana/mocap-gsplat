@@ -50,10 +50,6 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
 
     _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
 
-    # @classmethod
-    # def __init_subclass__(cls, **kwargs):
-    #     MosplatContextAccessorMixin.__init_subclass__(cls.bl_idname, **kwargs)
-
     @classmethod
     def at_registration(cls):
         super().at_registration()

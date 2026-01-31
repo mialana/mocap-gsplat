@@ -59,20 +59,6 @@ class MosplatPanelBase(Panel, MosplatContextAccessorMixin):
         except (UserFacingError, UnexpectedError) as e:
             return False
 
-    @staticmethod
-    def _col_factory(
-        layout: UILayout,
-        text: str,
-        alert: bool = False,
-        icon: Optional[IconItems] = None,
-        pos: Optional[Literal["EXPAND", "LEFT", "CENTER", "RIGHT"]] = None,
-    ):
-        col = layout.column()
-        if pos is not None:
-            col.alignment = pos
-        col.alert = alert
-        col.label(text=text, icon=icon) if icon else col.label(text=text)
-
     def draw(self, context: Context) -> None:
         if not (layout := self.layout):
             self.logger.warning("Layout not available in draw function.")

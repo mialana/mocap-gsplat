@@ -82,6 +82,7 @@ PER_FRAME_DIRNAME: Final[str] = "frame_{:04d}"
 RAW_FRAME_DIRNAME: Final[str] = "raw"
 
 MAX_LOG_ENTRIES_STORED: Final[int] = 24
+DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
 
 # path location of the shipped preprocess script
 DEFAULT_PREPROCESS_MEDIA_SCRIPT: Final[str] = str(
