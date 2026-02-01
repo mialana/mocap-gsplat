@@ -6,7 +6,7 @@ import os
 import libcst as cst
 from libcst import matchers as m
 
-from black import format_str, FileMode
+import black
 import isort
 
 ADDON_HUMAN_READABLE = os.getenv("ADDON_HUMAN_READABLE", "mosplat_blender")
@@ -246,15 +246,29 @@ def patch_original_file(py_file: Path, meta_path: Path, meta_symbols: list[str])
     )
 
     new_source = module.code
+    sorted = isort.code(new_source)  # sort with isort
 
-    if new_source != source:
-        sorted = isort.code(new_source)
-        # format with black
-        formatted = format_str(sorted, mode=FileMode())
+    # format with black
+    formatted = black.format_str(sorted, mode=black.FileMode())
 
-        py_file.write_text(formatted, encoding="utf-8", newline="\n")
+    if formatted == source:
+        return
+
+    py_file.write_text(formatted, encoding="utf-8", newline="\n")
 
     print(f"Patched '{py_file}'.")
+
+
+def diff_meta_file(meta_path: Path, formatted_new_text: str) -> bool:
+    """returns true if there is a difference"""
+
+    if not meta_path.exists():
+        return True
+
+    old_lines = meta_path.read_text(encoding="utf-8").splitlines()
+    new_lines = formatted_new_text.split("\n")[:-1]
+
+    return old_lines[1:] != new_lines[1:]  # remove timestamp line from check
 
 
 def generate_meta_file(py_file: Path):
@@ -286,16 +300,14 @@ def generate_meta_file(py_file: Path):
     meta_dir.mkdir(exist_ok=True)
 
     meta_path = meta_dir / f"{py_file.stem}_meta.py"
-
     meta_code = "\n".join(meta_lines)
-    formatted_meta_code = format_str(meta_code, mode=FileMode())  # format with black
+    formatted = black.format_str(meta_code, mode=black.FileMode())  # format with black
 
-    meta_path.write_text(formatted_meta_code, encoding="utf-8", newline="\n")
+    if diff_meta_file(meta_path, formatted):  # skip writing meta file to patch logic
+        meta_path.write_text(formatted, encoding="utf-8", newline="\n")
+        print(f"Generated '{meta_path}'")
 
     meta_symbols = [f"{cls}Meta" for cls in extractor.classes]
-
-    print(f"Generated '{meta_path}'")
-
     patch_original_file(py_file, meta_path, meta_symbols)
 
 
@@ -314,7 +326,7 @@ def get_args():
     parser.add_argument(
         "-f",
         "--files",
-        nargs="+",
+        nargs="*",
         type=Path,
         help="Files that need processing",
         default=[],
@@ -324,6 +336,7 @@ def get_args():
 
 
 def main(addon_src_dir: Path):
+    print("Starting generation of property meta files.")
     CORE_MODULE = addon_src_dir / "core"
 
     py_files = [file for file in CORE_MODULE.rglob("*.py")]
@@ -332,6 +345,8 @@ def main(addon_src_dir: Path):
 
     for file in py_files:
         generate_meta_file(file)
+
+    print("Done.")
 
 
 if __name__ == "__main__":

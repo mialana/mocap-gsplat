@@ -1,0 +1,32 @@
+[project]
+name = "mocap-gsplat"
+requires-python = ">=3.11"
+authors = [
+    {name = "Amy Liu", email = "aliu@amyliu.dev"},
+]
+
+[tool.black]
+
+[tool.isort]
+profile = "black"
+src_paths = ["mosplat_blender"]
+known_first_party = ["mosplat_blender"]
+
+known_blender = ["bpy", "bmesh", "mathutils"]
+
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "BLENDER",
+    "THIRDPARTY",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
+]
+
+[tool.pyright]
+include = ["mosplat_blender"]
+exclude = ["**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
+stubPath = "typings"
