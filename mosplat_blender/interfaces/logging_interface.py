@@ -202,7 +202,7 @@ class MosplatLoggingInterface:
             json_log_formatter = self.MosplatJsonFormatter(
                 log_fmt, datefmt=log_date_fmt, json_indent=2  # indent 2 for readability
             )
-            outdir.mkdir(exist_ok=True)  # make the log directory if necessary
+            outdir.mkdir(parents=True, exist_ok=True)  # make the log directory if necessary
 
             json_log_outfile = outdir / datetime.datetime.now().strftime(file_fmt)
             self._json_log_handler = logging.FileHandler(json_log_outfile)

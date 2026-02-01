@@ -1,55 +1,57 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
 
-from bpy.types import PropertyGroup, Context
+from pathlib import Path
+from typing import TYPE_CHECKING, Final, Generator, Generic, List, Tuple, Union
+
 from bpy.props import (
     BoolProperty,
-    FloatProperty,
-    EnumProperty,
-    IntProperty,
-    StringProperty,
     CollectionProperty,
-    PointerProperty,
+    EnumProperty,
+    FloatProperty,
+    IntProperty,
     IntVectorProperty,
+    PointerProperty,
+    StringProperty,
 )
+from bpy.types import Context, PropertyGroup
 
-from typing import Generic, TYPE_CHECKING, List, Tuple, Union, Generator
-from typing import Final
-from pathlib import Path
-
-from .checks import (
-    check_media_files,
-    check_data_output_dirpath,
-    check_data_json_filepath,
-    check_current_media_dirpath,
-    check_frame_range_poll_result,
-    check_frame_range_npy_filepaths,
-)
-
-from ..infrastructure.mixins import (
-    D,
-    BlRNAAccessorMixin,
-    DataclassInteropMixin,
-)
-from ..infrastructure.protocols import SupportsCollectionProperty
 from ..infrastructure.constants import RAW_FRAME_DIRNAME
-from ..infrastructure.schemas import (
-    UserFacingError,
-    OperatorIDEnum,
-    LogEntryLevelEnum,
-    BlenderEnumItem,
-)
-from ..infrastructure.schemas import (
-    GlobalData,
-    LogEntryHub,
-    LogEntry,
-    OperatorProgress,
-    MediaIODataset,
-    MediaFileStatus,
-    ProcessedFrameRange,
-    AppliedPreprocessScript,
-)
 from ..infrastructure.macros import try_access_path
+from ..infrastructure.mixins import BlRNAAccessorMixin, D, DataclassInteropMixin
+from ..infrastructure.protocols import SupportsCollectionProperty
+from ..infrastructure.schemas import (
+    AppliedPreprocessScript,
+    BlenderEnumItem,
+    GlobalData,
+    LogEntry,
+    LogEntryHub,
+    LogEntryLevelEnum,
+    MediaFileStatus,
+    MediaIODataset,
+    OperatorIDEnum,
+    OperatorProgress,
+    ProcessedFrameRange,
+    UserFacingError,
+)
+from .checks import (
+    check_current_media_dirpath,
+    check_data_json_filepath,
+    check_data_output_dirpath,
+    check_frame_range_npy_filepaths,
+    check_frame_range_poll_result,
+    check_media_files,
+)
+from .meta.properties_meta import (
+    Mosplat_PG_AppliedPreprocessScriptMeta,
+    Mosplat_PG_GlobalMeta,
+    Mosplat_PG_LogEntryHubMeta,
+    Mosplat_PG_LogEntryMeta,
+    Mosplat_PG_MediaFileStatusMeta,
+    Mosplat_PG_MediaIODatasetMeta,
+    Mosplat_PG_OperatorProgressMeta,
+    Mosplat_PG_ProcessedFrameRangeMeta,
+)
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
@@ -83,6 +85,10 @@ class Mosplat_PG_AppliedPreprocessScript(
     mod_time: FloatProperty(name="Modification Time", default=-1.0)
     file_size: IntProperty(name="File Size", default=-1)
 
+    @property
+    def _meta(self):
+        return Mosplat_PG_AppliedPreprocessScriptMeta
+
 
 class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
     __dataclass_type__ = ProcessedFrameRange
@@ -98,6 +104,10 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
         self,
     ) -> SupportsCollectionProperty[Mosplat_PG_AppliedPreprocessScript]:
         return self.applied_preprocess_scripts
+
+    @property
+    def _meta(self):
+        return Mosplat_PG_ProcessedFrameRangeMeta
 
 
 class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
@@ -119,6 +129,10 @@ class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
             self.width == dataset.median_width,
             self.height == dataset.median_height,
         )
+
+    @property
+    def _meta(self):
+        return Mosplat_PG_MediaFileStatusMeta
 
 
 class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
@@ -179,6 +193,10 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
     ) -> SupportsCollectionProperty[Mosplat_PG_ProcessedFrameRange]:
         return self.processed_frame_ranges
 
+    @property
+    def _meta(self):
+        return Mosplat_PG_MediaIODatasetMeta
+
 
 class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
     __dataclass_type__ = OperatorProgress
@@ -200,6 +218,10 @@ class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
         description="Whether any operator is 'using' the progress-related properties.",
         default=False,
     )
+
+    @property
+    def _meta(self):
+        return Mosplat_PG_OperatorProgressMeta
 
 
 class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
@@ -223,6 +245,10 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
     @classmethod
     def dyntip_prop_id(cls) -> str:
         return cls.get_prop_id("full_message")
+
+    @property
+    def _meta(self):
+        return Mosplat_PG_LogEntryMeta
 
 
 class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
@@ -255,6 +281,10 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
     @classmethod
     def level_filter_prop_id(cls) -> str:
         return cls.get_prop_id("logs_level_filter")
+
+    @property
+    def _meta(self):
+        return Mosplat_PG_LogEntryHubMeta
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
@@ -361,3 +391,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     ) -> Generator[Path]:
         """wrapper"""
         return check_frame_range_npy_filepaths(prefs, self, RAW_FRAME_DIRNAME)
+
+    @property
+    def _meta(self):
+        return Mosplat_PG_GlobalMeta

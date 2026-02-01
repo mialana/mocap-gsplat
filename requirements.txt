@@ -1,1 +1,9 @@
+# pypi packages that will NOT be packaged as wheels within blender add-on
+
 fake-bpy-module # type hints for bpy
+
+libcst # for property meta files generation
+
+isort # sort imports
+
+black # format code

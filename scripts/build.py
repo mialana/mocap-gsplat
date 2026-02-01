@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Tuple
 from dataclasses import dataclass, fields
 
+ADDON_HUMAN_READABLE = os.getenv("ADDON_HUMAN_READABLE", "mosplat_blender")
+
 original_excepthook = sys.excepthook
 
 
@@ -117,7 +119,7 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     """generate global build context using results of argparse."""
     repo_dir: Path = Path(__file__).resolve().parent.parent  # used in `.env`
 
-    ADDON_SRC_DIR: Path = repo_dir / "mosplat_blender"  # used in `.env` and argparse
+    ADDON_SRC_DIR: Path = repo_dir / ADDON_HUMAN_READABLE  # used in `.env` and argparse
 
     defaults = ArgparseDefaults(addon_src_dir=ADDON_SRC_DIR)
 

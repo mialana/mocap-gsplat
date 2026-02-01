@@ -1,25 +1,26 @@
 # pyright: reportInvalidTypeForm=false
 from __future__ import annotations
 
-import bpy
-from bpy.types import AddonPreferences, Context
-from bpy.props import StringProperty, IntProperty
-
-from pathlib import Path
 import os
-from typing import Set, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Set
 
-from .checks import check_media_extensions_set
-from ..interfaces.logging_interface import MosplatLoggingInterface
-from ..infrastructure.mixins import BlRNAAccessorMixin
+import bpy
+from bpy.props import IntProperty, StringProperty
+from bpy.types import AddonPreferences, Context
+
 from ..infrastructure.constants import (
-    ADDON_PREFERENCES_ID,
     ADDON_BASE_ID,
-    DEFAULT_PREPROCESS_MEDIA_SCRIPT,
+    ADDON_PREFERENCES_ID,
     ADDON_SHORTNAME,
+    DEFAULT_PREPROCESS_MEDIA_SCRIPT,
 )
-from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
 from ..infrastructure.macros import try_access_path
+from ..infrastructure.mixins import BlRNAAccessorMixin
+from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
+from ..interfaces.logging_interface import MosplatLoggingInterface
+from .checks import check_media_extensions_set
+from .meta.preferences_meta import Mosplat_AP_GlobalMeta
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
@@ -232,3 +233,7 @@ class Mosplat_AP_Global(AddonPreferences, BlRNAAccessorMixin):
         stdout_box.label(text="STDOUT Log Formatting", icon="GREASEPENCIL")
         stdout_box.prop(self, "stdout_date_log_format")
         stdout_box.prop(self, "stdout_log_format")
+
+    @property
+    def _meta(self):
+        return Mosplat_AP_GlobalMeta
