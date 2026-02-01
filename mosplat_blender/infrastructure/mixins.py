@@ -63,7 +63,7 @@ class LogClassMixin:
         from ..interfaces import MosplatLoggingInterface
 
         cls.class_logger = MosplatLoggingInterface.configure_logger_instance(
-            f"{cls.__module__}.logclass{label if label else cls.__qualname__}"
+            f"{cls.__module__}.logclass{label if label else cls.__name__}"
         )
 
     @classmethod
@@ -139,12 +139,16 @@ class MetadataProxyMixin(Generic[M], EnforceAttributesMixin[M]):
     helps to enforce required members and types
     """
 
+    _metadata_proxy_instance: M = _MISSING_
+
     @classmethod
     def preregistration(cls, *, metadata: M, **kwargs):
         # iterate through fields in dataclass, set corresponding class attribute.
         for fld in fields(metadata):
             value = getattr(metadata, fld.name)
             setattr(cls, fld.name, value)
+
+        cls._metadata_proxy_instance = metadata
 
         super().preregistration()
 
@@ -244,7 +248,7 @@ class BlRNAAccessorMixin(EnforceAttributesMixin):
             property = cls.bl_rna.properties[attrname]
             return property.name
         except KeyError:
-            msg = f"Property '{attrname}' does not exist on '{cls.__qualname__}'"
+            msg = f"Property '{attrname}' does not exist on '{cls.__name__}'"
             cls.class_logger.error(msg)
             return msg
 
@@ -254,7 +258,7 @@ class BlRNAAccessorMixin(EnforceAttributesMixin):
             property = cls.bl_rna.properties[attrname]
             return property.identifier
         except KeyError:
-            msg = f"Property '{attrname}' does not exist on '{cls.__qualname__}'"
+            msg = f"Property '{attrname}' does not exist on '{cls.__name__}'"
             cls.class_logger.error(msg)
             return msg
 

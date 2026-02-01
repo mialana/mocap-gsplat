@@ -83,6 +83,7 @@ class MosplatPanelBase(Panel, ContextAccessorMixin[MosplatPanelMetadata]):
             check_propertygroup(context.scene)
             return True
         except (UserFacingError, UnexpectedError) as e:
+            cls.class_logger.warning(f"Poll failed for '{cls.__name__}'.")
             return False
 
     def draw(self, context: Context) -> None:

@@ -65,7 +65,6 @@ class DownloadArgs(TypedDict):
     repo_id: str
     filename: str
     cache_dir: str
-    # tqdm_class: type
 
 
 def main():

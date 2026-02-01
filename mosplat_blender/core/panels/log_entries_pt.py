@@ -4,7 +4,7 @@ from bpy.types import bpy_prop_array
 
 from typing import TYPE_CHECKING, List, cast, Dict
 
-from ..properties import Mosplat_PG_LogEntry
+from ..properties import Mosplat_PG_LogEntry, Mosplat_PG_LogEntryHub
 from ...infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
 from ...infrastructure.protocols import SupportsCollectionProperty
 from ...infrastructure.schemas import UIListIDEnum, LogEntryLevelEnum
@@ -45,8 +45,8 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
 
         row = layout.row(align=True)
         row.alert = (
-            log.level_enum == LogEntryLevelEnum.ERROR
-            or log.level_enum == LogEntryLevelEnum.EXCEPTION
+            log.level_as_enum == LogEntryLevelEnum.ERROR
+            or log.level_as_enum == LogEntryLevelEnum.EXCEPTION
         )
         split = row.split(factor=0.15, align=True)
         split.label(
@@ -64,8 +64,8 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         collection: SupportsCollectionProperty[Mosplat_PG_LogEntry] = getattr(
             data, property
         )
-        props = self.props(context)
-        filter = props.log_level_filter_enum
+        log_hub = self.props(context).log_hub_accessor
+        filter = log_hub.logs_level_filter
 
         flt_flags: List[int] = []
         flt_neworder: List[int] = []
@@ -73,7 +73,7 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         for idx, log in enumerate(collection):
             if filter == LogEntryLevelEnum.ALL:
                 flt_flags.append(self.bitflag_filter_item)
-            elif log.level_enum == filter:
+            elif log.level_as_enum == filter:
                 flt_flags.append(self.bitflag_filter_item)
             else:
                 flt_flags.append(self.bitflag_item_never_show)
@@ -84,22 +84,22 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
     def draw_filter(self, context, layout) -> None:
         layout.row(align=True)
 
-        props = self.props(context)
-        layout.prop(props, props.get_prop_id("current_log_level_filter"))
+        log_hub = self.props(context).log_hub_accessor
+        layout.prop(log_hub, Mosplat_PG_LogEntryHub.level_filter_prop_id())
 
 
 class Mosplat_PT_LogEntries(MosplatPanelBase):
     def draw_with_layout(self, pkg, layout):
-        props = pkg.props
+        log_hub = pkg.props.log_hub_accessor
 
         layout.template_list(
             UIListIDEnum.LOG_ENTRIES,
             "",
-            props,
-            props.get_prop_id("current_log_entries"),
-            props,
-            props.get_prop_id("current_log_entry_index"),
-            item_dyntip_propname=Mosplat_PG_LogEntry.get_prop_id("full_message"),
+            log_hub,
+            Mosplat_PG_LogEntryHub.data_prop_id(),
+            log_hub,
+            Mosplat_PG_LogEntryHub.active_index_prop_id(),
+            item_dyntip_propname=Mosplat_PG_LogEntry.dyntip_prop_id(),
             rows=DEFAULT_LOG_ENTRY_ROWS,
             sort_lock=True,
         )

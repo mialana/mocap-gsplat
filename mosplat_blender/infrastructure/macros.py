@@ -133,7 +133,7 @@ def get_required_function(module: ModuleType, name: str) -> Callable:
     try:
         fn = getattr(module, name)
     except AttributeError as e:
-        e.add_note(f"NOTE: Module {module.__name__} has no function '{name}'")
+        e.add_note(f"NOTE: Module '{module.__name__}' has no function '{name}'")
         raise
 
     if not isinstance(fn, Callable):

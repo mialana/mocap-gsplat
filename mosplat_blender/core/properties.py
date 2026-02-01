@@ -27,7 +27,6 @@ from .checks import (
 )
 
 from ..infrastructure.mixins import (
-    M,
     D,
     BlRNAAccessorMixin,
     DataclassInteropMixin,
@@ -42,8 +41,9 @@ from ..infrastructure.schemas import (
 )
 from ..infrastructure.schemas import (
     GlobalData,
-    OperatorProgress,
+    LogEntryHub,
     LogEntry,
+    OperatorProgress,
     MediaIODataset,
     MediaFileStatus,
     ProcessedFrameRange,
@@ -54,7 +54,7 @@ from ..infrastructure.macros import try_access_path
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
 
-LogEntryEnumItems: Final[List[BlenderEnumItem]] = [
+LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
     member.to_blender_enum_item() for member in LogEntryLevelEnum
 ]
 
@@ -180,20 +180,6 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
         return self.processed_frame_ranges
 
 
-class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
-    __dataclass_type__ = LogEntry
-
-    level: EnumProperty(
-        name="Log Level", items=LogEntryEnumItems, default=LogEntryLevelEnum.INFO.value
-    )
-    message: StringProperty(name="Message")
-    full_message: StringProperty(name="Full Message")
-
-    @property
-    def level_enum(self) -> LogEntryLevelEnum:
-        return LogEntryLevelEnum(self.level)
-
-
 class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
     __dataclass_type__ = OperatorProgress
 
@@ -214,6 +200,61 @@ class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
         description="Whether any operator is 'using' the progress-related properties.",
         default=False,
     )
+
+
+class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
+    __dataclass_type__ = LogEntry
+
+    level: EnumProperty(
+        name="Log Entry Level",
+        items=LogEntryLevelEnumItems,
+        default=LogEntryLevelEnum.INFO.value,
+    )
+    message: StringProperty(name="Log Entry Message")
+    full_message: StringProperty(
+        name="Log Entry Full Message",
+        description="The property that is displayed in the dynamic tooltip while hovering on the item.",
+    )
+
+    @property
+    def level_as_enum(self) -> LogEntryLevelEnum:
+        return LogEntryLevelEnum(self.level)
+
+    @classmethod
+    def dyntip_prop_id(cls) -> str:
+        return cls.get_prop_id("full_message")
+
+
+class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
+    __dataclass_type__ = LogEntryHub
+
+    logs: CollectionProperty(name="Log Entries Data", type=Mosplat_PG_LogEntry)
+    logs_active_index: IntProperty(name="Log Entries Active Index", default=0)
+    logs_level_filter: EnumProperty(
+        name="Log Entries Level Filter",
+        items=LogEntryLevelEnumItems,
+        default=LogEntryLevelEnum.ALL.value,
+    )
+
+    @property
+    def entries_accessor(self) -> SupportsCollectionProperty[Mosplat_PG_LogEntry]:
+        return self.logs
+
+    @property
+    def level_filter_as_enum(self) -> LogEntryLevelEnum:
+        return LogEntryLevelEnum(self.logs_level_filter)
+
+    @classmethod
+    def data_prop_id(cls) -> str:
+        return cls.get_prop_id("logs")
+
+    @classmethod
+    def active_index_prop_id(cls) -> str:
+        return cls.get_prop_id("logs_active_index")
+
+    @classmethod
+    def level_filter_prop_id(cls) -> str:
+        return cls.get_prop_id("logs_level_filter")
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
@@ -250,23 +291,8 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         options={"SKIP_SAVE"},
     )
 
-    current_log_entries: CollectionProperty(
-        name="Current Log Entries",
-        type=Mosplat_PG_LogEntry,
-        options={"SKIP_SAVE"},
-    )
-
-    current_log_entry_index: IntProperty(
-        name="Current Log Entry Index",
-        default=0,
-        options={"SKIP_SAVE"},
-    )
-
-    current_log_level_filter: EnumProperty(
-        name="Current Log Level Filter",
-        items=LogEntryEnumItems,
-        default=LogEntryLevelEnum.ALL.value,
-        options={"SKIP_SAVE"},
+    current_log_entry_hub: PointerProperty(
+        name="Current Log Entry Hub", type=Mosplat_PG_LogEntryHub, options={"SKIP_SAVE"}
     )
 
     @property
@@ -278,14 +304,8 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         return self.current_operator_progress
 
     @property
-    def log_level_filter_enum(self) -> LogEntryLevelEnum:
-        return LogEntryLevelEnum(self.current_log_level_filter)
-
-    @property
-    def logs_accessor(
-        self,
-    ) -> SupportsCollectionProperty[Mosplat_PG_LogEntry]:
-        return self.current_log_entries
+    def log_hub_accessor(self) -> Mosplat_PG_LogEntryHub:
+        return self.current_log_entry_hub
 
     @property
     def current_media_dirpath(self) -> Path:

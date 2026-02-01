@@ -89,7 +89,7 @@ def no_instantiate(cls: T) -> T:
     """
 
     def __new__(cls_, *args, **kwargs):
-        raise DeveloperError(f"{cls_.__name__} cannot be instantiated")
+        raise DeveloperError(f"'{cls_.__name__}' cannot be instantiated")
 
     cls.__new__ = staticmethod(__new__)
     return cls

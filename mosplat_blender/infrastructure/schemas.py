@@ -466,6 +466,13 @@ class MediaIODataset:
 
 
 @dataclass
+class OperatorProgress:
+    current: int = -1
+    total: int = -1
+    in_use: bool = False
+
+
+@dataclass
 class LogEntry:
     level: str
     message: str
@@ -473,10 +480,10 @@ class LogEntry:
 
 
 @dataclass
-class OperatorProgress:
-    current: int = -1
-    total: int = -1
-    in_use: bool = False
+class LogEntryHub:
+    logs: List[LogEntry] = field(default_factory=list)
+    logs_active_index: int = 0
+    logs_level_filter: str = LogEntryLevelEnum.ALL.value
 
 
 @dataclass
@@ -489,6 +496,4 @@ class GlobalData:
     current_operator_progress: OperatorProgress = field(
         default_factory=OperatorProgress
     )
-    current_log_entries: List[LogEntry] = field(default_factory=list)
-    current_log_level_index: int = 0
-    current_log_level_filter: str = LogEntryLevelEnum.INFO.value
+    current_log_entry_hub: LogEntryHub = field(default_factory=LogEntryHub)

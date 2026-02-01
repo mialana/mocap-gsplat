@@ -20,8 +20,9 @@ from .properties import (
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,
-    Mosplat_PG_LogEntry,
     Mosplat_PG_OperatorProgress,
+    Mosplat_PG_LogEntry,
+    Mosplat_PG_LogEntryHub,
     Mosplat_PG_Global,
 )
 
@@ -36,8 +37,9 @@ properties_registry: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,
-    Mosplat_PG_LogEntry,
     Mosplat_PG_OperatorProgress,
+    Mosplat_PG_LogEntry,
+    Mosplat_PG_LogEntryHub,
     Mosplat_PG_Global,
 ]
 

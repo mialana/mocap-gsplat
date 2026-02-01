@@ -111,7 +111,7 @@ class MosplatOperatorBase(
                 # if not implemented run and return execute
                 return wrapped_result
             except UserFacingError as e:  # all errs here are expected to be user-facing
-                e.add_note("NOTE: Caught during operator invoke.")
+                e.add_note(f"NOTE: Caught error for '{self.bl_idname}' during invoke.")
                 # only error as we have sufficiently covered the stack with messages
                 self.logger.error(str(e))
                 self.cleanup(pkg)
@@ -133,7 +133,7 @@ class MosplatOperatorBase(
                 wrapped_result: Final = im_to_set(self._contexted_execute(pkg))
             except AttributeError as e:
                 msg = UserFacingError.make_msg(
-                    "This error occured during operator execution.\n"
+                    f"This error occured during execution of '{self.bl_idname}'.\n"
                     "Are you aware this operator requires invocation before execution?",
                     e,
                 )
@@ -142,7 +142,7 @@ class MosplatOperatorBase(
                 return {"FINISHED"}  # finish because blender props have changed
 
             if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result):  # intersection
-                self.logger.debug("Execution complete.")
+                self.logger.debug(f"'{self.bl_idname}' finished execution.")
                 self.cleanup(pkg)  # cleanup if not a modal operator
             return wrapped_result
 
@@ -156,7 +156,7 @@ class MosplatOperatorBase(
     def modal(self, context, event) -> OpResultSet:
         pkg = self.package(context)
         if event.type in {"ESC"}:
-            self.logger.info("Operator cancelled by user.")
+            self.logger.info(f"'{self.bl_idname}' cancelled by user.")
             self.cleanup(pkg)
             return {"FINISHED"}  # user manually cancels through escape
         elif event.type != "TIMER":
@@ -164,7 +164,7 @@ class MosplatOperatorBase(
         with self.CLEANUP_MANAGER(pkg):
             wrapped_result: Final = im_to_set(self._contexted_modal(pkg, event))
             if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result) and self.worker:
-                self.logger.debug("Modal callbacks stopped.")
+                self.logger.debug(f"Modal callbacks stopped for '{self.bl_idname}'.")
                 # cleanup if a non-looping result was returned and worker is not None
                 self.cleanup(pkg)
             return wrapped_result
@@ -210,7 +210,7 @@ class MosplatOperatorBase(
             self.logger.debug("Worker cleaned up")
 
         self.__data = None  # data is not guaranteed to be in-sync anymore
-        self.logger.info("Operator cleaned up")
+        self.logger.info(f"'{self.bl_idname}' cleaned up")
 
     @contextlib.contextmanager
     def CLEANUP_MANAGER(self, pkg: CtxPackage):
