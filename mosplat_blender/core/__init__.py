@@ -8,8 +8,8 @@ This is opposed to `infrastructure`, where `__init__.py` is empty, and individua
 
 from typing import List, Type
 
-from .operators import MosplatOperatorBase, all_operators
-from .panels import MosplatPanelBase, MosplatUIListBase, all_panels, all_ui_lists
+from .operators import MosplatOperatorBase, operator_factory
+from .panels import MosplatPanelBase, MosplatUIListBase, panel_factory, all_ui_lists
 from .preferences import Mosplat_AP_Global
 from .properties import (
     MosplatPropertyGroupBase,

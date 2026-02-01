@@ -3,12 +3,13 @@ from __future__ import annotations
 from bpy.types import Context, WindowManager, Timer, Event, Operator
 
 from typing import TYPE_CHECKING, Optional, Union, TypeVar, ClassVar, TypeAlias, Final
-from typing import List, Set, Tuple, NamedTuple, Generic, Literal
+from typing import List, Set, Tuple, NamedTuple, Generic
 
 import contextlib
 from queue import Queue
 import threading
 from functools import partial
+from dataclasses import dataclass, field
 
 from ..handlers import load_dataset_property_group_from_json
 from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
@@ -25,7 +26,10 @@ from ...infrastructure.schemas import (
 from ...interfaces.worker_interface import QT, MosplatWorkerInterface
 
 if TYPE_CHECKING:
-    from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
+    from bpy.stub_internal.rna_enums import (
+        OperatorReturnItems as OpResult,
+        OperatorTypeFlagItems,
+    )
 
     OpResultSet: TypeAlias = Set[OpResult]
     OpResultTuple: TypeAlias = Union[Tuple[OpResult, ...], OpResult]
@@ -38,7 +42,24 @@ if TYPE_CHECKING:
 K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
 
 
-class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin):
+@dataclass(frozen=True)
+class MosplatOperatorMetadata:
+    bl_idname: OperatorIDEnum
+    bl_description: str
+
+    @property
+    def bl_label(self) -> str:
+        return OperatorIDEnum.label_factory(self.bl_idname)
+
+    bl_category: str = field(default=OperatorIDEnum._category())
+    bl_options: Set[OperatorTypeFlagItems] = field(
+        default_factory=lambda: set({"REGISTER", "UNDO"})
+    )
+
+
+class MosplatOperatorBase(
+    Generic[QT, K], Operator, MosplatContextAccessorMixin[MosplatOperatorMetadata]
+):
     bl_category: ClassVar[str] = OperatorIDEnum._category()
     bl_options = {"REGISTER", "UNDO"}  # all of our operators should support undo
 
@@ -49,13 +70,6 @@ class MosplatOperatorBase(Generic[QT, K], Operator, MosplatContextAccessorMixin)
     __data: Optional[MediaIODataset] = None
 
     _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
-
-    @classmethod
-    def at_registration(cls):
-        super().at_registration()
-
-        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.__id_enum_type__):
-            cls.bl_label = OperatorIDEnum.label_factory(cls.bl_idname)
 
     @classmethod
     def poll(cls, context) -> bool:

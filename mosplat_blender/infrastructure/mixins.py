@@ -6,18 +6,20 @@ import os
 from typing import (
     ClassVar,
     Type,
-    TypeGuard,
     TypeVar,
     Generic,
     TYPE_CHECKING,
     List,
     NamedTuple,
     Optional,
+    Callable,
+    Union,
+    TypeAlias,
 )
-from enum import StrEnum
 from dataclasses import fields
 import logging
 import inspect
+from functools import partial
 
 
 from .protocols import SupportsCollectionProperty, SupportsDataclass
@@ -68,30 +70,10 @@ class MosplatLogClassMixin:
         return cls.class_logger
 
 
-class MosplatEnforceAttributesMixin:
-
-    @classmethod
-    def at_registration(cls):
-        """
-        ran at registration time of the class.
-        useful for differentiating 'abstract' base class behavior from registered classes
-        """
-        if "MOSPLAT_TESTING" in os.environ:
-            cls._enforce_mixin_attributes()
-
-    @classmethod
-    def _enforce_mixin_attributes(cls):
-        """enforce all required attributes are defined"""
-
-        # `getmembers_static` with custom predicate
-        if missing := inspect.getmembers_static(cls, lambda val: val is _MISSING_):
-            for attr_name, _ in missing:
-                raise DeveloperError(
-                    f"`{cls.__name__}` does not define required mixin variable: `{attr_name}`"
-                )
+PreregristrationFn: TypeAlias = Callable[[], None]
 
 
-class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
+class MosplatEnforceAttributesMixin(Generic[D], MosplatLogClassMixin):
     """
     a mixin base class that allows for standardization of common metadata between
     multiple subclasses of a Blender type.
@@ -109,29 +91,42 @@ class MosplatBlTypeMixin(MosplatLogClassMixin, MosplatEnforceAttributesMixin):
     in the effort of increasing consistency in the codebase.
     """
 
-    bl_idname: str = _MISSING_
-    bl_description: str = _MISSING_
-    __id_enum_type__: ClassVar[type] = _MISSING_  # no literals here!
+    from bpy import types
+
+    RegistrationClasses: TypeAlias = Union[
+        types.Panel,
+        types.UIList,
+        types.Operator,
+        types.PropertyGroup,
+        types.AddonPreferences,
+    ]
 
     @classmethod
-    def at_registration(cls):
-        super().at_registration()
-
+    def preregistration(cls, metadata: D):
+        """
+        ran at registration time of the class.
+        """
         if "MOSPLAT_TESTING" in os.environ:
-            cls.guard_type_of_bl_idname(cls.bl_idname, cls.__id_enum_type__)
+            cls._enforce_mixin_attributes()
 
-    @staticmethod
-    def guard_type_of_bl_idname(bl_idname, __id_enum_type__: Type[S]) -> TypeGuard[S]:
-        """guards `bl_idname` with its narrowed type"""
-        if not issubclass(__id_enum_type__, StrEnum):
+    @classmethod
+    def _enforce_mixin_attributes(cls):
+        """enforce all required attributes are defined"""
+
+        # `getmembers_static` with custom predicate
+        missing = inspect.getmembers_static(cls, lambda val: val is _MISSING_)
+        for attrname, _ in missing:
             raise DeveloperError(
-                f"`{__name__}` defines `__id_enum_type__` with incorrect type.\nExpected: {Type[StrEnum]}, \nActual: {bl_idname}"
+                f"'{cls.__name__}' does not define required mixin variable: '{attrname}'"
             )
-        if not isinstance(bl_idname, __id_enum_type__):
-            raise DeveloperError(
-                f"`{__name__}` defines `bl_idname` with incorrect type.\nExpected: {Type[__id_enum_type__]}, \nActual: {bl_idname}"
-            )
-        return True
+
+    @classmethod
+    def preregistration_fn_factory(cls, metadata: D) -> PreregristrationFn:
+        return partial(cls.preregistration, metadata)
+
+
+SD = TypeVar("SD", bound=SupportsDataclass)
+E = TypeVar("E", bound=MosplatEnforceAttributesMixin)
 
 
 class MosplatAPAccessorMixin(MosplatLogClassMixin):
@@ -164,9 +159,7 @@ class MosplatPGAccessorMixin(MosplatLogClassMixin):
         return check_propertygroup(context.scene)
 
 
-class MosplatBlPropertyAccessorMixin(
-    MosplatEnforceAttributesMixin, MosplatLogClassMixin
-):
+class MosplatBlPropertyAccessorMixin(MosplatEnforceAttributesMixin):
     """a mixin class for easier access to Blender properties' RNA"""
 
     from bpy.types import BlenderRNA
@@ -201,7 +194,10 @@ class CtxPackage(NamedTuple):
 
 
 class MosplatContextAccessorMixin(
-    MosplatBlTypeMixin, MosplatAPAccessorMixin, MosplatPGAccessorMixin
+    Generic[D],
+    MosplatEnforceAttributesMixin[D],
+    MosplatAPAccessorMixin,
+    MosplatPGAccessorMixin,
 ):
 
     if TYPE_CHECKING:
@@ -215,7 +211,7 @@ class MosplatContextAccessorMixin(
         )
 
 
-class MosplatDataclassInteropMixin(Generic[D], MosplatEnforceAttributesMixin):
+class MosplatDataclassInteropMixin(Generic[D]):
     """
     a mixin that automates the transformation to/from a dataclass.
     used for Blender `PropertyGroup` classes."""

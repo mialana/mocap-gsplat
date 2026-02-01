@@ -5,7 +5,7 @@ moves implementation logic and imports out of `__init__.py`.
 
 import bpy
 
-from typing import Type, Sequence, Union
+from typing import Type, Union, List
 
 from . import core
 from .interfaces import MosplatLoggingInterface
@@ -21,29 +21,38 @@ from .infrastructure.mixins import MosplatEnforceAttributesMixin
 from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME, ADDON_HUMAN_READABLE
 from .infrastructure.schemas import DeveloperError, UnexpectedError
 
-classes: Sequence[
+classes_old: List[
     Union[
-        Type[core.MosplatOperatorBase],
-        Type[core.MosplatPanelBase],
         Type[core.MosplatPropertyGroupBase],
         Type[core.Mosplat_AP_Global],
         Type[core.MosplatUIListBase],
     ]
 ] = (
-    [core.Mosplat_AP_Global]
-    + core.all_properties
-    + core.all_operators
-    + core.all_ui_lists
-    + core.all_panels
+    [core.Mosplat_AP_Global] + core.all_properties + core.all_ui_lists
 )
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
+registration_factory = core.operator_factory + core.panel_factory
+
 
 def register_addon():
-    for c in classes:
+    bpy.utils.register_classes_factory
+    for cls, pregistration_fn in registration_factory:
+        try:
+            pregistration_fn()
+            bpy.utils.register_class(cls)
+        except (ValueError, RuntimeError, AttributeError) as e:
+            raise DeveloperError(
+                f"Exception during registration of `{cls.__name__}`.", e
+            ) from e
+
+    for c in classes_old:
         try:
             if issubclass(c, MosplatEnforceAttributesMixin):
+                pass
+
+            elif issubclass(c, MosplatEnforceAttributesMixin):
                 c.at_registration()  # do any necessary class-level changes
             bpy.utils.register_class(c)
         except (ValueError, RuntimeError, AttributeError) as e:
@@ -77,7 +86,7 @@ def register_addon():
 def unregister_addon():
     """essentially all operations here should be guarded with try blocks"""
     # unregister all classes
-    for c in reversed(classes):
+    for c in reversed(classes_old):
         try:
             bpy.utils.unregister_class(c)
         except RuntimeError:

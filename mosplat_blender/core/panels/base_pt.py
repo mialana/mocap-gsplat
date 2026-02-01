@@ -3,6 +3,7 @@ from __future__ import annotations
 from bpy.types import Panel, UILayout, Context, UIList
 
 from typing import Literal, TYPE_CHECKING, Optional
+from dataclasses import dataclass
 
 from ..checks import check_addonpreferences, check_propertygroup
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
@@ -37,18 +38,25 @@ class MosplatUIListBase(UIList, MosplatContextAccessorMixin):
     __id_enum_type__ = UIListIDEnum
 
 
-class MosplatPanelBase(Panel, MosplatContextAccessorMixin):
+@dataclass(frozen=True)
+class MosplatPanelMetadata:
+    bl_idname: PanelIDEnum
+    bl_description: str
+
+    @property
+    def bl_label(self) -> str:
+        return PanelIDEnum.label_factory(self.bl_idname)
+
+    bl_category: str = PanelIDEnum._category()
+    bl_parent_id: Optional[PanelIDEnum] = None
+
+
+class MosplatPanelBase(Panel, MosplatContextAccessorMixin[MosplatPanelMetadata]):
     __id_enum_type__ = PanelIDEnum
 
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = PanelIDEnum._category()
-
-    @classmethod
-    def at_registration(cls):
-        super().at_registration()
-        if cls.guard_type_of_bl_idname(cls.bl_idname, cls.__id_enum_type__):
-            cls.bl_label = PanelIDEnum.label_factory(cls.bl_idname)
 
     @classmethod
     def poll(cls, context) -> bool:
