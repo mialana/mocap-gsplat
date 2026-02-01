@@ -12,6 +12,7 @@ import datetime
 from pathlib import Path
 from typing import Callable, Optional, Self, ClassVar, NoReturn, Tuple, TypeAlias
 from queue import Queue, Empty
+from enum import StrEnum, auto
 
 from ..infrastructure.constants import (
     COLORED_FORMATTER_FIELD_STYLES,
@@ -19,7 +20,7 @@ from ..infrastructure.constants import (
     MAX_LOG_ENTRIES_STORED,
 )
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
-from ..infrastructure.decorators import run_once_per_instance
+from ..infrastructure.decorators import run_once_per_instance, run_once
 from ..infrastructure.schemas import (
     UserFacingError,
     DeveloperError,
@@ -30,10 +31,15 @@ from ..infrastructure.schemas import (
 GlobalMessage: TypeAlias = Tuple[LogEntryLevelEnum, str, str]
 
 
+class LoggingHandler(StrEnum):
+    pass
+
+
 class MosplatLoggingInterface:
     instance: ClassVar[Optional[Self]]
     instance_name: ClassVar[str]
 
+    @run_once
     def __new__(cls, root_module_name: str) -> Self:
         """
         Expected usage is for only the top-level `__init__.py` of a package/program
@@ -156,7 +162,7 @@ class MosplatLoggingInterface:
         error_fmt = "'{handler_type}' logger cannot be initialized from addon prefs."
 
         try:
-            stdout_ok = self.init_stdout_handler(
+            stdout_ok = self._init_stdout_handler(
                 addon_prefs.stdout_log_format, addon_prefs.stdout_date_log_format
             )
         except UserFacingError as e:
@@ -166,7 +172,7 @@ class MosplatLoggingInterface:
             )
             logger.info(msg) if stdout_ok else logger.warning(msg)
         try:
-            json_ok = self.init_json_handler(
+            json_ok = self._init_json_handler(
                 log_fmt=addon_prefs.json_log_format,
                 log_date_fmt=addon_prefs.json_date_log_format,
                 outdir=Path(addon_prefs.cache_dir) / addon_prefs.json_log_subdir,

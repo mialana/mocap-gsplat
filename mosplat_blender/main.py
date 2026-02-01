@@ -5,7 +5,7 @@ moves implementation logic and imports out of `__init__.py`.
 
 import bpy
 
-from typing import Type, Union, List
+from typing import Type, Union, Tuple, Sequence
 
 from . import core
 from .interfaces import MosplatLoggingInterface
@@ -17,56 +17,50 @@ from .core.handlers import (
     handle_save_to_json,
 )
 
-from .infrastructure.mixins import MosplatEnforceAttributesMixin
-from .infrastructure.constants import ADDON_PROPERTIES_ATTRIBNAME, ADDON_HUMAN_READABLE
+from .infrastructure.constants import ADDON_GLOBAL_PROPS_NAME, ADDON_HUMAN_READABLE
 from .infrastructure.schemas import DeveloperError, UnexpectedError
-
-classes_old: List[
-    Union[
-        Type[core.MosplatPropertyGroupBase],
-        Type[core.Mosplat_AP_Global],
-        Type[core.MosplatUIListBase],
-    ]
-] = (
-    [core.Mosplat_AP_Global] + core.all_properties + core.all_ui_lists
-)
+from .infrastructure.mixins import PreregristrationFn
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
-registration_factory = core.operator_factory + core.panel_factory
+registration_factory: Sequence[
+    Tuple[
+        Union[
+            Type[core.MosplatOperatorBase],
+            Type[core.MosplatPanelBase],
+            Type[core.MosplatUIListBase],
+            Type[core.Mosplat_AP_Global],
+            Type[core.MosplatPropertyGroupBase],
+        ],
+        PreregristrationFn,
+    ],
+] = (
+    core.operator_factory
+    + core.panel_factory
+    + core.ui_list_factory
+    + [core.preferences_factory]  # addon preferences is a singleton class
+    + core.properties_factory
+)
 
 
 def register_addon():
     bpy.utils.register_classes_factory
     for cls, pregistration_fn in registration_factory:
         try:
-            pregistration_fn()
+            pregistration_fn()  # we call pre-registration function here
             bpy.utils.register_class(cls)
         except (ValueError, RuntimeError, AttributeError) as e:
             raise DeveloperError(
                 f"Exception during registration of `{cls.__name__}`.", e
             ) from e
 
-    for c in classes_old:
-        try:
-            if issubclass(c, MosplatEnforceAttributesMixin):
-                pass
-
-            elif issubclass(c, MosplatEnforceAttributesMixin):
-                c.at_registration()  # do any necessary class-level changes
-            bpy.utils.register_class(c)
-        except (ValueError, RuntimeError, AttributeError) as e:
-            raise DeveloperError(
-                f"Exception during registration of `{c.__name__}`.", e
-            ) from e
-
+    # do not catch thrown exceptions as we should not successfully register without addon preferences or property groups
     setattr(
         bpy.types.Scene,
-        ADDON_PROPERTIES_ATTRIBNAME,
+        ADDON_GLOBAL_PROPS_NAME,
         bpy.props.PointerProperty(type=core.Mosplat_PG_Global),
     )
 
-    # do not catch thrown exceptions as we should not successfully register without addon preferences
     addon_preferences: core.Mosplat_AP_Global = check_addonpreferences(
         bpy.context.preferences
     )
@@ -86,16 +80,16 @@ def register_addon():
 def unregister_addon():
     """essentially all operations here should be guarded with try blocks"""
     # unregister all classes
-    for c in reversed(classes_old):
+    for cls, _ in reversed(registration_factory):
         try:
-            bpy.utils.unregister_class(c)
+            bpy.utils.unregister_class(cls)
         except RuntimeError:
-            logger.error(f"Exception during unregistration of `{c.__name__=}`")
+            logger.error(f"Exception during unregistration of `{cls.__name__=}`")
 
     try:
-        delattr(bpy.types.Scene, ADDON_PROPERTIES_ATTRIBNAME)
+        delattr(bpy.types.Scene, ADDON_GLOBAL_PROPS_NAME)
     except AttributeError:
-        logger.error(f"Error during unregistration of add-on properties.")
+        logger.error(f"Error removing add-on properties.")
 
     try:
         from .interfaces import MosplatVGGTInterface

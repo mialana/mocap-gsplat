@@ -9,7 +9,7 @@ from pathlib import Path
 import threading
 import gc
 
-from ..infrastructure.mixins import MosplatLogClassMixin
+from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.decorators import no_instantiate
 from ..infrastructure.schemas import UnexpectedError
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
 
 @final
 @no_instantiate
-class MosplatVGGTInterface(MosplatLogClassMixin):
+class MosplatVGGTInterface(LogClassMixin):
     model: ClassVar[Optional[VGGT]] = None
     hf_id: ClassVar[Optional[str]] = None
     cache_dir: ClassVar[Optional[Path]] = None

@@ -1,4 +1,4 @@
-from typing import List, Type, Tuple, Dict, Callable, Generator
+from typing import List, Type, Tuple, Dict, Callable
 
 from .base_ot import MosplatOperatorBase, MosplatOperatorMetadata
 
@@ -10,6 +10,7 @@ from .run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
 
 from ...infrastructure.schemas import OperatorIDEnum
 from ...infrastructure.constants import ADDON_HUMAN_READABLE
+from ...infrastructure.mixins import PreregristrationFn
 
 operator_registry: Dict[
     Type[MosplatOperatorBase],
@@ -38,7 +39,7 @@ operator_registry: Dict[
     ),
 }
 
-operator_factory: List[Tuple[Type[MosplatOperatorBase], Callable[[], None]]] = [
-    (cls, cls.preregistration_fn_factory(metadata))
-    for cls, metadata in operator_registry.items()
+operator_factory: List[Tuple[Type[MosplatOperatorBase], PreregristrationFn]] = [
+    (cls, cls.preregistration_fn_factory(metadata=mta))
+    for cls, mta in operator_registry.items()
 ]

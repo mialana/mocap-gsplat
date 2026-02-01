@@ -16,7 +16,7 @@ from typing import cast, TYPE_CHECKING, Optional, Set, List, Generator, TypeGuar
 
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
-    ADDON_PROPERTIES_ATTRIBNAME,
+    ADDON_GLOBAL_PROPS_NAME,
     MEDIA_IO_DATASET_JSON_FILENAME,
     PER_FRAME_DIRNAME,
 )
@@ -36,7 +36,7 @@ def check_propertygroup(
     if scene is None:  # can occur if checked at the wrong time
         raise UserFacingError("Blender scene unavailable in this context.")
     try:
-        found_properties = getattr(scene, ADDON_PROPERTIES_ATTRIBNAME)
+        found_properties = getattr(scene, ADDON_GLOBAL_PROPS_NAME)
 
         if TYPE_CHECKING:
             # OK to use `cast` here as we've guarded its existence with a try-block, and we created it

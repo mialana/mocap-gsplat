@@ -6,7 +6,7 @@ from typing import Literal, TYPE_CHECKING, Optional
 from dataclasses import dataclass
 
 from ..checks import check_addonpreferences, check_propertygroup
-from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
+from ...infrastructure.mixins import CtxPackage, ContextAccessorMixin
 from ...infrastructure.schemas import (
     PanelIDEnum,
     UIListIDEnum,
@@ -34,7 +34,13 @@ def column_factory(
     return col
 
 
-class MosplatUIListBase(UIList, MosplatContextAccessorMixin):
+@dataclass
+class MosplatUIListMetadata:
+    bl_idname: str
+    bl_description: str
+
+
+class MosplatUIListBase(UIList, ContextAccessorMixin[MosplatUIListMetadata]):
     __id_enum_type__ = UIListIDEnum
 
 
@@ -61,7 +67,7 @@ class MosplatPanelMetadata:
         self.bl_parent_id = bl_parent_id.value if bl_parent_id else ""
 
 
-class MosplatPanelBase(Panel, MosplatContextAccessorMixin[MosplatPanelMetadata]):
+class MosplatPanelBase(Panel, ContextAccessorMixin[MosplatPanelMetadata]):
     __id_enum_type__ = PanelIDEnum
 
     @classmethod

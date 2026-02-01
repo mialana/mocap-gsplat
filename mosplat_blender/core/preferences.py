@@ -11,7 +11,7 @@ from typing import Set, TYPE_CHECKING
 
 from .checks import check_media_extensions_set
 from ..interfaces.logging_interface import MosplatLoggingInterface
-from ..infrastructure.mixins import MosplatBlPropertyAccessorMixin
+from ..infrastructure.mixins import BlRNAAccessorMixin
 from ..infrastructure.constants import (
     ADDON_PREFERENCES_ID,
     ADDON_BASE_ID,
@@ -70,7 +70,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
             self.logger.warning(str(e))
 
 
-class Mosplat_AP_Global(AddonPreferences, MosplatBlPropertyAccessorMixin):
+class Mosplat_AP_Global(AddonPreferences, BlRNAAccessorMixin):
     bl_idname = ADDON_PREFERENCES_ID
 
     cache_dir: StringProperty(

@@ -13,9 +13,9 @@ from dataclasses import dataclass
 
 from ..handlers import load_dataset_property_group_from_json
 from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
-from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
+from ...infrastructure.mixins import CtxPackage, ContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
-from ...infrastructure.constants import _TIMER_INTERVAL_, _GENERATED_
+from ...infrastructure.constants import _TIMER_INTERVAL_
 from ...infrastructure.schemas import (
     UnexpectedError,
     DeveloperError,
@@ -64,7 +64,7 @@ class MosplatOperatorMetadata:
 
 
 class MosplatOperatorBase(
-    Generic[QT, K], Operator, MosplatContextAccessorMixin[MosplatOperatorMetadata]
+    Generic[QT, K], Operator, ContextAccessorMixin[MosplatOperatorMetadata]
 ):
     __worker: Optional[MosplatWorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
@@ -139,7 +139,7 @@ class MosplatOperatorBase(
                 )
                 self.logger.error(msg)
                 self.cleanup(pkg)
-                return {"FINISHED"}  # finish because blender props changed
+                return {"FINISHED"}  # finish because blender props have changed
 
             if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result):  # intersection
                 self.logger.debug("Execution complete.")

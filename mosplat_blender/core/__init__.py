@@ -6,11 +6,14 @@ for addon registration.
 This is opposed to `infrastructure`, where `__init__.py` is empty, and individual modules files should be imported as needed.
 """
 
-from typing import List, Type
+from typing import List, Type, Tuple, Type
 
 from .operators import MosplatOperatorBase, operator_factory
-from .panels import MosplatPanelBase, MosplatUIListBase, panel_factory, all_ui_lists
+from .panels import MosplatPanelBase, MosplatUIListBase, panel_factory, ui_list_factory
 from .preferences import Mosplat_AP_Global
+
+from ..infrastructure.mixins import PreregristrationFn
+
 from .properties import (
     MosplatPropertyGroupBase,
     Mosplat_PG_AppliedPreprocessScript,
@@ -22,8 +25,13 @@ from .properties import (
     Mosplat_PG_Global,
 )
 
+preferences_factory: Tuple[Type[Mosplat_AP_Global], PreregristrationFn] = (
+    Mosplat_AP_Global,
+    Mosplat_AP_Global.preregistration_fn_factory(),
+)
+
 # property groups need to be registered in a bottom-to-top "owning" class order
-all_properties: List[Type[MosplatPropertyGroupBase]] = [
+properties_registry: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_AppliedPreprocessScript,
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
@@ -31,4 +39,8 @@ all_properties: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_LogEntry,
     Mosplat_PG_OperatorProgress,
     Mosplat_PG_Global,
+]
+
+properties_factory: List[Tuple[Type[MosplatPropertyGroupBase], PreregristrationFn]] = [
+    (cls, cls.preregistration_fn_factory()) for cls in properties_registry
 ]

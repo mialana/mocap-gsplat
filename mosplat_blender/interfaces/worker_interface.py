@@ -8,11 +8,11 @@ from datetime import datetime
 
 QT = TypeVar("QT")  # types elements of worker queue
 
-from ..infrastructure.mixins import MosplatLogClassMixin
+from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.decorators import record_work_time
 
 
-class MosplatWorkerInterface(Generic[QT], MosplatLogClassMixin):
+class MosplatWorkerInterface(Generic[QT], LogClassMixin):
     """
     this is a clean abstraction for blender operators that require similar "worker" behavior in a separate thread
 

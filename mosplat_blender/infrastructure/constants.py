@@ -71,7 +71,7 @@ ADDON_TEMP_DIRPATH: Final[Path] = Path(tempfile.mkdtemp(prefix=ADDON_PREFERENCES
 the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
 `bpy.context.scene` object for convenient access in operators, panels, etc.
 """
-ADDON_PROPERTIES_ATTRIBNAME: Final[str] = f"{ADDON_SHORTNAME}_props"
+ADDON_GLOBAL_PROPS_NAME: Final[str] = f"{ADDON_SHORTNAME}_props"
 
 OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME}."
 PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"

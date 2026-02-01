@@ -27,9 +27,10 @@ from .checks import (
 )
 
 from ..infrastructure.mixins import (
+    M,
     D,
-    MosplatBlPropertyAccessorMixin,
-    MosplatDataclassInteropMixin,
+    BlRNAAccessorMixin,
+    DataclassInteropMixin,
 )
 from ..infrastructure.protocols import SupportsCollectionProperty
 from ..infrastructure.constants import RAW_FRAME_DIRNAME
@@ -67,8 +68,8 @@ def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
 class MosplatPropertyGroupBase(
     Generic[D],
     PropertyGroup,
-    MosplatBlPropertyAccessorMixin,
-    MosplatDataclassInteropMixin[D],
+    BlRNAAccessorMixin,
+    DataclassInteropMixin[D],
 ):
     pass
 
