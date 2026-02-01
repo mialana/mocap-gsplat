@@ -35,11 +35,16 @@ sys.excepthook = quiet_excepthook
 
 step_tracker: int = 1
 
+try:
+    terminal_width = os.get_terminal_size().columns
+except OSError:
+    terminal_width = 80
+
 
 def _():
     """macro like function to separate print logs"""
     global step_tracker
-    print(f"----------------- STEP{step_tracker}")
+    print(f" STEP{step_tracker}".rjust(terminal_width, "-"))
     step_tracker += 1
 
 
@@ -134,6 +139,7 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     timestamp_str = f"# {timestamp} \n# created using '{Path(__file__).name}'\n\n"
 
     wheels_dir: Path = ADDON_SRC_DIR / "wheels"
+    wheels_dir.mkdir(exist_ok=True)
     print(f"Wheels Directory Path: {wheels_dir}")
 
     ADDON_REQUIREMENTS_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.txt"
@@ -325,12 +331,13 @@ def package(ctx: BuildContext):
     print(f"Addon packaged as `{zip_path}`")
 
 
-def clean(wheels_dir):
+def clean(wheels_dir: Path):
     print(f"Beginning clean...")
     if os.path.exists(wheels_dir) and os.path.isdir(wheels_dir):
         try:
             shutil.rmtree(wheels_dir)
             print(f"Wheels directory and all its contents have been removed.")
+            wheels_dir.mkdir(exist_ok=True)  # remake directory
         except OSError:
             print(f"Error deleting wheels directory")
             raise
@@ -347,6 +354,7 @@ def main():
         ctx.ADDON_REQUIREMENTS_TXT_FILE,
         ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE,
         ctx.MANIFEST_TOML_TXT_FILE,
+        ctx.wheels_dir,
         *([ctx.DEV_REQUIREMENTS_TXT_FILE] if args.dev else []),
     ]:  # check that all required input resources are where they are supposed to be
         if not p.exists():
@@ -358,7 +366,7 @@ def main():
         clean(ctx.wheels_dir)
         _()  # skip a line
 
-    # download_pypi_wheels(ctx, args.blender_python_version, should_install=args.dev)
+    download_pypi_wheels(ctx, args.blender_python_version, should_install=args.dev)
     _()  # skip a line
 
     generate_blender_manifest_toml(ctx)

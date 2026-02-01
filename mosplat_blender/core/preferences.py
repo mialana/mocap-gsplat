@@ -20,7 +20,7 @@ from ..infrastructure.mixins import BlRNAAccessorMixin
 from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from .checks import check_media_extensions_set
-from .meta.preferences_meta import Mosplat_AP_GlobalMeta
+from .meta.preferences_meta import Mosplat_AP_Global_Meta
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global

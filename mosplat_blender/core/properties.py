@@ -43,14 +43,14 @@ from .checks import (
     check_media_files,
 )
 from .meta.properties_meta import (
-    Mosplat_PG_AppliedPreprocessScriptMeta,
-    Mosplat_PG_GlobalMeta,
-    Mosplat_PG_LogEntryHubMeta,
-    Mosplat_PG_LogEntryMeta,
-    Mosplat_PG_MediaFileStatusMeta,
-    Mosplat_PG_MediaIODatasetMeta,
-    Mosplat_PG_OperatorProgressMeta,
-    Mosplat_PG_ProcessedFrameRangeMeta,
+    Mosplat_PG_AppliedPreprocessScript_Meta,
+    Mosplat_PG_Global_Meta,
+    Mosplat_PG_LogEntry_Meta,
+    Mosplat_PG_LogEntryHub_Meta,
+    Mosplat_PG_MediaFileStatus_Meta,
+    Mosplat_PG_MediaIODataset_Meta,
+    Mosplat_PG_OperatorProgress_Meta,
+    Mosplat_PG_ProcessedFrameRange_Meta,
 )
 
 if TYPE_CHECKING:

@@ -13,7 +13,7 @@ env:
     ADDON_HUMAN_READABLE: mosplat_blender
 
 jobs:
-    check_format:
+    checks:
         strategy:
             matrix:
                 blender_python_version: ["3.11", "3.12"]
@@ -22,7 +22,7 @@ jobs:
             python-version: ${{ matrix.blender_python_version }}
 
     build_and_release:
-        needs: check_format
+        needs: checks
         strategy:
             fail-fast: false
             matrix:

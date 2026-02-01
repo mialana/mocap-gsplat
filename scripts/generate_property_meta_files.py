@@ -350,7 +350,7 @@ def generate_meta_file(py_file: Path):
         meta_path.write_text(formatted, encoding="utf-8", newline="\n")
         print(f"GENERATED '{meta_path}'")
 
-    meta_symbols = [f"{cls}Meta" for cls in extractor.classes]
+    meta_symbols = [f"{cls}_Meta" for cls in extractor.classes]
     patch_original_file(py_file, meta_path, meta_symbols)
 
 
