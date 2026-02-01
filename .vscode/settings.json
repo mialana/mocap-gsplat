@@ -1,5 +1,6 @@
 {
-    "files.autoSave": "off",
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 3000,
     "python.languageServer": "Pylance",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
     "[python]": {
@@ -12,6 +13,6 @@
     },
     "blender.addon.reloadOnSave": false,
     "blender.addon.logLevel": "info",
-    "blender.addon.buildTaskName": "",
+    "blender.addon.buildTaskName": "generate property meta files",
     "blender.addon.justMyCode": false
 }

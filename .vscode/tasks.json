@@ -23,6 +23,23 @@
             "args": ["${workspaceFolder}/scripts/build.py", "--dev"],
             "problemMatcher": [],
             "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "generate property meta files",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "${workspaceFolder}/scripts/generate_property_meta_files.py"
+            ],
+            "problemMatcher": [],
+            "group": {
                 "kind": "build",
                 "isDefault": true
             },

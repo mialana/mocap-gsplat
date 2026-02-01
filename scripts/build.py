@@ -21,7 +21,15 @@ from pathlib import Path
 from typing import Tuple
 from dataclasses import dataclass, fields
 
-from functools import partial
+original_excepthook = sys.excepthook
+
+
+def quiet_excepthook(exctype, value, traceback):
+    # only print the value (error message) to the console
+    print(f"Error: {value}", file=sys.stderr)
+
+
+sys.excepthook = quiet_excepthook
 
 step_tracker: int = 1
 
@@ -48,6 +56,7 @@ class BuildContext:
     DEV_REQUIREMENTS_TXT_FILE: Path
     MANIFEST_TOML_TXT_FILE: Path
     manifest_toml_file: Path
+    GENERATE_PROPERTY_META_FILES_SCRIPT: Path
 
 
 def buildcontext_factory(scope) -> BuildContext:
@@ -70,7 +79,7 @@ def get_args(defaults: ArgparseDefaults):
     parser.add_argument(
         "-a",
         "--addon_src_dir",
-        help="Path to Mosplat Blender add-on directory",
+        help="Path to add-on source directory",
         type=Path,
         default=defaults.addon_src_dir,
     )
@@ -114,7 +123,7 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
 
     args = get_args(defaults)  # get program args from argparse
 
-    ADDON_SRC_DIR = args.addon_src_dir  # override defaults with new program args
+    ADDON_SRC_DIR: Path = args.addon_src_dir  # override defaults with new program args
 
     addon_base_id = ADDON_SRC_DIR.name
     addon_human_readable = capwords(addon_base_id.replace("_", " "))
@@ -123,32 +132,34 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     timestamp: datetime.datetime = datetime.datetime.now()
     timestamp_str = f"# auto-generated in build: {timestamp} \n\n"
 
-    wheels_dir: Path = Path(os.path.join(args.addon_src_dir, "wheels"))
+    wheels_dir: Path = ADDON_SRC_DIR / "wheels"
     print(f"Wheels Directory Path: {wheels_dir}")
 
-    ADDON_REQUIREMENTS_TXT_FILE: Path = Path(
-        os.path.join(args.addon_src_dir, "requirements.txt")
-    )
+    ADDON_REQUIREMENTS_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.txt"
+
     print(f"Addon's `requirements.txt` File Path: {ADDON_REQUIREMENTS_TXT_FILE}")
 
-    ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path = Path(
-        os.path.join(args.addon_src_dir, "requirements.nobinary.txt")
+    ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path = (
+        ADDON_SRC_DIR / "requirements.nobinary.txt"
     )
+
     print(
         f"Addon's `requirements.nobinary.txt` File Path: {ADDON_NOBINARY_REQUIREMENTS_TXT_FILE}"
     )
 
-    DEV_REQUIREMENTS_TXT_FILE: Path = Path(os.path.join(repo_dir, "requirements.txt"))
+    DEV_REQUIREMENTS_TXT_FILE: Path = repo_dir / "requirements.txt"
     print(f"Developer's `requirements.txt` File Path: {DEV_REQUIREMENTS_TXT_FILE}")
 
-    MANIFEST_TOML_TXT_FILE: Path = Path(
-        os.path.join(args.addon_src_dir, "blender_manifest.toml.txt")
-    )
+    MANIFEST_TOML_TXT_FILE: Path = ADDON_SRC_DIR / "blender_manifest.toml.txt"
+
     print(f"Input `blender_manifest.txt` File Path: {MANIFEST_TOML_TXT_FILE}")
-    manifest_toml_file: Path = Path(
-        os.path.join(args.addon_src_dir, "blender_manifest.toml")
-    )
+    manifest_toml_file: Path = ADDON_SRC_DIR / "blender_manifest.toml"
+
     print(f"Output `blender_manifest.toml` File Path: {manifest_toml_file}")
+
+    GENERATE_PROPERTY_META_FILES_SCRIPT: Path = (
+        Path(__file__).resolve().parent / "generate_property_meta_files.py"
+    )
 
     return (
         buildcontext_factory(locals()),
@@ -213,10 +224,7 @@ def install_dev_pypi_packages(ctx: BuildContext):
         )
 
     except subprocess.CalledProcessError as e:
-        print(f"Error while installing PyPI wheels for development")
-        raise
-    except Exception:
-        print(f"An unexpected error occurred")
+        e.add_note(f"Error while installing PyPI wheels for development.")
         raise
 
     print("Install complete")
@@ -253,11 +261,8 @@ def download_pypi_wheels(ctx: BuildContext, blender_python_version, should_insta
             ]
         )
 
-    except subprocess.CalledProcessError:
-        print(f"Error in call to download PyPI wheels")
-        raise  # automatically includes stack trace
-    except Exception:
-        print(f"An unexpected error occurred")
+    except subprocess.CalledProcessError as e:
+        e.add_note(f"Error in call to download PyPI wheels.")
         raise
 
     print("All PyPI wheels successfully downloaded.")
@@ -295,6 +300,21 @@ def generate_blender_manifest_toml(ctx: BuildContext):
         f.write(template)
 
     print(f"`{ctx.manifest_toml_file}` successfully generated.")
+
+
+def run_extra_build_scripts(ctx: BuildContext):
+    try:
+        subprocess.check_call(
+            [
+                sys.executable,
+                str(ctx.GENERATE_PROPERTY_META_FILES_SCRIPT),
+                "-a",
+                ctx.ADDON_SRC_DIR,
+            ]
+        )
+    except subprocess.CalledProcessError as e:
+        e.add_note(f"Error while generating property meta files.")
+        raise
 
 
 def package(ctx: BuildContext):
@@ -346,6 +366,7 @@ def main():
         ctx.ADDON_REQUIREMENTS_TXT_FILE,
         ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE,
         ctx.MANIFEST_TOML_TXT_FILE,
+        ctx.GENERATE_PROPERTY_META_FILES_SCRIPT,
         *([ctx.DEV_REQUIREMENTS_TXT_FILE] if args.dev else []),
     ]:  # check that all required input resources are where they are supposed to be
         if not p.exists():
@@ -361,6 +382,8 @@ def main():
     _()  # skip a line
 
     generate_blender_manifest_toml(ctx)
+
+    run_extra_build_scripts(ctx)
 
     package(ctx)
 
