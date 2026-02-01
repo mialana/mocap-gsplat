@@ -10,16 +10,16 @@ Purpose:
 """
 
 import argparse
-import sys
+import datetime
 import os
 import shutil
 import subprocess
-import datetime
+import sys
 import zipfile
-from string import capwords
-from pathlib import Path
-from typing import Tuple
 from dataclasses import dataclass, fields
+from pathlib import Path
+from string import capwords
+from typing import Tuple
 
 ADDON_HUMAN_READABLE = os.getenv("ADDON_HUMAN_READABLE", "mosplat_blender")
 
@@ -58,7 +58,6 @@ class BuildContext:
     DEV_REQUIREMENTS_TXT_FILE: Path
     MANIFEST_TOML_TXT_FILE: Path
     manifest_toml_file: Path
-    GENERATE_PROPERTY_META_FILES_SCRIPT: Path
 
 
 def buildcontext_factory(scope) -> BuildContext:
@@ -132,7 +131,7 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     version_tag = get_version_tag_from_git()
 
     timestamp: datetime.datetime = datetime.datetime.now()
-    timestamp_str = f"# auto-generated in build: {timestamp} \n\n"
+    timestamp_str = f"# {timestamp} \n# created using '{Path(__file__).name}'\n\n"
 
     wheels_dir: Path = ADDON_SRC_DIR / "wheels"
     print(f"Wheels Directory Path: {wheels_dir}")
@@ -153,15 +152,10 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     print(f"Developer's `requirements.txt` File Path: {DEV_REQUIREMENTS_TXT_FILE}")
 
     MANIFEST_TOML_TXT_FILE: Path = ADDON_SRC_DIR / "blender_manifest.toml.txt"
-
     print(f"Input `blender_manifest.txt` File Path: {MANIFEST_TOML_TXT_FILE}")
+
     manifest_toml_file: Path = ADDON_SRC_DIR / "blender_manifest.toml"
-
     print(f"Output `blender_manifest.toml` File Path: {manifest_toml_file}")
-
-    GENERATE_PROPERTY_META_FILES_SCRIPT: Path = (
-        Path(__file__).resolve().parent / "generate_property_meta_files.py"
-    )
 
     return (
         buildcontext_factory(locals()),
@@ -304,21 +298,6 @@ def generate_blender_manifest_toml(ctx: BuildContext):
     print(f"`{ctx.manifest_toml_file}` successfully generated.")
 
 
-def run_extra_build_scripts(ctx: BuildContext):
-    try:
-        subprocess.check_call(
-            [
-                sys.executable,
-                str(ctx.GENERATE_PROPERTY_META_FILES_SCRIPT),
-                "-a",
-                ctx.ADDON_SRC_DIR,
-            ]
-        )
-    except subprocess.CalledProcessError as e:
-        e.add_note(f"Error while generating property meta files.")
-        raise
-
-
 def package(ctx: BuildContext):
     zip_path = ctx.ADDON_SRC_DIR.parent / f"{ctx.ADDON_SRC_DIR.name}.zip"
 
@@ -368,7 +347,6 @@ def main():
         ctx.ADDON_REQUIREMENTS_TXT_FILE,
         ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE,
         ctx.MANIFEST_TOML_TXT_FILE,
-        ctx.GENERATE_PROPERTY_META_FILES_SCRIPT,
         *([ctx.DEV_REQUIREMENTS_TXT_FILE] if args.dev else []),
     ]:  # check that all required input resources are where they are supposed to be
         if not p.exists():
@@ -380,12 +358,10 @@ def main():
         clean(ctx.wheels_dir)
         _()  # skip a line
 
-    download_pypi_wheels(ctx, args.blender_python_version, should_install=args.dev)
+    # download_pypi_wheels(ctx, args.blender_python_version, should_install=args.dev)
     _()  # skip a line
 
     generate_blender_manifest_toml(ctx)
-
-    run_extra_build_scripts(ctx)
 
     package(ctx)
 

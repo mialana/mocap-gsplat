@@ -236,4 +236,4 @@ class Mosplat_AP_Global(AddonPreferences, BlRNAAccessorMixin):
 
     @property
     def _meta(self):
-        return Mosplat_AP_GlobalMeta
+        return Mosplat_AP_Global_Meta

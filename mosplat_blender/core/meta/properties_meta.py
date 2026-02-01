@@ -1,15 +1,13 @@
-# auto-generated in build: 2026-02-01 13:57:20.305518
+# 2026-02-01 18:45:41.541658
+# created using 'generate_property_meta_files.py'
 
-
-from __future__ import annotations
-
-Mosplat_PG_AppliedPreprocessScriptMeta = {
+Mosplat_PG_AppliedPreprocessScript_Meta: dict[str, dict[str, str]] = {
     "script_path": {"name": "Script Path", "description": ""},
     "mod_time": {"name": "Modification Time", "description": ""},
     "file_size": {"name": "File Size", "description": ""},
 }
 
-Mosplat_PG_ProcessedFrameRangeMeta = {
+Mosplat_PG_ProcessedFrameRange_Meta: dict[str, dict[str, str]] = {
     "start_frame": {"name": "Start Frame", "description": ""},
     "end_frame": {"name": "End Frame", "description": ""},
     "applied_preprocess_scripts": {
@@ -18,7 +16,7 @@ Mosplat_PG_ProcessedFrameRangeMeta = {
     },
 }
 
-Mosplat_PG_MediaFileStatusMeta = {
+Mosplat_PG_MediaFileStatus_Meta: dict[str, dict[str, str]] = {
     "filepath": {"name": "Filepath", "description": ""},
     "frame_count": {"name": "Frame Count", "description": ""},
     "width": {"name": "Width", "description": ""},
@@ -28,7 +26,7 @@ Mosplat_PG_MediaFileStatusMeta = {
     "file_size": {"name": "File Size", "description": ""},
 }
 
-Mosplat_PG_MediaIODatasetMeta = {
+Mosplat_PG_MediaIODataset_Meta: dict[str, dict[str, str]] = {
     "base_directory": {
         "name": "Base Directory",
         "description": "Filepath to directory containing media files being processed.",
@@ -50,7 +48,7 @@ Mosplat_PG_MediaIODatasetMeta = {
     "processed_frame_ranges": {"name": "Processed Frame Ranges", "description": ""},
 }
 
-Mosplat_PG_OperatorProgressMeta = {
+Mosplat_PG_OperatorProgress_Meta: dict[str, dict[str, str]] = {
     "current": {
         "name": "Progress Current",
         "description": "Singleton current progress of operators.",
@@ -65,7 +63,7 @@ Mosplat_PG_OperatorProgressMeta = {
     },
 }
 
-Mosplat_PG_LogEntryMeta = {
+Mosplat_PG_LogEntry_Meta: dict[str, dict[str, str]] = {
     "level": {"name": "Log Entry Level", "description": ""},
     "message": {"name": "Log Entry Message", "description": ""},
     "full_message": {
@@ -74,13 +72,13 @@ Mosplat_PG_LogEntryMeta = {
     },
 }
 
-Mosplat_PG_LogEntryHubMeta = {
+Mosplat_PG_LogEntryHub_Meta: dict[str, dict[str, str]] = {
     "logs": {"name": "Log Entries Data", "description": ""},
     "logs_active_index": {"name": "Log Entries Active Index", "description": ""},
     "logs_level_filter": {"name": "Log Entries Level Filter", "description": ""},
 }
 
-Mosplat_PG_GlobalMeta = {
+Mosplat_PG_Global_Meta: dict[str, dict[str, str]] = {
     "current_media_dir": {
         "name": "Media Directory",
         "description": "Filepath to directory containing media files to be processed.",

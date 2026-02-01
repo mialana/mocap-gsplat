@@ -1,9 +1,7 @@
-# auto-generated in build: 2026-02-01 13:57:20.305518
+# 2026-02-01 18:45:41.541658
+# created using 'generate_property_meta_files.py'
 
-
-from __future__ import annotations
-
-Mosplat_AP_GlobalMeta = {
+Mosplat_AP_Global_Meta: dict[str, dict[str, str]] = {
     "cache_dir": {
         "name": "Cache Directory",
         "description": "Cache directory on disk used by the addon",

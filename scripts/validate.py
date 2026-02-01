@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 ADDON_HUMAN_READABLE = os.getenv("ADDON_HUMAN_READABLE", "mosplat_blender")
 

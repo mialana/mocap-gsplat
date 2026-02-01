@@ -32,11 +32,11 @@
             }
         },
         {
-            "label": "generate property meta files",
+            "label": "prereload",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
-                "${workspaceFolder}/scripts/generate_property_meta_files.py"
+                "${workspaceFolder}/scripts/prereload.py"
             ],
             "problemMatcher": [],
             "group": {

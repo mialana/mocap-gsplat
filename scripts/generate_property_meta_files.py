@@ -1,13 +1,12 @@
-from pathlib import Path
 import argparse
-from datetime import datetime
 import os
-
-import libcst as cst
-from libcst import matchers as m
+from datetime import datetime
+from pathlib import Path
 
 import black
 import isort
+import libcst as cst
+from libcst import matchers as m
 
 ADDON_HUMAN_READABLE = os.getenv("ADDON_HUMAN_READABLE", "mosplat_blender")
 
@@ -23,7 +22,13 @@ BLENDER_PROPERTY_TYPES = {
 }
 
 timestamp: datetime = datetime.now()
-timestamp_str = f"# auto-generated in build: {timestamp} \n\n"
+timestamp_str = f"# {timestamp} \n# created using '{Path(__file__).name}'\n"
+
+
+check_only: bool = False
+verbose: bool = True
+found_file_count: int = 0
+modification_count: int = 0  # tracks how many files need modification / are modified
 
 
 class PropertyGroupMetaExtractor(cst.CSTVisitor):
@@ -224,7 +229,7 @@ class MetaPropertyInjector(cst.CSTTransformer):
             body=cst.IndentedBlock(
                 body=[
                     cst.SimpleStatementLine(
-                        body=[cst.Return(cst.Name(f"{cls_name}Meta"))]
+                        body=[cst.Return(cst.Name(f"{cls_name}_Meta"))]
                     )
                 ]
             ),
@@ -251,12 +256,24 @@ def patch_original_file(py_file: Path, meta_path: Path, meta_symbols: list[str])
     # format with black
     formatted = black.format_str(sorted, mode=black.FileMode())
 
-    if formatted == source:
-        return
+    needs_modification = formatted != source
 
-    py_file.write_text(formatted, encoding="utf-8", newline="\n")
+    print(f"({found_file_count}+) Analyzed original file patch status.")
+    if verbose:
+        print(f"\tCurrent character count: '{len(source)}'")
+        print(f"\tPatched character count: '{len(formatted)}'")
+        print(f"\tNeeds modification: '{needs_modification}'")
 
-    print(f"Patched '{py_file}'.")
+    global modification_count
+    modification_count += int(needs_modification)
+
+    if check_only and (verbose or needs_modification):
+        print(
+            f"Original File Check Result: {('failed' if needs_modification else 'success').upper()}"
+        )
+    elif needs_modification:  # commit
+        py_file.write_text(formatted, encoding="utf-8", newline="\n")
+        print(f"PATCHED '{py_file}'.")
 
 
 def diff_meta_file(meta_path: Path, formatted_new_text: str) -> bool:
@@ -279,20 +296,23 @@ def generate_meta_file(py_file: Path):
     module.visit(extractor)
 
     if not extractor.classes:
-        return  # nothing to do
+        return  # doesn't contain blender properties
+
+    global found_file_count
+    found_file_count += 1
 
     meta_lines = [
         timestamp_str,
-        "from __future__ import annotations",
-        "",
     ]
 
+    prop_count = 0
     for cls_name, props in extractor.classes.items():
-        meta_lines.append(f"{cls_name}Meta = {{")
+        meta_lines.append(f"{cls_name}_Meta: dict[str, dict[str, str]] = {{")
         for prop, data in props.items():
             meta_lines.append(
                 f"    {prop!r}: {{'name': {data['name']!r}, 'description': {data['description']!r}}},"
             )
+            prop_count += 1
         meta_lines.append("}")
         meta_lines.append("")
 
@@ -300,12 +320,35 @@ def generate_meta_file(py_file: Path):
     meta_dir.mkdir(exist_ok=True)
 
     meta_path = meta_dir / f"{py_file.stem}_meta.py"
+
+    meta_exists = meta_path.exists()
+
     meta_code = "\n".join(meta_lines)
     formatted = black.format_str(meta_code, mode=black.FileMode())  # format with black
 
-    if diff_meta_file(meta_path, formatted):  # skip writing meta file to patch logic
+    needs_modification = diff_meta_file(meta_path, formatted)
+
+    global modification_count
+    modification_count += int(needs_modification)
+
+    print(
+        f"({found_file_count}) Found file containing Blender properties: '{py_file.name}'"
+    )
+    if verbose:
+        print(
+            f"\tClasses found containing Blender properties: '{len(extractor.classes)}'"
+        )
+        print(f"\tTotal Blender properties in file: '{prop_count}'")
+        print(f"\tHas meta file been generated previously: '{meta_exists}'")
+        print(f"\tNeeds modification: '{needs_modification}'")
+
+    if check_only and (verbose or needs_modification):
+        print(
+            f"Meta File Check Result: {('Failed' if needs_modification else 'Success').upper()}"
+        )
+    elif needs_modification:  # commit
         meta_path.write_text(formatted, encoding="utf-8", newline="\n")
-        print(f"Generated '{meta_path}'")
+        print(f"GENERATED '{meta_path}'")
 
     meta_symbols = [f"{cls}Meta" for cls in extractor.classes]
     patch_original_file(py_file, meta_path, meta_symbols)
@@ -332,21 +375,54 @@ def get_args():
         default=[],
     )
 
+    parser.add_argument(
+        "-c",
+        "--check",
+        action="store_true",
+        help="Check only if changes would be made.",
+        default=[],
+    )
+
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Output only bare minimum status checks.",
+        default=[],
+    )
+
     return parser.parse_args()
 
 
-def main(addon_src_dir: Path):
-    print("Starting generation of property meta files.")
+def main(
+    addon_src_dir: Path,
+    extra_files: list[Path] = [],
+    check: bool = False,
+    quiet: bool = False,
+):
+    global check_only, verbose
+    check_only = check
+    verbose = not quiet
+
     CORE_MODULE = addon_src_dir / "core"
 
     py_files = [file for file in CORE_MODULE.rglob("*.py")]
 
-    py_files.extend(args.files)
+    py_files.extend(extra_files)
 
     for file in py_files:
         generate_meta_file(file)
 
     print("Done.")
+
+    if check_only and modification_count > 0:
+        raise SystemExit(
+            f"SYSTEM ERROR: '{modification_count}' files still need changes applied."
+        )
+
+    print(
+        f"{'Files needing modification' if check_only else 'Files modified'}: '{modification_count}'"
+    )
 
 
 if __name__ == "__main__":
@@ -357,4 +433,9 @@ if __name__ == "__main__":
         or Path(__file__).resolve().parent.parent / ADDON_HUMAN_READABLE
     )
 
-    main(addon_src_dir=ADDON_SRC_DIR)
+    main(
+        addon_src_dir=ADDON_SRC_DIR,
+        extra_files=args.files,
+        check=args.check,
+        quiet=args.quiet,
+    )

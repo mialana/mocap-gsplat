@@ -87,7 +87,7 @@ class Mosplat_PG_AppliedPreprocessScript(
 
     @property
     def _meta(self):
-        return Mosplat_PG_AppliedPreprocessScriptMeta
+        return Mosplat_PG_AppliedPreprocessScript_Meta
 
 
 class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
@@ -107,7 +107,7 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
 
     @property
     def _meta(self):
-        return Mosplat_PG_ProcessedFrameRangeMeta
+        return Mosplat_PG_ProcessedFrameRange_Meta
 
 
 class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
@@ -132,7 +132,7 @@ class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
 
     @property
     def _meta(self):
-        return Mosplat_PG_MediaFileStatusMeta
+        return Mosplat_PG_MediaFileStatus_Meta
 
 
 class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
@@ -195,7 +195,7 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
 
     @property
     def _meta(self):
-        return Mosplat_PG_MediaIODatasetMeta
+        return Mosplat_PG_MediaIODataset_Meta
 
 
 class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
@@ -221,7 +221,7 @@ class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
 
     @property
     def _meta(self):
-        return Mosplat_PG_OperatorProgressMeta
+        return Mosplat_PG_OperatorProgress_Meta
 
 
 class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
@@ -248,7 +248,7 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
 
     @property
     def _meta(self):
-        return Mosplat_PG_LogEntryMeta
+        return Mosplat_PG_LogEntry_Meta
 
 
 class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
@@ -284,7 +284,7 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
 
     @property
     def _meta(self):
-        return Mosplat_PG_LogEntryHubMeta
+        return Mosplat_PG_LogEntryHub_Meta
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
@@ -394,4 +394,4 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
 
     @property
     def _meta(self):
-        return Mosplat_PG_GlobalMeta
+        return Mosplat_PG_Global_Meta
