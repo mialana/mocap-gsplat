@@ -8,15 +8,15 @@ we can operate with type-awareness in development.
 
 from __future__ import annotations
 
-from bpy.types import Preferences, Scene, Context, WindowManager
-
 import os
 from pathlib import Path
-from typing import cast, TYPE_CHECKING, Optional, Set, List, Generator, TypeGuard
+from typing import TYPE_CHECKING, Generator, List, Optional, Set, TypeGuard, cast
+
+from bpy.types import Context, Preferences, Scene, WindowManager
 
 from ..infrastructure.constants import (
-    ADDON_PREFERENCES_ID,
     ADDON_GLOBAL_PROPS_NAME,
+    ADDON_PREFERENCES_ID,
     MEDIA_IO_DATASET_JSON_FILENAME,
     PER_FRAME_DIRNAME,
 )

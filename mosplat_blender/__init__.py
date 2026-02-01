@@ -13,10 +13,11 @@ are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logg
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-from .main import register_addon, unregister_addon
 from .interfaces import MosplatLoggingInterface
+from .main import register_addon, unregister_addon
 
 
 def clear_terminal():

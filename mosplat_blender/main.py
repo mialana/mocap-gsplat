@@ -3,23 +3,21 @@ main entrypoint for addon.
 moves implementation logic and imports out of `__init__.py`.
 """
 
+from typing import Sequence, Tuple, Type, Union
+
 import bpy
 
-from typing import Type, Union, Tuple, Sequence
-
 from . import core
-from .interfaces import MosplatLoggingInterface
-
 from .core.checks import check_addonpreferences
 from .core.handlers import (
     handle_load_from_json,
     handle_load_from_json_timer_entrypoint,
     handle_save_to_json,
 )
-
 from .infrastructure.constants import ADDON_GLOBAL_PROPS_NAME, ADDON_HUMAN_READABLE
-from .infrastructure.schemas import DeveloperError, UnexpectedError
 from .infrastructure.mixins import PreregristrationFn
+from .infrastructure.schemas import DeveloperError, UnexpectedError
+from .interfaces import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 

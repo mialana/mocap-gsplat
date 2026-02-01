@@ -10,10 +10,10 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-from typing import Any, Final
+import tempfile
 from pathlib import Path
 from string import capwords
-import tempfile
+from typing import Any, Final
 
 _MISSING_: Any = object()  # sentinel variable
 _GENERATED_: Any = object()

@@ -5,31 +5,29 @@ dataclass member methods should raise standard library error types.
 
 from __future__ import annotations
 
+import json
+from abc import ABC
+from dataclasses import asdict, dataclass, field
+from enum import StrEnum, auto
 from pathlib import Path
+from string import capwords
 from typing import (
+    TYPE_CHECKING,
+    Callable,
+    ClassVar,
     Dict,
     List,
-    cast,
-    Tuple,
-    TYPE_CHECKING,
-    Union,
-    Callable,
-    Tuple,
     Optional,
-    ClassVar,
-    TypeAlias,
     Self,
+    Tuple,
+    TypeAlias,
+    Union,
+    cast,
 )
 
-from dataclasses import dataclass, field, asdict
-import json
-from enum import StrEnum, auto
-from string import capwords
-from abc import ABC
-
 from .constants import (
-    OPERATOR_ID_PREFIX,
     ADDON_SHORTNAME,
+    OPERATOR_ID_PREFIX,
     PANEL_ID_PREFIX,
     UI_LIST_ID_PREFIX,
 )
@@ -41,6 +39,7 @@ from .macros import (
 
 if TYPE_CHECKING:
     from cv2 import VideoCapture
+
     from ..core.properties import Mosplat_PG_MediaIODataset
 
 

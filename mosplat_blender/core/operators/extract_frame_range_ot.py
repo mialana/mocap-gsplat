@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from typing import Tuple, List, Generator, NamedTuple
 from pathlib import Path
+from typing import Generator, List, NamedTuple, Tuple
 
-from .base_ot import MosplatOperatorBase
-
+from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
 from ...infrastructure.schemas import (
-    UserFacingError,
     MediaIODataset,
     ProcessedFrameRange,
+    UserFacingError,
 )
-from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
+from .base_ot import MosplatOperatorBase
 
 
 class ThreadKwargs(NamedTuple):

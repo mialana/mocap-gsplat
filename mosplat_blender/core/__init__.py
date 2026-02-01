@@ -6,24 +6,22 @@ for addon registration.
 This is opposed to `infrastructure`, where `__init__.py` is empty, and individual modules files should be imported as needed.
 """
 
-from typing import List, Type, Tuple, Type
+from typing import List, Tuple, Type
 
+from ..infrastructure.mixins import PreregristrationFn
 from .operators import MosplatOperatorBase, operator_factory
 from .panels import MosplatPanelBase, MosplatUIListBase, panel_factory, ui_list_factory
 from .preferences import Mosplat_AP_Global
-
-from ..infrastructure.mixins import PreregristrationFn
-
 from .properties import (
-    MosplatPropertyGroupBase,
     Mosplat_PG_AppliedPreprocessScript,
-    Mosplat_PG_ProcessedFrameRange,
+    Mosplat_PG_Global,
+    Mosplat_PG_LogEntry,
+    Mosplat_PG_LogEntryHub,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIODataset,
     Mosplat_PG_OperatorProgress,
-    Mosplat_PG_LogEntry,
-    Mosplat_PG_LogEntryHub,
-    Mosplat_PG_Global,
+    Mosplat_PG_ProcessedFrameRange,
+    MosplatPropertyGroupBase,
 )
 
 preferences_factory: Tuple[Type[Mosplat_AP_Global], PreregristrationFn] = (

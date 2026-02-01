@@ -1,9 +1,8 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
+from ...infrastructure.schemas import MediaFileStatus, OperatorIDEnum
 from ..properties import Mosplat_PG_MediaIODataset
-from ...infrastructure.schemas import OperatorIDEnum, MediaFileStatus
-
 from .base_pt import MosplatPanelBase, column_factory
 
 _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")

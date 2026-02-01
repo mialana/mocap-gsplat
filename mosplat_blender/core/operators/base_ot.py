@@ -1,33 +1,44 @@
 from __future__ import annotations
 
-from bpy.types import Context, WindowManager, Timer, Event, Operator
-
-from typing import TYPE_CHECKING, Optional, Union, TypeVar, ClassVar, TypeAlias, Final
-from typing import List, Set, Tuple, NamedTuple, Generic
-
 import contextlib
-from queue import Queue
 import threading
-from functools import partial
 from dataclasses import dataclass
+from functools import partial
+from queue import Queue
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Final,
+    Generic,
+    List,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
-from ..handlers import load_dataset_property_group_from_json
-from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
-from ...infrastructure.mixins import CtxPackage, ContextAccessorMixin
-from ...infrastructure.macros import immutable_to_set as im_to_set
+from bpy.types import Context, Event, Operator, Timer, WindowManager
+
 from ...infrastructure.constants import _TIMER_INTERVAL_
+from ...infrastructure.macros import immutable_to_set as im_to_set
+from ...infrastructure.mixins import ContextAccessorMixin, CtxPackage
 from ...infrastructure.schemas import (
-    UnexpectedError,
     DeveloperError,
-    UserFacingError,
-    OperatorIDEnum,
     MediaIODataset,
+    OperatorIDEnum,
+    UnexpectedError,
+    UserFacingError,
 )
 from ...interfaces.worker_interface import QT, MosplatWorkerInterface
+from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
+from ..handlers import load_dataset_property_group_from_json
 
 if TYPE_CHECKING:
+    from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
     from bpy.stub_internal.rna_enums import (
-        OperatorReturnItems as OpResult,
         OperatorTypeFlagItems,
     )
 

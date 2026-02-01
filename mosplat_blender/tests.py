@@ -11,13 +11,13 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 def test_deps_imports():
     try:
+        import cv2
+        import einops
+        import huggingface_hub
         import numpy
         import PIL
-        import huggingface_hub
-        import einops
-        import safetensors
         import plyfile
-        import cv2
+        import safetensors
         import torch
         import torchvision
         import vggt

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Dict, List, cast
+
 from bpy.types import bpy_prop_array
 
-from typing import TYPE_CHECKING, List, cast, Dict
-
-from ..properties import Mosplat_PG_LogEntry, Mosplat_PG_LogEntryHub
 from ...infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
 from ...infrastructure.protocols import SupportsCollectionProperty
-from ...infrastructure.schemas import UIListIDEnum, LogEntryLevelEnum
-
+from ...infrastructure.schemas import LogEntryLevelEnum, UIListIDEnum
+from ..properties import Mosplat_PG_LogEntry, Mosplat_PG_LogEntryHub
 from .base_pt import MosplatPanelBase, MosplatUIListBase
 
 if TYPE_CHECKING:

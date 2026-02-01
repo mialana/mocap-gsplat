@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import threading
-from queue import Queue, Empty
-from typing import Generic, TypeVar, Optional, Callable, Optional
-
 from datetime import datetime
+from queue import Empty, Queue
+from typing import Callable, Generic, Optional, TypeVar
 
 QT = TypeVar("QT")  # types elements of worker queue
 
-from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.decorators import record_work_time
+from ..infrastructure.mixins import LogClassMixin
 
 
 class MosplatWorkerInterface(Generic[QT], LogClassMixin):

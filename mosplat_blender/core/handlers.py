@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import bpy
-from bpy.types import Scene
-from bpy.app.handlers import persistent
-
 from typing import TYPE_CHECKING, Optional, Tuple
 
-from .checks import check_propertygroup, check_addonpreferences
+import bpy
+from bpy.app.handlers import persistent
+from bpy.types import Scene
 
 from ..infrastructure.schemas import MediaIODataset
 from ..interfaces.logging_interface import MosplatLoggingInterface
+from .checks import check_addonpreferences, check_propertygroup
 
 if TYPE_CHECKING:
-    from .properties import Mosplat_PG_Global
     from .preferences import Mosplat_AP_Global
+    from .properties import Mosplat_PG_Global
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 

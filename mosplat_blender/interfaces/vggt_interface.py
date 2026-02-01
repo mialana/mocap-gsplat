@@ -4,13 +4,13 @@ provides the interface between the add-on and the VGGT model.
 
 from __future__ import annotations
 
-from typing import ClassVar, TYPE_CHECKING, final, Optional
-from pathlib import Path
-import threading
 import gc
+import threading
+from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar, Optional, final
 
-from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.decorators import no_instantiate
+from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import UnexpectedError
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt

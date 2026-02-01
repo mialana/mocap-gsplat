@@ -1,24 +1,23 @@
-import bpy
-
+import ast
+import os
+import subprocess
+from functools import partial
 from pathlib import Path
 from queue import Queue
-from typing import Tuple, NamedTuple, Final
-import subprocess
-import os
-import ast
-from functools import partial
+from typing import Final, NamedTuple, Tuple
 
+import bpy
+
+from ...infrastructure.constants import (
+    _TIMEOUT_INTERVAL_,
+    DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
+)
 from ...infrastructure.macros import (
-    tuple_type_matches_known_tuple_type,
     kill_subprocess_cross_platform,
+    try_access_path,
+    tuple_type_matches_known_tuple_type,
 )
 from ...infrastructure.schemas import UnexpectedError, UserFacingError
-from ...infrastructure.constants import (
-    DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
-    _TIMEOUT_INTERVAL_,
-)
-from ...infrastructure.macros import try_access_path
-
 from .base_ot import MosplatOperatorBase
 
 QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown tuples

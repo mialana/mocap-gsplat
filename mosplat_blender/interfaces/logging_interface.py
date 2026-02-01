@@ -8,26 +8,26 @@ and handles cleanup to not dirty the global namespace.
 
 from __future__ import annotations
 
-import sys
-import logging
 import datetime
-from pathlib import Path
-from typing import Callable, Optional, Self, ClassVar, NoReturn, Tuple, TypeAlias
-from queue import Queue, Empty
+import logging
+import sys
 from enum import StrEnum, auto
+from pathlib import Path
+from queue import Empty, Queue
+from typing import Callable, ClassVar, NoReturn, Optional, Self, Tuple, TypeAlias
 
 from ..infrastructure.constants import (
     COLORED_FORMATTER_FIELD_STYLES,
     COLORED_FORMATTER_LEVEL_STYLES,
     MAX_LOG_ENTRIES_STORED,
 )
+from ..infrastructure.decorators import run_once, run_once_per_instance
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
-from ..infrastructure.decorators import run_once_per_instance, run_once
 from ..infrastructure.schemas import (
-    UserFacingError,
     DeveloperError,
-    UnexpectedError,
     LogEntryLevelEnum,
+    UnexpectedError,
+    UserFacingError,
 )
 
 BlenderLogEntry: TypeAlias = Tuple[LogEntryLevelEnum, str, str]
@@ -202,7 +202,9 @@ class MosplatLoggingInterface:
             json_log_formatter = self.MosplatJsonFormatter(
                 log_fmt, datefmt=log_date_fmt, json_indent=2  # indent 2 for readability
             )
-            outdir.mkdir(parents=True, exist_ok=True)  # make the log directory if necessary
+            outdir.mkdir(
+                parents=True, exist_ok=True
+            )  # make the log directory if necessary
 
             json_log_outfile = outdir / datetime.datetime.now().strftime(file_fmt)
             self._json_log_handler = logging.FileHandler(json_log_outfile)
@@ -290,6 +292,7 @@ class MosplatLoggingInterface:
     def _drain_blender_log_entry_queue(self):
         """pops items from local queue and adds to Blender collection property"""
         from bpy import context  # local runtime import for most up-to-date context
+
         from ..core.checks import check_propertygroup
 
         try:

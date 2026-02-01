@@ -2,28 +2,27 @@
 
 from __future__ import annotations
 
+import inspect
+import logging
 import os
+from dataclasses import fields
+from functools import partial
 from typing import (
-    ClassVar,
-    Type,
-    TypeVar,
-    Generic,
     TYPE_CHECKING,
+    Callable,
+    ClassVar,
+    Generic,
     List,
     NamedTuple,
     Optional,
-    Callable,
-    Union,
+    Type,
     TypeAlias,
+    TypeVar,
+    Union,
 )
-from dataclasses import fields
-import logging
-import inspect
-from functools import partial
 
-
-from .protocols import SupportsCollectionProperty, SupportsDataclass
 from .constants import _MISSING_
+from .protocols import SupportsCollectionProperty, SupportsDataclass
 from .schemas import DeveloperError
 
 S = TypeVar("S")
@@ -43,6 +42,7 @@ class CtxPackage(NamedTuple):
 
 if TYPE_CHECKING:
     from bpy.types import Context
+
     from ..core.preferences import Mosplat_AP_Global
     from ..core.properties import Mosplat_PG_Global
 

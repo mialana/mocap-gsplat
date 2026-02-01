@@ -1,5 +1,4 @@
 from ...infrastructure.schemas import OperatorIDEnum
-
 from .base_pt import MosplatPanelBase
 
 

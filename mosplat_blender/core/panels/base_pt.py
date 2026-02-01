@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from bpy.types import Panel, UILayout, Context, UIList
-
-from typing import Literal, TYPE_CHECKING, Optional, Set, Literal, TypeAlias
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal, Optional, Set, TypeAlias
 
-from ..checks import check_addonpreferences, check_propertygroup
-from ...infrastructure.mixins import CtxPackage, ContextAccessorMixin
+from bpy.types import Context, Panel, UILayout, UIList
+
+from ...infrastructure.mixins import ContextAccessorMixin, CtxPackage
 from ...infrastructure.schemas import (
     PanelIDEnum,
-    UserFacingError,
     UnexpectedError,
+    UserFacingError,
 )
-
+from ..checks import check_addonpreferences, check_propertygroup
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems

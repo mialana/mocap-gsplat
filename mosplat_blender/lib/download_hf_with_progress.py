@@ -5,12 +5,12 @@ running as a subprocess allows complete separation of concerns,
 and the process can even be completely killed if necessary.
 """
 
-import sys
 import argparse
-from pathlib import Path
 import json
-from dataclasses import dataclass, asdict
-from typing import Tuple, TypedDict, Type
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Tuple, Type, TypedDict
 
 if "--" in sys.argv:  # parse original subprocess call
     ARGV = sys.argv[sys.argv.index("--") + 1 :]

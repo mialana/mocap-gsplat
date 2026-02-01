@@ -1,7 +1,6 @@
 import bpy
 
 from ...infrastructure.constants import ADDON_HUMAN_READABLE
-
 from .base_ot import MosplatOperatorBase
 
 

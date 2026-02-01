@@ -3,8 +3,8 @@ protocol classes for static-typing purposes.
 many exist to prevent escape of blender types into .infrastructure
 """
 
-from typing import Protocol, Any, TypeVar, Iterator, runtime_checkable, ClassVar
 from dataclasses import Field
+from typing import Any, ClassVar, Iterator, Protocol, TypeVar, runtime_checkable
 
 
 class SupportsMosplat_AP_Global(Protocol):

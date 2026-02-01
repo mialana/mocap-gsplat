@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Tuple, List, NamedTuple
 from pathlib import Path
+from typing import List, NamedTuple, Tuple
 
+from ...infrastructure.schemas import MediaFileStatus, MediaIODataset
 from .base_ot import MosplatOperatorBase
-
-from ...infrastructure.schemas import MediaIODataset, MediaFileStatus
 
 
 class ThreadKwargs(NamedTuple):

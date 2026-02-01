@@ -15,10 +15,10 @@ and as seen below, if edits needs to be applied per media file, use `media_file_
 to apply transformations to `images` with a single frame fittingly.
 """
 
-import numpy as np
-import numpy.typing as npt
 from typing import List, Optional
 
+import numpy as np
+import numpy.typing as npt
 
 _IMAGES_MASK: Optional[npt.NDArray[np.bool_]] = None
 

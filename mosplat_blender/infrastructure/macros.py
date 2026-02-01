@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
+import sys
+from importlib.machinery import ModuleSpec
+from importlib.util import module_from_spec, spec_from_file_location
 from os import stat_result
 from pathlib import Path
 from statistics import median
-
-from typing import Iterable, List, Tuple, Set, LiteralString, TypeAlias
-from typing import TYPE_CHECKING, Optional, Callable, TypeGuard, TypeVar, Union
-
-from importlib.util import spec_from_file_location, module_from_spec
-from importlib.machinery import ModuleSpec
 from types import ModuleType
-import sys
-
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Iterable,
+    List,
+    LiteralString,
+    Optional,
+    Set,
+    Tuple,
+    TypeAlias,
+    TypeGuard,
+    TypeVar,
+    Union,
+)
 
 if TYPE_CHECKING:
     import cv2  # static only import of risky module

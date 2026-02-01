@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from functools import wraps, update_wrapper
+from functools import update_wrapper, wraps
 from typing import (
     Callable,
-    ParamSpec,
-    TypeVar,
-    Type,
-    Optional,
-    Generic,
     Concatenate,
+    Generic,
+    Optional,
+    ParamSpec,
     Self,
+    Type,
+    TypeVar,
+    overload,
 )
-from typing import overload
 
-from .schemas import DeveloperError
 from .constants import _MISSING_
+from .schemas import DeveloperError
 
 # maintains original callable's signature for `run_once` and `record_work_time`
 P = ParamSpec("P")
@@ -115,8 +115,8 @@ def record_work_time(
     Returns:
         Wrapped function (with exact signature).
     """
-    from datetime import datetime
     import time
+    from datetime import datetime
 
     @wraps(fn)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
