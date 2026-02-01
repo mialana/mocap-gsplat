@@ -31,6 +31,15 @@ S = TypeVar("S")
 D = TypeVar("D", bound=SupportsDataclass)  # dataclass equivalent of the property group
 ChildD = TypeVar("ChildD", bound=SupportsDataclass)  # dataclass that is a property
 
+PreregristrationFn: TypeAlias = Callable[[], None]
+
+
+class CtxPackage(NamedTuple):
+    context: Context
+    prefs: Mosplat_AP_Global
+    props: Mosplat_PG_Global
+
+
 if TYPE_CHECKING:
     from bpy.types import Context
     from ..core.preferences import Mosplat_AP_Global
@@ -70,9 +79,6 @@ class MosplatLogClassMixin:
         return cls.class_logger
 
 
-PreregristrationFn: TypeAlias = Callable[[], None]
-
-
 class MosplatEnforceAttributesMixin(Generic[D], MosplatLogClassMixin):
     """
     a mixin base class that allows for standardization of common metadata between
@@ -106,6 +112,11 @@ class MosplatEnforceAttributesMixin(Generic[D], MosplatLogClassMixin):
         """
         ran at registration time of the class.
         """
+
+        for fld in fields(metadata):
+            value = getattr(metadata, fld.name)
+            setattr(cls, fld.name, value)
+
         if "MOSPLAT_TESTING" in os.environ:
             cls._enforce_mixin_attributes()
 
@@ -123,10 +134,6 @@ class MosplatEnforceAttributesMixin(Generic[D], MosplatLogClassMixin):
     @classmethod
     def preregistration_fn_factory(cls, metadata: D) -> PreregristrationFn:
         return partial(cls.preregistration, metadata)
-
-
-SD = TypeVar("SD", bound=SupportsDataclass)
-E = TypeVar("E", bound=MosplatEnforceAttributesMixin)
 
 
 class MosplatAPAccessorMixin(MosplatLogClassMixin):
@@ -187,12 +194,6 @@ class MosplatBlPropertyAccessorMixin(MosplatEnforceAttributesMixin):
             return msg
 
 
-class CtxPackage(NamedTuple):
-    context: Context
-    prefs: Mosplat_AP_Global
-    props: Mosplat_PG_Global
-
-
 class MosplatContextAccessorMixin(
     Generic[D],
     MosplatEnforceAttributesMixin[D],
@@ -222,20 +223,20 @@ class MosplatDataclassInteropMixin(Generic[D]):
         cls = self.__dataclass_type__
 
         kwargs = {}
-        for f in fields(cls):
-            value = getattr(self, f.name)
+        for fld in fields(cls):
+            value = getattr(self, fld.name)
             if isinstance(value, MosplatDataclassInteropMixin):
                 value = value.to_dataclass()
             elif isinstance(value, SupportsCollectionProperty):
                 value = self.collection_property_to_dataclass_list(value)
-            kwargs[f.name] = value
+            kwargs[fld.name] = value
 
         return cls(**kwargs)
 
     def from_dataclass(self, dc: D) -> None:
-        for f in fields(dc):
-            value = getattr(dc, f.name)
-            target = getattr(self, f.name, None)
+        for fld in fields(dc):
+            value = getattr(dc, fld.name)
+            target = getattr(self, fld.name, None)
             if isinstance(target, MosplatDataclassInteropMixin):
                 target.from_dataclass(value)
             elif isinstance(target, SupportsCollectionProperty):
@@ -247,7 +248,7 @@ class MosplatDataclassInteropMixin(Generic[D]):
                     else:
                         item_pg = item_dc
             else:
-                setattr(self, f.name, value)
+                setattr(self, fld.name, value)
 
     @staticmethod
     def collection_property_to_dataclass_list(

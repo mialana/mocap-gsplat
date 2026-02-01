@@ -27,10 +27,12 @@ panel_registry: Dict[
     Mosplat_PT_Preprocess: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.PREPROCESS,
         bl_description=f"Holds operations for preprocessing '{ADDON_SHORTNAME}' data",
+        bl_parent_id=PanelIDEnum.MAIN,
     ),
     Mosplat_PT_LogEntries: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.LOG_ENTRIES,
         bl_description="Panel to display log entries.",
+        bl_parent_id=PanelIDEnum.MAIN,
     ),
 }
 

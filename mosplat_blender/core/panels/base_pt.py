@@ -38,25 +38,31 @@ class MosplatUIListBase(UIList, MosplatContextAccessorMixin):
     __id_enum_type__ = UIListIDEnum
 
 
-@dataclass(frozen=True)
+@dataclass
 class MosplatPanelMetadata:
-    bl_idname: PanelIDEnum
+    bl_idname: str
     bl_description: str
-
-    @property
-    def bl_label(self) -> str:
-        return PanelIDEnum.label_factory(self.bl_idname)
-
+    bl_label: str
+    bl_parent_id: str
     bl_category: str = PanelIDEnum._category()
-    bl_parent_id: Optional[PanelIDEnum] = None
+    bl_space_type: str = "VIEW_3D"
+    bl_region_type: str = "UI"
+
+    def __init__(
+        self,
+        *,
+        bl_idname: PanelIDEnum,
+        bl_description: str,
+        bl_parent_id: Optional[PanelIDEnum] = None,
+    ):
+        self.bl_idname = bl_idname.value
+        self.bl_description = bl_description
+        self.bl_label = PanelIDEnum.label_factory(bl_idname)
+        self.bl_parent_id = bl_parent_id.value if bl_parent_id else ""
 
 
 class MosplatPanelBase(Panel, MosplatContextAccessorMixin[MosplatPanelMetadata]):
     __id_enum_type__ = PanelIDEnum
-
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = PanelIDEnum._category()
 
     @classmethod
     def poll(cls, context) -> bool:

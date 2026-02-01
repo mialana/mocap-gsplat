@@ -105,7 +105,7 @@ class OperatorIDEnum(StrEnum):
         return f"{OPERATOR_ID_PREFIX}{name.lower()}"
 
     @staticmethod
-    def label_factory(member: OperatorIDEnum):
+    def label_factory(member: OperatorIDEnum) -> str:
         """
         creates the operator label from the id
         keeping this here so this file can be a one-stop shop for metadata construction

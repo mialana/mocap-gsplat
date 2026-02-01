@@ -9,13 +9,13 @@ import contextlib
 from queue import Queue
 import threading
 from functools import partial
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..handlers import load_dataset_property_group_from_json
 from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
 from ...infrastructure.mixins import CtxPackage, MosplatContextAccessorMixin
 from ...infrastructure.macros import immutable_to_set as im_to_set
-from ...infrastructure.constants import _TIMER_INTERVAL_
+from ...infrastructure.constants import _TIMER_INTERVAL_, _GENERATED_
 from ...infrastructure.schemas import (
     UnexpectedError,
     DeveloperError,
@@ -42,29 +42,30 @@ if TYPE_CHECKING:
 K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
 
 
-@dataclass(frozen=True)
+@dataclass
 class MosplatOperatorMetadata:
-    bl_idname: OperatorIDEnum
+    bl_idname: str
     bl_description: str
+    bl_label: str
+    bl_options: Set[OperatorTypeFlagItems]
+    bl_category = OperatorIDEnum._category()
 
-    @property
-    def bl_label(self) -> str:
-        return OperatorIDEnum.label_factory(self.bl_idname)
-
-    bl_category: str = field(default=OperatorIDEnum._category())
-    bl_options: Set[OperatorTypeFlagItems] = field(
-        default_factory=lambda: set({"REGISTER", "UNDO"})
-    )
+    def __init__(
+        self,
+        *,
+        bl_idname: OperatorIDEnum,
+        bl_description: str,
+        bl_options: Set[OperatorTypeFlagItems] = {"REGISTER", "UNDO"},
+    ):
+        self.bl_idname = bl_idname.value
+        self.bl_description = bl_description
+        self.bl_label = OperatorIDEnum.label_factory(bl_idname)
+        self.bl_options = bl_options
 
 
 class MosplatOperatorBase(
     Generic[QT, K], Operator, MosplatContextAccessorMixin[MosplatOperatorMetadata]
 ):
-    bl_category: ClassVar[str] = OperatorIDEnum._category()
-    bl_options = {"REGISTER", "UNDO"}  # all of our operators should support undo
-
-    __id_enum_type__ = OperatorIDEnum
-
     __worker: Optional[MosplatWorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
     __data: Optional[MediaIODataset] = None

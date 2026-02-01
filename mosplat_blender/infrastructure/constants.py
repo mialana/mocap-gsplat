@@ -16,6 +16,7 @@ from string import capwords
 import tempfile
 
 _MISSING_: Any = object()  # sentinel variable
+_GENERATED_: Any = object()
 
 _TIMER_INTERVAL_: Final[float] = 0.1
 _TIMEOUT_INTERVAL_: Final[float] = 15.0  # amount of time to wait before timeout
