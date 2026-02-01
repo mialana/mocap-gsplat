@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 
 from ..properties import Mosplat_PG_MediaIODataset
-from ...infrastructure.schemas import PanelIDEnum, OperatorIDEnum, MediaFileStatus
+from ...infrastructure.schemas import OperatorIDEnum, MediaFileStatus
 
 from .base_pt import MosplatPanelBase, column_factory
 
@@ -10,11 +10,6 @@ _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS
 
 
 class Mosplat_PT_Preprocess(MosplatPanelBase):
-    bl_idname = PanelIDEnum.PREPROCESS
-    bl_description = "Holds operations for preprocessing Mosplat data"
-
-    bl_parent_id = PanelIDEnum.MAIN
-
     def draw_with_layout(self, pkg, layout):
         props = pkg.props
         column = layout.column()

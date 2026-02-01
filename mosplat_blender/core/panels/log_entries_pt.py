@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, List, cast, Dict
 from ..properties import Mosplat_PG_LogEntry
 from ...infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
 from ...infrastructure.protocols import SupportsCollectionProperty
-from ...infrastructure.schemas import PanelIDEnum, UIListIDEnum, LogEntryLevelEnum
+from ...infrastructure.schemas import UIListIDEnum, LogEntryLevelEnum
 
 from .base_pt import MosplatPanelBase, MosplatUIListBase
 
@@ -89,14 +89,10 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
 
 
 class Mosplat_PT_LogEntries(MosplatPanelBase):
-    bl_idname = PanelIDEnum.LOG_ENTRIES
-    bl_description = "Panel to display log entries."
-    bl_parent_id = PanelIDEnum.MAIN
-
     def draw_with_layout(self, pkg, layout):
         props = pkg.props
 
-        template_list = layout.template_list(
+        layout.template_list(
             UIListIDEnum.LOG_ENTRIES,
             "",
             props,

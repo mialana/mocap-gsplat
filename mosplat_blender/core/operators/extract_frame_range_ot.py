@@ -7,7 +7,6 @@ from .base_ot import MosplatOperatorBase
 
 from ...infrastructure.schemas import (
     UserFacingError,
-    OperatorIDEnum,
     MediaIODataset,
     ProcessedFrameRange,
 )
@@ -24,9 +23,6 @@ class ThreadKwargs(NamedTuple):
 class Mosplat_OT_extract_frame_range(
     MosplatOperatorBase[str, ThreadKwargs],
 ):
-    bl_idname = OperatorIDEnum.EXTRACT_FRAME_RANGE
-    bl_description = "Extract a frame range from all media files in media directory."
-
     @classmethod
     def _contexted_poll(cls, pkg):
         props = pkg.props

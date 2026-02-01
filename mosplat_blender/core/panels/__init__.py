@@ -22,6 +22,7 @@ panel_registry: Dict[
     Mosplat_PT_Main: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.MAIN,
         bl_description=f"Main panel holding all '{ADDON_SHORTNAME}' panels",
+        bl_options={"HIDE_HEADER"},
     ),
     Mosplat_PT_Preprocess: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.PREPROCESS,

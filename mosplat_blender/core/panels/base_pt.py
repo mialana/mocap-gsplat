@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from bpy.types import Panel, UILayout, Context, UIList
 
-from typing import Literal, TYPE_CHECKING, Optional
+from typing import Literal, TYPE_CHECKING, Optional, Set, Literal, TypeAlias
 from dataclasses import dataclass
 
 from ..checks import check_addonpreferences, check_propertygroup
 from ...infrastructure.mixins import CtxPackage, ContextAccessorMixin
 from ...infrastructure.schemas import (
     PanelIDEnum,
-    UIListIDEnum,
     UserFacingError,
     UnexpectedError,
 )
@@ -17,6 +16,10 @@ from ...infrastructure.schemas import (
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems
+
+    PanelTypeFlagItems: TypeAlias = Literal[  # stubs don't supply as an enum yet
+        "DEFAULT_CLOSED", "HIDE_HEADER", "INSTANCED", "HEADER_LAYOUT_EXPAND"
+    ]
 
 
 def column_factory(
@@ -41,7 +44,7 @@ class MosplatUIListMetadata:
 
 
 class MosplatUIListBase(UIList, ContextAccessorMixin[MosplatUIListMetadata]):
-    __id_enum_type__ = UIListIDEnum
+    pass
 
 
 @dataclass
@@ -50,6 +53,7 @@ class MosplatPanelMetadata:
     bl_description: str
     bl_label: str
     bl_parent_id: str
+    bl_options: Set[PanelTypeFlagItems]
     bl_category: str = PanelIDEnum._category()
     bl_space_type: str = "VIEW_3D"
     bl_region_type: str = "UI"
@@ -60,15 +64,17 @@ class MosplatPanelMetadata:
         bl_idname: PanelIDEnum,
         bl_description: str,
         bl_parent_id: Optional[PanelIDEnum] = None,
+        bl_options: Set[PanelTypeFlagItems] = set(),
     ):
         self.bl_idname = bl_idname.value
         self.bl_description = bl_description
         self.bl_label = PanelIDEnum.label_factory(bl_idname)
         self.bl_parent_id = bl_parent_id.value if bl_parent_id else ""
+        self.bl_options = bl_options
 
 
 class MosplatPanelBase(Panel, ContextAccessorMixin[MosplatPanelMetadata]):
-    __id_enum_type__ = PanelIDEnum
+    bl_options = {"HIDE_HEADER"}
 
     @classmethod
     def poll(cls, context) -> bool:

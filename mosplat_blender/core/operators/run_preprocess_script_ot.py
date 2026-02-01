@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .base_ot import MosplatOperatorBase
 
-from ...infrastructure.schemas import OperatorIDEnum, MediaIODataset
+from ...infrastructure.schemas import MediaIODataset
 from ...infrastructure.constants import RAW_FRAME_DIRNAME
 
 
@@ -18,9 +18,6 @@ class ThreadKwargs(NamedTuple):
 class Mosplat_OT_run_preprocess_script(
     MosplatOperatorBase[str, ThreadKwargs],
 ):
-    bl_idname = OperatorIDEnum.RUN_PREPROCESS_SCRIPT
-    bl_description = "Run current preprocess script on current frame range."
-
     @classmethod
     def _contexted_poll(cls, pkg) -> bool:
         props = pkg.props

@@ -5,11 +5,7 @@ from pathlib import Path
 
 from .base_ot import MosplatOperatorBase
 
-from ...infrastructure.schemas import (
-    OperatorIDEnum,
-    MediaIODataset,
-    MediaFileStatus,
-)
+from ...infrastructure.schemas import MediaIODataset, MediaFileStatus
 
 
 class ThreadKwargs(NamedTuple):
@@ -20,9 +16,6 @@ class ThreadKwargs(NamedTuple):
 class Mosplat_OT_validate_media_file_statuses(
     MosplatOperatorBase[Tuple[bool, str], ThreadKwargs]
 ):
-    bl_idname = OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES
-    bl_description = "Check frame count, width, and height of all media files found in current media directory."
-
     def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
         props = pkg.props

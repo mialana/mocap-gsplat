@@ -1,18 +1,11 @@
 import bpy
 
 from ...infrastructure.constants import ADDON_HUMAN_READABLE
-from ...infrastructure.schemas import OperatorIDEnum
 
 from .base_ot import MosplatOperatorBase
 
 
 class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):
-    bl_idname = OperatorIDEnum.OPEN_ADDON_PREFERENCES
-    bl_description = (
-        f"Quick navigation to '{ADDON_HUMAN_READABLE}' saved addon preferences."
-    )
-    bl_options = {"REGISTER", "MACRO"}
-
     def _contexted_execute(self, pkg):
         context = pkg.context
 

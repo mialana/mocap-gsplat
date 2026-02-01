@@ -249,7 +249,8 @@ class MosplatOperatorBase(
     def _operator_thread(queue: Queue[QT], cancel_event: threading.Event, *, twargs: K):
         """
         this function is required IF it's a modal operator.
-        otherwise, the `NotImplementedError` pathway will never be seen.
+        otherwise, this error is safe & correct as the pathway will never be seen.
+        `twargs` stands for both 'thread kwargs' and 'tuple kwargs'
         """
         raise NotImplementedError
 

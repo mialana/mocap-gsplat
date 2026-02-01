@@ -12,7 +12,7 @@ from ...infrastructure.macros import (
     tuple_type_matches_known_tuple_type,
     kill_subprocess_cross_platform,
 )
-from ...infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
+from ...infrastructure.schemas import UnexpectedError, UserFacingError
 from ...infrastructure.constants import (
     DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
     _TIMEOUT_INTERVAL_,
@@ -33,9 +33,6 @@ class ThreadKwargs(NamedTuple):
 class Mosplat_OT_initialize_model(
     MosplatOperatorBase[Tuple[str, int, int, str], ThreadKwargs]
 ):
-    bl_idname = OperatorIDEnum.INITIALIZE_MODEL
-    bl_description = "Download or load VGGT model weights using Hugging Face."
-
     @classmethod
     def _contexted_poll(cls, pkg):
         from ...interfaces import MosplatVGGTInterface
