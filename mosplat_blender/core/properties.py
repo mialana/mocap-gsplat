@@ -229,9 +229,14 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
         default=LogEntryLevelEnum.INFO.value,
     )
     message: StringProperty(name="Log Entry Message")
+    session_index: IntProperty(
+        name="Log Session Index",
+        description="The self-stored index represented as a monotonic increasing index since the session start.",
+        default=-1,
+    )
     full_message: StringProperty(
         name="Log Entry Full Message",
-        description="The property that is displayed in the dynamic tooltip while hovering on the item.",
+        description="The property that is displayed in the dynamic tooltip while hovering on the log item.",
     )
 
 
@@ -250,10 +255,6 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
     @property
     def entries_accessor(self) -> SupportsCollectionProperty[Mosplat_PG_LogEntry]:
         return self.logs
-
-    @property
-    def level_filter_as_enum(self) -> LogEntryLevelEnum:
-        return LogEntryLevelEnum(self.logs_level_filter)
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):

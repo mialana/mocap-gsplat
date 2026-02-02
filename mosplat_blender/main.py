@@ -12,6 +12,7 @@ from .core.checks import check_addonpreferences
 from .core.handlers import (
     handle_load_from_json,
     handle_load_from_json_timer_entrypoint,
+    handle_reset_properties,
     handle_save_to_json,
 )
 from .infrastructure.constants import ADDON_GLOBAL_PROPS_NAME, ADDON_HUMAN_READABLE
@@ -67,6 +68,7 @@ def register_addon():
 
     # try load from JSON every file load and after registration occurs
     bpy.app.handlers.load_post.append(handle_load_from_json)
+    bpy.app.handlers.load_post.append(handle_reset_properties)
     bpy.app.timers.register(handle_load_from_json_timer_entrypoint, first_interval=0)
 
     bpy.app.handlers.undo_post.append(handle_save_to_json)

@@ -57,7 +57,7 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         inner.label(text=log.message)
         sub = inner.row(align=True)
         sub.alignment = "RIGHT"
-        sub.label(text=str(index))
+        sub.label(text=str(log.session_index))
 
     def filter_items(self, context, data, property):
         collection: SupportsCollectionProperty[Mosplat_PG_LogEntry] = getattr(

@@ -80,6 +80,7 @@ class MosplatLoggingInterface:
         self._root_logger.propagate = False  # prevent propogation to parent loggers
 
         self._blender_log_entry_queue = Queue()
+        self._blender_session_index_tracker = 0
 
     @classmethod
     def retrieve_root_module_name_from_env(cls) -> str:
@@ -114,6 +115,7 @@ class MosplatLoggingInterface:
     def cleanup(self):
         # drain message queue
         self.clear_blender_log_entry_queue()
+        self._blender_session_index_tracker = 0
 
         """remove handlers from the root logger"""
         if self._stdout_log_handler:
@@ -278,6 +280,9 @@ class MosplatLoggingInterface:
                 entry = entries.add()
                 entry.level = level.value
                 entry.message = msg
+                entry.session_index = self._blender_session_index_tracker
+                self._blender_session_index_tracker += 1  # increment the tracker here
+
                 entry.full_message = full_msg
 
                 while len(entries) > MAX_LOG_ENTRIES_STORED:

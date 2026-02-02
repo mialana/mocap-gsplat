@@ -105,7 +105,7 @@ class Mosplat_OT_initialize_model(
                 "--python",
                 self._subprocess_script,
                 "--",
-                "inv",
+                prefs.vggt_hf_id,
                 str(prefs.vggt_model_dir),
             ],
             stdout=subprocess.PIPE,
@@ -203,9 +203,8 @@ def _wait_and_update_queue_loop(
     if ret != 0:
         e = subprocess.CalledProcessError(ret, proc.args)
         e.add_note(
-            "NOTE 1: Occurred while downloading Hugging Face model via subprocess."
+            "NOTE: Occurred while downloading Hugging Face model via subprocess."
         )
-        e.add_note("NOTE 2: ignore this if operator was deliberately cancelled.")
         raise e
 
     return  # proc existed successfully

@@ -23,10 +23,7 @@ logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 def handle_load_from_json(scene: Scene):
     """entrypoint for `bpy.app.handlers.load_post`"""
 
-    bpy.app.timers.register(
-        lambda: handle_load_from_json_timer_entrypoint(scene),
-        first_interval=0,
-    )
+    handle_load_from_json_timer_entrypoint(scene)
 
 
 def handle_load_from_json_timer_entrypoint(scene: Optional[Scene] = None) -> None:
@@ -77,3 +74,16 @@ def handle_save_to_json(scene: Scene):
     prefs = check_addonpreferences(bpy.context.preferences)
 
     props.dataset_accessor.to_JSON(props.data_json_filepath(prefs))
+
+
+@persistent
+def handle_reset_properties(scene: Scene):
+    scene = scene or bpy.context.scene
+    props = check_propertygroup(scene)
+
+    meta = props._meta
+
+    for prop_meta in meta:
+        props.property_unset(prop_meta.id)
+
+    logger.info("Properties reset.")

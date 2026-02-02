@@ -60,9 +60,11 @@ class Mosplat_OT_extract_frame_range(
         if next == "done":
             self.cleanup(pkg)  # write props (as dataclass) to JSON
             return "FINISHED"
-
-        if next != "update":  # if sent an error message via queue
-            self.logger.warning(next)
+        elif next.startswith("update"):  # if sent an error message via queue
+            self.logger.debug(next)
+        else:
+            self.logger.error(next)
+            return "FINISHED"
 
         # sync props regardless as the updated dataclass is still valid
         pkg.props.dataset_accessor.from_dataclass(self.data)
@@ -93,10 +95,13 @@ class Mosplat_OT_extract_frame_range(
                 npy_filepath.parent.mkdir(parents=True, exist_ok=True)
 
                 if not is_path_accessible(npy_filepath):
-                    write_frame_data_to_npy(idx, caps, npy_filepath)
+                    note = write_frame_data_to_npy(idx, caps, npy_filepath)
+                else:
+                    # TODO: Check the
+                    note = f"NPY data for frame index '{idx}' already found on disk. Skipping..."
 
                 new_frame_range.end_frame = idx
-                queue.put("update")
+                queue.put(f"update: {note}")
         except (UserFacingError, OSError) as e:
             queue.put(str(e))  # exit early wherever error occurs and put error on queue
         finally:

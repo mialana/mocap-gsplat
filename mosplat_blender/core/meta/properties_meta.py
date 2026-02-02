@@ -1,4 +1,4 @@
-# 2026-02-01 22:55:13.287558
+# 2026-02-02 13:12:50.767790
 # created using 'generate_property_meta_files.py'
 
 
@@ -48,6 +48,7 @@ class Mosplat_PG_OperatorProgress_Meta(NamedTuple):
 class Mosplat_PG_LogEntry_Meta(NamedTuple):
     level: PropertyMeta
     message: PropertyMeta
+    session_index: PropertyMeta
     full_message: PropertyMeta
 
 
@@ -144,10 +145,15 @@ MOSPLAT_PG_OPERATORPROGRESS_META = Mosplat_PG_OperatorProgress_Meta(
 MOSPLAT_PG_LOGENTRY_META = Mosplat_PG_LogEntry_Meta(
     level=PropertyMeta(id="level", name="Log Entry Level", description=""),
     message=PropertyMeta(id="message", name="Log Entry Message", description=""),
+    session_index=PropertyMeta(
+        id="session_index",
+        name="Log Session Index",
+        description="The self-stored index represented as a monotonic increasing index since the session start.",
+    ),
     full_message=PropertyMeta(
         id="full_message",
         name="Log Entry Full Message",
-        description="The property that is displayed in the dynamic tooltip while hovering on the item.",
+        description="The property that is displayed in the dynamic tooltip while hovering on the log item.",
     ),
 )
 

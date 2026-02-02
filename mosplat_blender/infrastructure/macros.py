@@ -12,6 +12,7 @@ from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Callable,
+    Generator,
     Iterable,
     List,
     LiteralString,
@@ -121,6 +122,8 @@ def write_frame_data_to_npy(
 
     stacked = np.stack(images, axis=0)
     np.save(out_path, stacked)
+
+    return f"Frame index '{frame_idx}' finished with stacked images shape '{stacked.shape}'."
 
 
 def import_module_from_path_dynamic(path: Path) -> ModuleType:

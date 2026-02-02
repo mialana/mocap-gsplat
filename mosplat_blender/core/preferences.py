@@ -210,39 +210,35 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
 
         col = layout.column(align=True)
 
+        meta = self._meta
+
         gen_io_box = col.box()
         gen_io_box.label(text="General I/O Configuration", icon="DISK_DRIVE_LARGE")
-        gen_io_box.prop(self, "cache_dir")
-        gen_io_box.prop(self, "json_log_subdir")
-        gen_io_box.prop(self, "vggt_model_subdir")
+        gen_io_box.prop(self, meta.cache_dir.id)
+        gen_io_box.prop(self, meta.json_log_subdir.id)
+        gen_io_box.prop(self, meta.vggt_model_subdir.id)
+        gen_io_box.prop(self, meta.vggt_hf_id.id)
 
         layout.separator()
 
         data_proc_box = col.box()
         data_proc_box.label(text="Data Processing Configuration", icon="MESH_CYLINDER")
-        data_proc_box.prop(self, "data_output_path")
-        data_proc_box.prop(self, "preprocess_media_script_file")
-        data_proc_box.prop(self, "media_extensions")
-        data_proc_box.prop(self, "max_frame_range")
+        data_proc_box.prop(self, meta.data_output_path.id)
+        data_proc_box.prop(self, meta.preprocess_media_script_file.id)
+        data_proc_box.prop(self, meta.media_extensions.id)
+        data_proc_box.prop(self, meta.max_frame_range.id)
 
         layout.separator()
 
         json_box = col.box()
         json_box.label(text="JSON Log Configuration", icon="FILE_TEXT")
-        json_box.prop(self, "json_log_filename_format")
-        json_box.prop(self, "json_date_log_format")
-        json_box.prop(self, "json_log_format")
+        json_box.prop(self, meta.json_log_filename_format.id)
+        json_box.prop(self, meta.json_date_log_format.id)
+        json_box.prop(self, meta.json_log_format.id)
 
         layout.separator()
 
         stdout_box = col.box()
         stdout_box.label(text="STDOUT Log Formatting", icon="GREASEPENCIL")
-        stdout_box.prop(self, "stdout_date_log_format")
-        stdout_box.prop(self, "stdout_log_format")
-
-
-_meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
-
-_meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
-
-_meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
+        stdout_box.prop(self, meta.stdout_date_log_format.id)
+        stdout_box.prop(self, meta.stdout_log_format.id)
