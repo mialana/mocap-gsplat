@@ -9,11 +9,7 @@ Specifically, it implements these `bpy_struct` classes (`bpy_struct` is the base
 1.  [`bpy.types.Operator`](https://docs.blender.org/api/current/bpy.types.Operator.html)
 2.  [`bpy.types.Panel`](https://docs.blender.org/api/current/bpy.types.Panel.html)
 
-These types have a hierarchal class tree like so:
-
-```txt
-log class mixin <- native Pythonic mixin class <- base class w/ both mixins and blender inheritance <- instance class
-```
+These types have a hierarchal class tree using mixins and the base blender type.
 
 For more information about the implementation and usefulness of the mixin classes, see [mixins.py](../infrastructure/mixins.py).
 

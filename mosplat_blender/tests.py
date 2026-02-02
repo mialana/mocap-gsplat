@@ -4,6 +4,8 @@ these defer from `.infrastructure.checks` as they are developer test that are no
 actually called within the add-on's runtime.
 """
 
+import os
+
 from .interfaces.logging_interface import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
@@ -25,3 +27,14 @@ def test_deps_imports():
         logger.info("Success! All dependencies could be imported.")
     except ImportError:
         logger.exception("Error importing a required dependency.")
+
+
+def test_env():
+    """currently just a convenience function to easily see env variables in debuggers."""
+    env_list = []
+    for k, v in os.environ.items():
+        env_list.append((k, v))
+
+    env_list.sort(key=lambda tup: tup[0])
+
+    return

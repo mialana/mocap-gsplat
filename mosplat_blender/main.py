@@ -63,7 +63,7 @@ def register_addon():
         bpy.context.preferences
     )
 
-    MosplatLoggingInterface.init_handlers_from_addon_prefs(addon_preferences)
+    MosplatLoggingInterface()._init_handlers_from_addon_prefs(addon_preferences)
 
     # try load from JSON every file load and after registration occurs
     bpy.app.handlers.load_post.append(handle_load_from_json)
@@ -92,7 +92,7 @@ def unregister_addon():
     try:
         from .interfaces import MosplatVGGTInterface
 
-        MosplatVGGTInterface.cleanup()
+        MosplatVGGTInterface.cleanup_interface()
     except UnexpectedError as e:
         logger.error(f"Error during VGGT cleanup: {str(e)}")
 

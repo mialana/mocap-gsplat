@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from ...infrastructure.schemas import MediaFileStatus, OperatorIDEnum
+from ...infrastructure.schemas import EnvVariableEnum, MediaFileStatus, OperatorIDEnum
 from ..properties import Mosplat_PG_MediaIODataset
 from .base_pt import MosplatPanelBase, column_factory
 
@@ -38,7 +38,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
 
         grid = statuses_box.grid_flow(columns=4, align=True, row_major=True)
 
-        if "MOSPLAT_TESTING" in os.environ:
+        if EnvVariableEnum.TESTING in os.environ:
             self._overwrite_median_as_status(dataset)
             statuses.append(_median_as_status)
 

@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import sys
 from enum import StrEnum, auto
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Queue
 from typing import Callable, ClassVar, NoReturn, Optional, Self, Tuple, TypeAlias
 
 from ..infrastructure.constants import (
@@ -25,6 +26,7 @@ from ..infrastructure.decorators import run_once, run_once_per_instance
 from ..infrastructure.protocols import SupportsMosplat_AP_Global
 from ..infrastructure.schemas import (
     DeveloperError,
+    EnvVariableEnum,
     LogEntryLevelEnum,
     UnexpectedError,
     UserFacingError,
@@ -40,11 +42,9 @@ class LoggingHandler(StrEnum):
 
 
 class MosplatLoggingInterface:
-    instance: ClassVar[Optional[Self]]
-    instance_name: ClassVar[str]
+    instance: ClassVar[Optional[Self]] = None
 
-    @run_once
-    def __new__(cls, root_module_name: str) -> Self:
+    def __new__(cls, *args) -> Self:
         """
         Expected usage is for only the top-level `__init__.py` of a package/program
         to create an instance of the interface.
@@ -54,12 +54,14 @@ class MosplatLoggingInterface:
         Proceeding attempts to create new instances will return that same interface.
         """
 
+        if cls.instance:
+            return cls.instance  # early return if already exists
+
         cls.instance = super().__new__(cls)
-        cls.instance_name = root_module_name
         return cls.instance
 
     @run_once_per_instance
-    def __init__(self, root_module_name: str):
+    def __init__(self, root_module_name: Optional[str] = None):
         self._root_logger: logging.Logger
         self._old_factory: Callable[..., logging.LogRecord]
 
@@ -71,10 +73,24 @@ class MosplatLoggingInterface:
 
         self._set_log_record_factory()
 
+        if not root_module_name:
+            root_module_name = self.retrieve_root_module_name_from_env()
+
         self._root_logger = self.configure_logger_instance(root_module_name)
         self._root_logger.propagate = False  # prevent propogation to parent loggers
 
         self._blender_log_entry_queue = Queue()
+
+    @classmethod
+    def retrieve_root_module_name_from_env(cls) -> str:
+        env_var = EnvVariableEnum.ROOT_MODULE_NAME
+        name_from_env = os.getenv(env_var)
+
+        if not name_from_env:
+            raise DeveloperError(
+                f"Failed to retrieve '{env_var}' from environment for logging init."
+            )
+        return name_from_env
 
     @classmethod
     def cleanup(cls):
@@ -98,7 +114,7 @@ class MosplatLoggingInterface:
     @classmethod
     def init_handlers_from_addon_prefs(cls, addon_prefs: SupportsMosplat_AP_Global):
         if cls.instance is None:
-            cls.error_out()
+            cls.instance = cls()
 
         cls.instance._init_handlers_from_addon_prefs(addon_prefs)
 
@@ -106,7 +122,7 @@ class MosplatLoggingInterface:
     def init_stdout_handler(cls, log_fmt: str, log_date_fmt: str) -> bool:
         """set formatter of stdout logger and add as handler"""
         if cls.instance is None:
-            cls.error_out()
+            cls.instance = cls()
 
         return cls.instance._init_stdout_handler(log_fmt, log_date_fmt)
 
@@ -116,14 +132,14 @@ class MosplatLoggingInterface:
     ) -> bool:
         """build path for json log output file, set formatter, and add as handler"""
         if cls.instance is None:
-            cls.error_out()
+            cls.instance = cls()
 
         return cls.instance._init_json_handler(log_fmt, log_date_fmt, outdir, file_fmt)
 
     @classmethod
     def add_global_message(cls, msg: BlenderLogEntry):
         if cls.instance is None:
-            cls.error_out()
+            cls.instance = cls()
 
         cls.instance._add_blender_log_entry(msg)
 

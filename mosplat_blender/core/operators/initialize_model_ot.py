@@ -36,7 +36,7 @@ class Mosplat_OT_initialize_model(
     def _contexted_poll(cls, pkg):
         from ...interfaces import MosplatVGGTInterface
 
-        if MosplatVGGTInterface.model is not None:
+        if MosplatVGGTInterface().model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
         if pkg.props.progress_accessor.in_use:
@@ -169,7 +169,7 @@ class Mosplat_OT_initialize_model(
         from ...interfaces import MosplatVGGTInterface
 
         try:
-            MosplatVGGTInterface.initialize_model(
+            MosplatVGGTInterface().initialize_model(
                 twargs.hf_id, twargs.model_cache_dir, cancel_event
             )
 
@@ -202,7 +202,10 @@ def _wait_and_update_queue_loop(
     ret: int = proc.wait()
     if ret != 0:
         e = subprocess.CalledProcessError(ret, proc.args)
-        e.add_note("NOTE: ignore this if operator was deliberately cancelled.")
+        e.add_note(
+            "NOTE 1: Occurred while downloading Hugging Face model via subprocess."
+        )
+        e.add_note("NOTE 2: ignore this if operator was deliberately cancelled.")
         raise e
 
     return  # proc existed successfully

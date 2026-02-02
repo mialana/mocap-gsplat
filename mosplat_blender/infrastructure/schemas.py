@@ -90,6 +90,15 @@ class UnexpectedError(CustomError):
 """Enum Convenience Classes"""
 
 
+class EnvVariableEnum(StrEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return f"{ADDON_SHORTNAME}_{name}".upper()
+
+    TESTING = auto()
+    ROOT_MODULE_NAME = auto()
+
+
 class OperatorIDEnum(StrEnum):
     @staticmethod
     def _prefix():

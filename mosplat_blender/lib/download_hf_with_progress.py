@@ -82,12 +82,24 @@ def main():
         repo_id=repo_id, filename=SAFETENSORS_SINGLE_FILE, cache_dir=str(cache_dir)
     )
 
-    hf_hub_download(**dl_args, tqdm_class=make_tqdm_class())
+    try:
+        hf_hub_download(**dl_args, tqdm_class=make_tqdm_class())
 
-    print(
-        str(SubprocessPayload("ok", msg=str(json.dumps(dl_args))).values_tuple()),
-        flush=True,
-    )
+        print(
+            str(SubprocessPayload("ok", msg=str(json.dumps(dl_args))).values_tuple()),
+            flush=True,
+        )  # send download args
+    except Exception:
+        # ensure download args still send
+        print(
+            str(
+                SubprocessPayload(
+                    "warning", msg=str(json.dumps(dl_args))
+                ).values_tuple()
+            ),
+            flush=True,
+        )
+        raise
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .infrastructure.schemas import EnvVariableEnum
 from .interfaces import MosplatLoggingInterface
 from .main import register_addon, unregister_addon
 
@@ -27,8 +28,11 @@ def clear_terminal():
 def register():
     load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
 
+    # keep this module's name within env during execution
+    os.environ.setdefault(EnvVariableEnum.ROOT_MODULE_NAME, __name__)
+
     # initialize handlers and local "root" logger
-    MosplatLoggingInterface(__name__)
+    MosplatLoggingInterface()
 
     register_addon()
 
@@ -38,5 +42,7 @@ def unregister():
 
     MosplatLoggingInterface.cleanup()
 
-    if "MOSPLAT_TESTING" in os.environ:
+    if EnvVariableEnum.TESTING in os.environ:
         clear_terminal()  # for dev QOL
+
+    os.environ.pop(EnvVariableEnum.ROOT_MODULE_NAME, None)

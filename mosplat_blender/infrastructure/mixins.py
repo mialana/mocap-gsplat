@@ -23,7 +23,7 @@ from typing import (
 
 from .constants import _MISSING_
 from .protocols import SupportsCollectionProperty, SupportsDataclass
-from .schemas import DeveloperError
+from .schemas import DeveloperError, EnvVariableEnum
 
 S = TypeVar("S")
 
@@ -113,7 +113,7 @@ class EnforceAttributesMixin(Generic[M], LogClassMixin):
         """
         ran at registration time of the class.
         """
-        if "MOSPLAT_TESTING" in os.environ:
+        if EnvVariableEnum.TESTING in os.environ:
             cls._enforce_mixin_attributes()
 
     @classmethod

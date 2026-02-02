@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Set
 
-import bpy
 from bpy.props import IntProperty, StringProperty
 from bpy.types import AddonPreferences, Context
 
@@ -52,13 +51,13 @@ def update_media_extensions(self: Mosplat_AP_Global, context: Context):
 def update_model_preferences(self: Mosplat_AP_Global, context: Context):
     from ..interfaces.vggt_interface import MosplatVGGTInterface as interface
 
-    if interface.model is not None:
-        if interface.cache_dir != self.vggt_model_dir:
+    if interface().model is not None:
+        if interface().cache_dir != self.vggt_model_dir:
             self.logger.warning(
                 "Changed model cache dir, next init will take a while."
                 "Change back to previous directory if this is not desired."
             )
-        elif interface.hf_id != self.vggt_hf_id:
+        elif interface().hf_id != self.vggt_hf_id:
             self.logger.warning(
                 "Changed Hugging Face ID for model, next init will take a while."
                 "Change back to previous ID if this is not desired."
@@ -66,7 +65,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
         else:
             return  # prefs did not change from what is currently initialized with.
         try:
-            interface.cleanup()
+            interface.cleanup_interface()
         except UnexpectedError as e:
             self.logger.warning(str(e))
 
