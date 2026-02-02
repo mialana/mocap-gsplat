@@ -19,28 +19,34 @@ from ..infrastructure.mixins import BlRNAAccessorMixin
 from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from .checks import check_media_extensions_set
-from .meta.preferences_meta import Mosplat_AP_Global_Meta
+from .meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
 
 if TYPE_CHECKING:
     from .preferences import Mosplat_AP_Global
 
 
 def update_stdout_logging(self: Mosplat_AP_Global, _: Context):
-    if MosplatLoggingInterface.init_stdout_handler(
-        log_fmt=self.stdout_log_format,
-        log_date_fmt=self.stdout_date_log_format,
-    ):
+    try:
+        MosplatLoggingInterface().init_stdout_handler(
+            log_fmt=self.stdout_log_format,
+            log_date_fmt=self.stdout_date_log_format,
+        )
         self.logger.info("STDOUT logging updated.")
+    except UserFacingError as e:
+        self.logger.error(UserFacingError.make_msg("STDOUT log settings invalid.", e))
 
 
 def update_json_logging(self: Mosplat_AP_Global, _: Context):
-    if MosplatLoggingInterface.init_json_handler(
-        log_fmt=self.json_log_format,
-        log_date_fmt=self.json_date_log_format,
-        outdir=self.json_log_dir,
-        file_fmt=self.json_log_filename_format,
-    ):
+    try:
+        MosplatLoggingInterface().init_json_handler(
+            log_fmt=self.json_log_format,
+            log_date_fmt=self.json_date_log_format,
+            outdir=self.json_log_dir,
+            file_fmt=self.json_log_filename_format,
+        )
         self.logger.info("JSON logging updated.")
+    except UserFacingError as e:
+        self.logger.error(UserFacingError.make_msg("JSON log settings invalid.", e))
 
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
@@ -71,6 +77,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
 
 
 class Mosplat_AP_Global(AddonPreferences, BlRNAAccessorMixin):
+    _meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
     bl_idname = ADDON_PREFERENCES_ID
 
     cache_dir: StringProperty(
@@ -233,6 +240,9 @@ class Mosplat_AP_Global(AddonPreferences, BlRNAAccessorMixin):
         stdout_box.prop(self, "stdout_date_log_format")
         stdout_box.prop(self, "stdout_log_format")
 
-    @property
-    def _meta(self):
-        return Mosplat_AP_Global_Meta
+
+_meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
+
+_meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
+
+_meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META

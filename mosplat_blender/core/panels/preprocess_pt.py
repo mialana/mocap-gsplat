@@ -21,8 +21,8 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
             init_model_box.row().progress(factor=(float(prog_curr) / float(prog_total)))
 
         box = column.box()
-        box.row().label(text=props.get_prop_name("current_media_dir"))
-        box.row().prop(props, "current_media_dir", text="")
+        box.row().label(text=props._meta.current_media_dir.name)
+        box.row().prop(props, props._meta.current_media_dir.id, text="")
 
         dataset = props.dataset_accessor
 
@@ -34,7 +34,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
             return  # early return
 
         statuses_box = box.box()
-        statuses_box.label(text=dataset.get_prop_name("media_file_statuses"))
+        statuses_box.label(text=dataset._meta.media_file_statuses.name)
 
         grid = statuses_box.grid_flow(columns=4, align=True, row_major=True)
 
@@ -56,7 +56,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
         ranges = dataset.ranges_accessor
         if len(ranges) > 0:
             ranges_box = box.box()
-            ranges_box.label(text=dataset.get_prop_name("processed_frame_ranges"))
+            ranges_box.label(text=dataset._meta.processed_frame_ranges.name)
             for r in ranges:
                 scripts = r.scripts_accessor
                 has_scripts = len(scripts) > 0
@@ -77,7 +77,7 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
                         script_row.alignment = "RIGHT"
                         script_row.label(text=Path(script.script_path).name)
 
-        box.row().prop(props, "current_frame_range")
+        box.row().prop(props, props._meta.current_frame_range.id)
         box.row().operator(OperatorIDEnum.EXTRACT_FRAME_RANGE)
 
         # column.separator()

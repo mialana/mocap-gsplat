@@ -29,6 +29,7 @@ check_only: bool = False
 verbose: bool = True
 found_file_count: int = 0
 modification_count: int = 0  # tracks how many files need modification / are modified
+SCHEMAS_MODULE: Path = Path()
 
 
 class PropertyGroupMetaExtractor(cst.CSTVisitor):
@@ -93,7 +94,7 @@ class PropertyGroupMetaExtractor(cst.CSTVisitor):
 class MetaImportInjector(cst.CSTTransformer):
     def __init__(self, module_name: str, symbols: list[str]):
         self.module_name = module_name
-        self.symbols = set(symbols)
+        self.symbols = set(symbols + [sym.upper() for sym in symbols])
         self.found = False
 
     def leave_ImportFrom(
@@ -169,7 +170,7 @@ class MetaImportInjector(cst.CSTTransformer):
 
     @staticmethod
     def _from_dotted_name(name: str) -> cst.Name | cst.Attribute:
-        parts = name.split(".")
+        parts = [p for p in name.split(".") if p]
         expr: cst.Name | cst.Attribute = cst.Name(parts[0])
         for part in parts[1:]:
             expr = cst.Attribute(
@@ -212,45 +213,66 @@ class MetaPropertyInjector(cst.CSTTransformer):
 
         new_body = []
         for stmt in updated_node.body.body:
-            if isinstance(stmt, cst.FunctionDef) and stmt.name.value == "_meta":
+            # remove any previous _meta definition
+            if (
+                isinstance(stmt, cst.SimpleStatementLine)
+                and len(stmt.body) == 1
+                and isinstance(stmt.body[0], cst.AnnAssign)
+                and isinstance(stmt.body[0].target, cst.Name)
+                and stmt.body[0].target.value == "_meta"
+            ):
                 continue
             new_body.append(stmt)
 
-        new_body.append(self._make_meta_property(original_node.name.value))
+        insert_at = 0
+
+        # Skip class docstring if present
+        if (
+            new_body
+            and isinstance(new_body[0], cst.SimpleStatementLine)
+            and len(new_body[0].body) == 1
+            and isinstance(new_body[0].body[0], cst.Expr)
+            and isinstance(new_body[0].body[0].value, cst.SimpleString)
+        ):
+            insert_at = 1
+
+        new_body.insert(
+            insert_at,
+            cst.SimpleStatementLine(
+                body=[self._make_meta_classvar(original_node.name.value)]
+            ),
+        )
+
         return updated_node.with_changes(
             body=updated_node.body.with_changes(body=new_body)
         )
 
-    def _make_meta_property(self, cls_name: str) -> cst.FunctionDef:
-        return cst.FunctionDef(
-            name=cst.Name("_meta"),
-            params=cst.Parameters(params=[cst.Param(cst.Name("self"))]),
-            decorators=[cst.Decorator(cst.Name("property"))],
-            body=cst.IndentedBlock(
-                body=[
-                    cst.SimpleStatementLine(
-                        body=[cst.Return(cst.Name(f"{cls_name}_Meta"))]
-                    )
-                ]
-            ),
+    def _make_meta_classvar(self, cls_name: str) -> cst.AnnAssign:
+        meta_type = f"{cls_name}_Meta"
+        meta_instance = f"{cls_name}_META".upper()
+        return cst.AnnAssign(
+            target=cst.Name("_meta"),
+            annotation=cst.Annotation(cst.Name(meta_type)),
+            value=cst.Name(meta_instance),
         )
 
 
-def patch_original_file(py_file: Path, meta_path: Path, meta_symbols: list[str]):
+def patch_original_file(
+    py_file: Path, meta_path: Path, meta_symbols: list[str], original_classes: list[str]
+):
     source = py_file.read_text(encoding="utf-8")
     module = cst.parse_module(source)
 
-    rel_path = meta_path.relative_to(py_file.parent)
-    parts = rel_path.with_suffix("").parts
-    module_name = ".".join(parts)
+    module_name = dot_rel_path(py_file, meta_path)
 
     module = module.visit(MetaImportInjector(module_name, meta_symbols))
 
     module = module.visit(
-        MetaPropertyInjector(classes_with_meta={name[:-4] for name in meta_symbols})
+        MetaPropertyInjector(classes_with_meta={cls for cls in original_classes})
     )
 
     new_source = module.code
+
     sorted = isort.code(new_source)  # sort with isort
 
     # format with black
@@ -274,6 +296,32 @@ def patch_original_file(py_file: Path, meta_path: Path, meta_symbols: list[str])
     elif needs_modification:  # commit
         py_file.write_text(formatted, encoding="utf-8", newline="\n")
         print(f"PATCHED '{py_file}'.")
+
+
+def dot_rel_path(source_path: Path, dest_path: Path) -> str:
+    source_dir = source_path.resolve()
+    dest_path = dest_path.resolve()
+
+    # filesystem-style relative path
+    rel = os.path.relpath(dest_path, start=source_dir)
+
+    # drop ".py"
+    rel = os.path.splitext(rel)[0]
+
+    parts = rel.split(os.sep)
+
+    dots = ""
+    while parts and parts[0] == "..":
+        dots += "."
+        parts.pop(0)
+
+    # always at least one dot for relative import
+    dots = dots or "."
+
+    if parts:
+        return dots + ".".join(parts)
+    else:
+        return dots
 
 
 def diff_meta_file(meta_path: Path, formatted_new_text: str) -> bool:
@@ -301,21 +349,6 @@ def generate_meta_file(py_file: Path):
     global found_file_count
     found_file_count += 1
 
-    meta_lines = [
-        timestamp_str,
-    ]
-
-    prop_count = 0
-    for cls_name, props in extractor.classes.items():
-        meta_lines.append(f"{cls_name}_Meta: dict[str, dict[str, str]] = {{")
-        for prop, data in props.items():
-            meta_lines.append(
-                f"    {prop!r}: {{'name': {data['name']!r}, 'description': {data['description']!r}}},"
-            )
-            prop_count += 1
-        meta_lines.append("}")
-        meta_lines.append("")
-
     meta_dir = py_file.parent / "meta"
     meta_dir.mkdir(exist_ok=True)
 
@@ -323,8 +356,36 @@ def generate_meta_file(py_file: Path):
 
     meta_exists = meta_path.exists()
 
+    meta_lines = [
+        timestamp_str,
+        "",
+        f"from {dot_rel_path(meta_path, SCHEMAS_MODULE)} import PropertyMeta",
+        "from typing import NamedTuple",
+        "",
+    ]
+
+    prop_count = 0
+    for cls_name, props in extractor.classes.items():
+        meta_lines.append(f"class {cls_name}_Meta(NamedTuple):")
+        for prop in props:
+            meta_lines.append(f"    {prop}: PropertyMeta")
+            prop_count += 1
+        meta_lines.append("")
+
+    for cls_name, props in extractor.classes.items():
+        meta_lines.append(f"{cls_name.upper()}_META = {cls_name}_Meta(")
+        for prop, data in props.items():
+            meta_lines.append(
+                f"    {prop}=PropertyMeta("
+                f"id={prop!r}, name={data['name']!r}, description={data['description']!r}"
+                f"),"
+            )
+        meta_lines.append(")")
+        meta_lines.append("")
+
     meta_code = "\n".join(meta_lines)
-    formatted = black.format_str(meta_code, mode=black.FileMode())  # format with black
+    sorted = isort.code(meta_code)
+    formatted = black.format_str(sorted, mode=black.FileMode())  # format with black
 
     needs_modification = diff_meta_file(meta_path, formatted)
 
@@ -351,7 +412,8 @@ def generate_meta_file(py_file: Path):
         print(f"GENERATED '{meta_path}'")
 
     meta_symbols = [f"{cls}_Meta" for cls in extractor.classes]
-    patch_original_file(py_file, meta_path, meta_symbols)
+    original_classes = [cls for cls in extractor.classes]
+    patch_original_file(py_file, meta_path, meta_symbols, original_classes)
 
 
 def get_args():
@@ -400,11 +462,12 @@ def main(
     check: bool = False,
     quiet: bool = False,
 ):
-    global check_only, verbose
+    global check_only, verbose, SCHEMAS_MODULE
     check_only = check
     verbose = not quiet
 
     CORE_MODULE = addon_src_dir / "core"
+    SCHEMAS_MODULE = addon_src_dir / "infrastructure" / "schemas.py"
 
     py_files = [file for file in CORE_MODULE.rglob("*.py")]
 
@@ -416,9 +479,7 @@ def main(
     print("Done.")
 
     if check_only and modification_count > 0:
-        raise SystemExit(
-            f"SYSTEM ERROR: '{modification_count}' files still need changes applied."
-        )
+        raise SystemExit(f"'{modification_count}' files still need changes applied.")
 
     print(
         f"{'Files needing modification' if check_only else 'Files modified'}: '{modification_count}'"

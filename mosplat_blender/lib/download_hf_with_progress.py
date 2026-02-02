@@ -82,24 +82,39 @@ def main():
         repo_id=repo_id, filename=SAFETENSORS_SINGLE_FILE, cache_dir=str(cache_dir)
     )
 
+    dl_args_json: str = str(json.dumps(dl_args))
+
     try:
         hf_hub_download(**dl_args, tqdm_class=make_tqdm_class())
 
         print(
-            str(SubprocessPayload("ok", msg=str(json.dumps(dl_args))).values_tuple()),
+            str(
+                SubprocessPayload(
+                    "ok", msg=f"Download args: '{dl_args_json}'"
+                ).values_tuple()
+            ),
             flush=True,
         )  # send download args
-    except Exception:
+    except Exception as e:
         # ensure download args still send
         print(
             str(
                 SubprocessPayload(
-                    "warning", msg=str(json.dumps(dl_args))
+                    "warning",
+                    msg=f"Download failed with the following error message:\n{str(e)}",
                 ).values_tuple()
             ),
             flush=True,
         )
-        raise
+        print(
+            str(
+                SubprocessPayload(
+                    "warning", msg=f"Download args: '{dl_args_json}'"
+                ).values_tuple()
+            ),
+            flush=True,
+        )
+        raise SystemExit("Unsuccessful.")
 
 
 if __name__ == "__main__":

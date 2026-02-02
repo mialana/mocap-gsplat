@@ -96,7 +96,7 @@ def check_data_output_dirpath(
         )  # see if the directory can be created successfully
     except (FileExistsError, PermissionError, OSError):
         raise UserFacingError(
-            f"'{props.get_prop_name('current_media_dir')}' and '{prefs.get_prop_name('data_output_path')}' create an invalid directory value: '{output}'"
+            f"'{props._meta.current_media_dir.name}' and '{prefs._meta.data_output_path.name}' create an invalid directory value: '{output}'"
         )
 
     return output
@@ -144,7 +144,7 @@ def check_current_media_dirpath(props: Mosplat_PG_Global):
     dirpath = Path(props.current_media_dir)
     if not dirpath.is_dir():
         raise UserFacingError(
-            f"'{props.get_prop_name('media_dir_path')}' is not a valid directory."
+            f"'{props._meta.current_media_dir.name}' is not a valid directory."
         )
 
     return dirpath
@@ -155,7 +155,7 @@ def check_frame_range_poll_result(
 ) -> List[str]:
     err_list = []
     start, end = props.current_frame_range
-    curr_range_name = props.get_prop_name("current_frame_range")
+    curr_range_name = props._meta.current_frame_range.name
     if start >= end:
         err_list.append(
             f"Start frame for '{curr_range_name}' must be less than end frame."

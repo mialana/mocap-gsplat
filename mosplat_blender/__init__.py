@@ -32,7 +32,7 @@ def register():
     os.environ.setdefault(EnvVariableEnum.ROOT_MODULE_NAME, __name__)
 
     # initialize handlers and local "root" logger
-    MosplatLoggingInterface()
+    MosplatLoggingInterface(__name__)
 
     register_addon()
 
@@ -40,7 +40,7 @@ def register():
 def unregister():
     unregister_addon()
 
-    MosplatLoggingInterface.cleanup()
+    MosplatLoggingInterface.cleanup_interface()
 
     if EnvVariableEnum.TESTING in os.environ:
         clear_terminal()  # for dev QOL

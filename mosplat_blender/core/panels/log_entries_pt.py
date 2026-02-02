@@ -42,15 +42,15 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
             return
         log: Mosplat_PG_LogEntry = item
 
+        level_as_enum = LogEntryLevelEnum(log._meta.level)
+
         row = layout.row(align=True)
         row.alert = (
-            log.level_as_enum == LogEntryLevelEnum.ERROR
-            or log.level_as_enum == LogEntryLevelEnum.EXCEPTION
+            level_as_enum == LogEntryLevelEnum.ERROR
+            or level_as_enum == LogEntryLevelEnum.EXCEPTION
         )
         split = row.split(factor=0.15, align=True)
-        split.label(
-            text=log.level, icon=LOG_LEVEL_ICON_MAP[LogEntryLevelEnum[log.level]]
-        )
+        split.label(text=log.level, icon=LOG_LEVEL_ICON_MAP[level_as_enum])
 
         inner = split.split(factor=0.9, align=True)
 
@@ -84,21 +84,23 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         layout.row(align=True)
 
         log_hub = self.props(context).log_hub_accessor
-        layout.prop(log_hub, Mosplat_PG_LogEntryHub.level_filter_prop_id())
+        layout.prop(log_hub, Mosplat_PG_LogEntryHub._meta.logs_level_filter.id)
 
 
 class Mosplat_PT_LogEntries(MosplatPanelBase):
     def draw_with_layout(self, pkg, layout):
         log_hub = pkg.props.log_hub_accessor
 
+        hub_meta = Mosplat_PG_LogEntryHub._meta
+
         layout.template_list(
             UIListIDEnum.LOG_ENTRIES,
             "",
             log_hub,
-            Mosplat_PG_LogEntryHub.data_prop_id(),
+            hub_meta.logs.id,
             log_hub,
-            Mosplat_PG_LogEntryHub.active_index_prop_id(),
-            item_dyntip_propname=Mosplat_PG_LogEntry.dyntip_prop_id(),
+            hub_meta.logs_active_index.id,
+            item_dyntip_propname=Mosplat_PG_LogEntry._meta.full_message.id,
             rows=DEFAULT_LOG_ENTRY_ROWS,
             sort_lock=True,
         )

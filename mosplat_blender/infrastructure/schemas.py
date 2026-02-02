@@ -17,6 +17,7 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    NamedTuple,
     Optional,
     Self,
     Tuple,
@@ -202,6 +203,12 @@ class LogEntryLevelEnum(StrEnum):
             return cls[levelname.upper()]
         except KeyError:
             return cls["INFO"]
+
+
+class PropertyMeta(NamedTuple):
+    id: str
+    name: str
+    description: str
 
 
 @dataclass(frozen=True)

@@ -63,7 +63,7 @@ def register_addon():
         bpy.context.preferences
     )
 
-    MosplatLoggingInterface()._init_handlers_from_addon_prefs(addon_preferences)
+    MosplatLoggingInterface().init_handlers_from_addon_prefs(addon_preferences)
 
     # try load from JSON every file load and after registration occurs
     bpy.app.handlers.load_post.append(handle_load_from_json)

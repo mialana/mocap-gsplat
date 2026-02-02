@@ -105,7 +105,7 @@ class Mosplat_OT_initialize_model(
                 "--python",
                 self._subprocess_script,
                 "--",
-                prefs.vggt_hf_id,
+                "inv",
                 str(prefs.vggt_model_dir),
             ],
             stdout=subprocess.PIPE,

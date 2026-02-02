@@ -43,6 +43,14 @@ from .checks import (
     check_media_files,
 )
 from .meta.properties_meta import (
+    MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META,
+    MOSPLAT_PG_GLOBAL_META,
+    MOSPLAT_PG_LOGENTRY_META,
+    MOSPLAT_PG_LOGENTRYHUB_META,
+    MOSPLAT_PG_MEDIAFILESTATUS_META,
+    MOSPLAT_PG_MEDIAIODATASET_META,
+    MOSPLAT_PG_OPERATORPROGRESS_META,
+    MOSPLAT_PG_PROCESSEDFRAMERANGE_META,
     Mosplat_PG_AppliedPreprocessScript_Meta,
     Mosplat_PG_Global_Meta,
     Mosplat_PG_LogEntry_Meta,
@@ -79,18 +87,18 @@ class MosplatPropertyGroupBase(
 class Mosplat_PG_AppliedPreprocessScript(
     MosplatPropertyGroupBase[AppliedPreprocessScript]
 ):
+    _meta: Mosplat_PG_AppliedPreprocessScript_Meta = (
+        MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META
+    )
     __dataclass_type__ = AppliedPreprocessScript
 
     script_path: StringProperty(name="Script Path", subtype="FILE_PATH")
     mod_time: FloatProperty(name="Modification Time", default=-1.0)
     file_size: IntProperty(name="File Size", default=-1)
 
-    @property
-    def _meta(self):
-        return Mosplat_PG_AppliedPreprocessScript_Meta
-
 
 class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
+    _meta: Mosplat_PG_ProcessedFrameRange_Meta = MOSPLAT_PG_PROCESSEDFRAMERANGE_META
     __dataclass_type__ = ProcessedFrameRange
 
     start_frame: IntProperty(name="Start Frame", default=0, min=0)
@@ -105,12 +113,9 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
     ) -> SupportsCollectionProperty[Mosplat_PG_AppliedPreprocessScript]:
         return self.applied_preprocess_scripts
 
-    @property
-    def _meta(self):
-        return Mosplat_PG_ProcessedFrameRange_Meta
-
 
 class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
+    _meta: Mosplat_PG_MediaFileStatus_Meta = MOSPLAT_PG_MEDIAFILESTATUS_META
     __dataclass_type__ = MediaFileStatus
 
     filepath: StringProperty(name="Filepath", subtype="FILE_PATH")
@@ -130,12 +135,9 @@ class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
             self.height == dataset.median_height,
         )
 
-    @property
-    def _meta(self):
-        return Mosplat_PG_MediaFileStatus_Meta
-
 
 class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
+    _meta: Mosplat_PG_MediaIODataset_Meta = MOSPLAT_PG_MEDIAIODATASET_META
     __dataclass_type__ = MediaIODataset
 
     base_directory: StringProperty(
@@ -193,12 +195,9 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
     ) -> SupportsCollectionProperty[Mosplat_PG_ProcessedFrameRange]:
         return self.processed_frame_ranges
 
-    @property
-    def _meta(self):
-        return Mosplat_PG_MediaIODataset_Meta
-
 
 class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
+    _meta: Mosplat_PG_OperatorProgress_Meta = MOSPLAT_PG_OPERATORPROGRESS_META
     __dataclass_type__ = OperatorProgress
 
     current: IntProperty(
@@ -219,12 +218,9 @@ class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
         default=False,
     )
 
-    @property
-    def _meta(self):
-        return Mosplat_PG_OperatorProgress_Meta
-
 
 class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
+    _meta: Mosplat_PG_LogEntry_Meta = MOSPLAT_PG_LOGENTRY_META
     __dataclass_type__ = LogEntry
 
     level: EnumProperty(
@@ -242,16 +238,9 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
     def level_as_enum(self) -> LogEntryLevelEnum:
         return LogEntryLevelEnum(self.level)
 
-    @classmethod
-    def dyntip_prop_id(cls) -> str:
-        return cls.get_prop_id("full_message")
-
-    @property
-    def _meta(self):
-        return Mosplat_PG_LogEntry_Meta
-
 
 class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
+    _meta: Mosplat_PG_LogEntryHub_Meta = MOSPLAT_PG_LOGENTRYHUB_META
     __dataclass_type__ = LogEntryHub
 
     logs: CollectionProperty(name="Log Entries Data", type=Mosplat_PG_LogEntry)
@@ -282,12 +271,9 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
     def level_filter_prop_id(cls) -> str:
         return cls.get_prop_id("logs_level_filter")
 
-    @property
-    def _meta(self):
-        return Mosplat_PG_LogEntryHub_Meta
-
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
+    _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
     __dataclass_type__ = GlobalData
 
     current_media_dir: StringProperty(
@@ -391,7 +377,3 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
     ) -> Generator[Path]:
         """wrapper"""
         return check_frame_range_npy_filepaths(prefs, self, RAW_FRAME_DIRNAME)
-
-    @property
-    def _meta(self):
-        return Mosplat_PG_Global_Meta
