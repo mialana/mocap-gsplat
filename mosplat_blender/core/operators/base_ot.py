@@ -202,14 +202,23 @@ class MosplatOperatorBase(
         """
         raise NotImplementedError
 
-    def cancel(self, context):
-        # no manager needed here as cleanup is non-blocking
-        self.cleanup(self.package(context))
+    def commit_data_to_json(self, pkg: CtxPackage):
+        # update JSON with current state of PG as source of truth
+        try:
+            json_filepath = pkg.props.data_json_filepath(pkg.prefs)
+            pkg.props.dataset_accessor.to_JSON(json_filepath)
+            self.logger.info(
+                f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
+            )
+        except UserFacingError as e:
+            msg = DeveloperError.make_msg(
+                f"Error occurred while committing data from '{self.bl_idname}' back to JSON.",
+                e,
+            )
+            self.logger.warning(msg)
 
     def cleanup(self, pkg: CtxPackage):
-        # update JSON with current state of PG as source of truth
-        json_filepath = pkg.props.data_json_filepath(pkg.prefs)
-        pkg.props.dataset_accessor.to_JSON(json_filepath)
+        self.commit_data_to_json(pkg)
 
         if self.timer:
             self.wm(pkg.context).event_timer_remove(self.timer)
@@ -222,6 +231,10 @@ class MosplatOperatorBase(
 
         self.__data = None  # data is not guaranteed to be in-sync anymore
         self.logger.info(f"'{self.bl_idname}' cleaned up")
+
+    def cancel(self, context):
+        # no manager needed here as cleanup is non-blocking
+        self.cleanup(self.package(context))
 
     @contextlib.contextmanager
     def CLEANUP_MANAGER(self, pkg: CtxPackage):

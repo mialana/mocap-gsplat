@@ -15,7 +15,7 @@ from ..infrastructure.constants import (
     DEFAULT_PREPROCESS_MEDIA_SCRIPT,
 )
 from ..infrastructure.macros import try_access_path
-from ..infrastructure.mixins import BlRNAAccessorMixin
+from ..infrastructure.mixins import EnforceAttributesMixin
 from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
 from ..interfaces.logging_interface import MosplatLoggingInterface
 from .checks import check_media_extensions_set
@@ -51,7 +51,7 @@ def update_json_logging(self: Mosplat_AP_Global, _: Context):
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
     OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES)
-    self.logger.info(f"'{self.get_prop_name('media_extensions')}' updated.")
+    self.logger.info(f"'{self._meta.media_extensions.name}' updated.")
 
 
 def update_model_preferences(self: Mosplat_AP_Global, context: Context):
@@ -76,7 +76,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
             self.logger.warning(str(e))
 
 
-class Mosplat_AP_Global(AddonPreferences, BlRNAAccessorMixin):
+class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     _meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
     bl_idname = ADDON_PREFERENCES_ID
 

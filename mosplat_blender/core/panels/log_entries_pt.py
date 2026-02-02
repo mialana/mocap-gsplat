@@ -42,7 +42,7 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
             return
         log: Mosplat_PG_LogEntry = item
 
-        level_as_enum = LogEntryLevelEnum(log._meta.level)
+        level_as_enum = LogEntryLevelEnum(log.level)
 
         row = layout.row(align=True)
         row.alert = (
@@ -70,9 +70,10 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         flt_neworder: List[int] = []
 
         for idx, log in enumerate(collection):
+            level_as_enum = LogEntryLevelEnum(log.level)
             if filter == LogEntryLevelEnum.ALL:
                 flt_flags.append(self.bitflag_filter_item)
-            elif log.level_as_enum == filter:
+            elif level_as_enum == filter:
                 flt_flags.append(self.bitflag_filter_item)
             else:
                 flt_flags.append(self.bitflag_item_never_show)

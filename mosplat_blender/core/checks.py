@@ -125,18 +125,17 @@ def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> Lis
 
 
 def check_media_extensions_set(prefs: Mosplat_AP_Global) -> Set[str]:
+    prop_name = prefs._meta.media_extensions.name
     try:
         exts = set(
             [ext.strip().lower() for ext in str(prefs.media_extensions).split(",")]
         )
     except IndexError:
         raise UserFacingError(
-            f"Extensions in '{prefs.get_prop_name('media_extensions')}' should be separated by commas."
+            f"Extensions in '{prop_name}' should be separated by commas."
         )
     if len(exts) == 0:
-        raise UserFacingError(
-            f"No extensions could be parsed from '{prefs.get_prop_name('media_extensions')}'."
-        )
+        raise UserFacingError(f"No extensions could be parsed from '{prop_name}'.")
     return exts
 
 
@@ -162,12 +161,14 @@ def check_frame_range_poll_result(
         )
 
     if end >= props.dataset_accessor.median_frame_count:
+        prop_name = props.dataset_accessor._meta.median_frame_count.name
+        count = props.dataset_accessor.median_frame_count
         err_list.append(
-            f"End frame must be less than '{props.dataset_accessor.get_prop_name('median_frame_count')}' of '{props.dataset_accessor.median_frame_count}' frames."
+            f"End frame must be less than '{prop_name}' of '{count}' frames."
         )
 
     max_frame_range = prefs.max_frame_range
-    max_range_name = prefs.get_prop_name("max_frame_range")
+    max_range_name = prefs._meta.max_frame_range
     if max_frame_range != -1 and end - start > prefs.max_frame_range:
         err_list.append(
             f"For best results, set '{curr_range_name}' to less than '{max_frame_range}'.\n"

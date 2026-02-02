@@ -235,34 +235,6 @@ class PGAccessorMixin:
         return check_propertygroup(context.scene)
 
 
-class BlRNAAccessorMixin(EnforceAttributesMixin):
-    """a mixin class for easier access to Blender properties' RNA"""
-
-    from bpy.types import BlenderRNA
-
-    bl_rna: ClassVar[BlenderRNA]
-
-    @classmethod
-    def get_prop_name(cls, attrname: str) -> str:
-        try:
-            property = cls.bl_rna.properties[attrname]
-            return property.name
-        except KeyError:
-            msg = f"Property '{attrname}' does not exist on '{cls.__name__}'"
-            cls.class_logger.error(msg)
-            return msg
-
-    @classmethod
-    def get_prop_id(cls, attrname: str) -> str:
-        try:
-            property = cls.bl_rna.properties[attrname]
-            return property.identifier
-        except KeyError:
-            msg = f"Property '{attrname}' does not exist on '{cls.__name__}'"
-            cls.class_logger.error(msg)
-            return msg
-
-
 class ContextAccessorMixin(
     Generic[M],
     MetadataProxyMixin[M],

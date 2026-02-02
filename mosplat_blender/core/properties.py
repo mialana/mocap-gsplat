@@ -18,7 +18,7 @@ from bpy.types import Context, PropertyGroup
 
 from ..infrastructure.constants import RAW_FRAME_DIRNAME
 from ..infrastructure.macros import try_access_path
-from ..infrastructure.mixins import BlRNAAccessorMixin, D, DataclassInteropMixin
+from ..infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
 from ..infrastructure.protocols import SupportsCollectionProperty
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
@@ -72,13 +72,13 @@ LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
 def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
     OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT")
 
-    self.logger.info(f"'{self.get_prop_name('current_media_dir')}' updated.")
+    self.logger.info(f"'{self._meta.current_media_dir.name}' updated.")
 
 
 class MosplatPropertyGroupBase(
     Generic[D],
     PropertyGroup,
-    BlRNAAccessorMixin,
+    EnforceAttributesMixin,
     DataclassInteropMixin[D],
 ):
     pass
@@ -234,10 +234,6 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
         description="The property that is displayed in the dynamic tooltip while hovering on the item.",
     )
 
-    @property
-    def level_as_enum(self) -> LogEntryLevelEnum:
-        return LogEntryLevelEnum(self.level)
-
 
 class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
     _meta: Mosplat_PG_LogEntryHub_Meta = MOSPLAT_PG_LOGENTRYHUB_META
@@ -258,18 +254,6 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
     @property
     def level_filter_as_enum(self) -> LogEntryLevelEnum:
         return LogEntryLevelEnum(self.logs_level_filter)
-
-    @classmethod
-    def data_prop_id(cls) -> str:
-        return cls.get_prop_id("logs")
-
-    @classmethod
-    def active_index_prop_id(cls) -> str:
-        return cls.get_prop_id("logs_active_index")
-
-    @classmethod
-    def level_filter_prop_id(cls) -> str:
-        return cls.get_prop_id("logs_level_filter")
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
