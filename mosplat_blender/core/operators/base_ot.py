@@ -194,6 +194,10 @@ class MosplatOperatorBase(
 
         return "RUNNING_MODAL"
 
+    def _sync_to_props(self, props: Mosplat_PG_Global):
+        """sync global properties with owned copy of data"""
+        props.dataset_accessor.from_dataclass(self.data)
+
     def _queue_callback(self, pkg: CtxPackage, event: Event, next: QT) -> OpResultTuple:
         """
         an entrypoint for when a new element is placed in the queue during `modal`.

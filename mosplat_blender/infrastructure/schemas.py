@@ -17,11 +17,15 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Literal,
     NamedTuple,
+    NotRequired,
     Optional,
+    Required,
     Self,
     Tuple,
     TypeAlias,
+    TypedDict,
     Union,
     cast,
 )
@@ -39,6 +43,7 @@ from .macros import (
 )
 
 if TYPE_CHECKING:
+    import numpy as np
     from cv2 import VideoCapture
 
     from ..core.properties import Mosplat_PG_MediaIODataset
@@ -88,6 +93,12 @@ class UnexpectedError(CustomError):
     base_msg = "Something went wrong"
 
 
+class PropertyMeta(NamedTuple):
+    id: str
+    name: str
+    description: str
+
+
 """Enum Convenience Classes"""
 
 
@@ -134,7 +145,6 @@ class OperatorIDEnum(StrEnum):
         )
 
     INITIALIZE_MODEL = auto()
-    RUN_INFERENCE = auto()
     OPEN_ADDON_PREFERENCES = auto()
     VALIDATE_MEDIA_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
@@ -205,10 +215,23 @@ class LogEntryLevelEnum(StrEnum):
             return cls["INFO"]
 
 
-class PropertyMeta(NamedTuple):
-    id: str
-    name: str
-    description: str
+class SavedNPZName(StrEnum):
+    RAW = auto()
+    PREPROCESSED = auto()
+
+
+NPZNameToPathLookup: TypeAlias = Dict[SavedNPZName, List[Path]]
+
+
+class FrameNPZStructure(TypedDict):
+    frame: Required[np.ndarray[Tuple[()], np.dtype[np.int32]]]
+    media_files: Required[np.ndarray[Tuple[int], np.dtype[np.str_]]]
+    data: NotRequired[
+        np.ndarray[
+            Tuple[int, int, int, Literal[3]],  # FRAME, H, W, RGB
+            np.dtype[np.uint8],
+        ]
+    ]
 
 
 @dataclass(frozen=True)

@@ -80,7 +80,6 @@ UI_LIST_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_UL_"
 MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
 
 PER_FRAME_DIRNAME: Final[str] = "frame_{:04d}"
-RAW_FRAME_DIRNAME: Final[str] = "raw"
 
 MAX_LOG_ENTRIES_STORED: Final[int] = 24
 DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
@@ -89,6 +88,8 @@ DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
 DEFAULT_PREPROCESS_MEDIA_SCRIPT: Final[str] = str(
     Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_video_rotations.py"
 )
+# target function in script
+PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
 
 # path location of hf model download via subprocess script
 DOWNLOAD_HF_WITH_PROGRESS_SCRIPT: Final[Path] = (

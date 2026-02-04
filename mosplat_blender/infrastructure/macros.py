@@ -12,7 +12,6 @@ from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Generator,
     Iterable,
     List,
     LiteralString,
@@ -23,10 +22,14 @@ from typing import (
     TypeGuard,
     TypeVar,
     Union,
+    Unpack,
+    cast,
 )
 
 if TYPE_CHECKING:
     import cv2  # static only import of risky module
+
+    from .schemas import FrameNPZStructure
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
@@ -104,8 +107,11 @@ def kill_subprocess_cross_platform(pid: int):
             pass  # this requires no exception-raising
 
 
-def write_frame_data_to_npy(
-    frame_idx: int, caps: List[cv2.VideoCapture], out_path: Path
+def write_frame_data_to_npz(
+    frame_idx: int,
+    caps: List[cv2.VideoCapture],
+    out_path: Path,
+    **kwargs: Unpack[FrameNPZStructure],
 ):
     """raises `OSError` if `cv2` could not read any frame."""
     import cv2
@@ -117,11 +123,13 @@ def write_frame_data_to_npy(
         ret, frame = cap.read()
         if not ret:
             raise OSError(f"Failed to read frame: '{frame_idx}'")
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # BGR to RGB
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).astype(np.uint8)  # BGR to RGB
         images.append(frame)
 
-    stacked = np.stack(images, axis=0)
-    np.save(out_path, stacked)
+    stacked = np.stack(images, axis=0, dtype=np.uint8)
+    kwargs["data"] = stacked
+
+    np.savez(out_path, **cast(dict, kwargs))  # cast for type-checking here
 
     return f"Frame index '{frame_idx}' finished with stacked images shape '{stacked.shape}'."
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Generator, Generic, List, Tuple, Union
+from typing import TYPE_CHECKING, Final, Generic, List, Tuple, Union
 
 from bpy.props import (
     BoolProperty,
@@ -16,8 +16,6 @@ from bpy.props import (
 )
 from bpy.types import Context, PropertyGroup
 
-from ..infrastructure.constants import RAW_FRAME_DIRNAME
-from ..infrastructure.macros import try_access_path
 from ..infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
 from ..infrastructure.protocols import SupportsCollectionProperty
 from ..infrastructure.schemas import (
@@ -29,18 +27,19 @@ from ..infrastructure.schemas import (
     LogEntryLevelEnum,
     MediaFileStatus,
     MediaIODataset,
+    NPZNameToPathLookup,
     OperatorIDEnum,
     OperatorProgress,
     ProcessedFrameRange,
-    UserFacingError,
+    SavedNPZName,
 )
 from .checks import (
     check_current_media_dirpath,
     check_data_json_filepath,
     check_data_output_dirpath,
-    check_frame_range_npy_filepaths,
     check_frame_range_poll_result,
     check_media_files,
+    check_npz_filepaths_for_frame_range,
 )
 from .meta.properties_meta import (
     MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META,
@@ -101,8 +100,8 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
     _meta: Mosplat_PG_ProcessedFrameRange_Meta = MOSPLAT_PG_PROCESSEDFRAMERANGE_META
     __dataclass_type__ = ProcessedFrameRange
 
-    start_frame: IntProperty(name="Start Frame", default=0, min=0)
-    end_frame: IntProperty(name="End Frame", default=0, min=0)
+    start_frame: IntProperty(name="Start Frame", min=0)
+    end_frame: IntProperty(name="End Frame", min=0)
     applied_preprocess_scripts: CollectionProperty(
         name="Applied Preprocess Scripts", type=Mosplat_PG_AppliedPreprocessScript
     )
@@ -274,7 +273,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         name="Frame Range",
         description="Start and end frame of data to be processed.",
         size=2,
-        default=(0, 60),
+        default=(0, 30),
         min=0,
         options={"SKIP_SAVE"},
     )
@@ -336,29 +335,11 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
             )
         return result
 
-    def frame_range_npy_filepaths(
-        self, prefs: Mosplat_AP_Global, id: str
-    ) -> List[Path]:
-        """
-        raises `UserFacingError` if one of the expected frames do not exist.
-        if the files are not expected to exist yet, use the generator fn below instead.
-        """
-        filepaths: List[Path] = []
-
-        for fp in check_frame_range_npy_filepaths(prefs, self, id):
-            try:
-                try_access_path(fp)  # raises
-                filepaths.append(fp)
-            except (OSError, PermissionError, FileNotFoundError) as e:
-                raise UserFacingError(
-                    f"Expected to find an extracted NPY file at '{fp}'."
-                    "Re-extract the frame range if necessary.",
-                    e,
-                )  # convert now to a `UserFacingError`
-        return filepaths
-
-    def generate_frame_range_npy_filepaths(
-        self, prefs: Mosplat_AP_Global
-    ) -> Generator[Path]:
+    def generate_npz_filepaths_for_frame_range(
+        self,
+        prefs: Mosplat_AP_Global,
+        names: List[SavedNPZName],
+        should_exist: List[bool],
+    ) -> NPZNameToPathLookup:
         """wrapper"""
-        return check_frame_range_npy_filepaths(prefs, self, RAW_FRAME_DIRNAME)
+        return check_npz_filepaths_for_frame_range(prefs, self, names, should_exist)

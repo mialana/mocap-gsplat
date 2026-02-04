@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator, List, Optional, Set, TypeGuard, cast
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, TypeAlias, TypeGuard, cast
 
-from bpy.types import Context, Preferences, Scene, WindowManager
+from bpy.types import Preferences, Scene, WindowManager
 
 from ..infrastructure.constants import (
     ADDON_GLOBAL_PROPS_NAME,
@@ -20,7 +20,13 @@ from ..infrastructure.constants import (
     MEDIA_IO_DATASET_JSON_FILENAME,
     PER_FRAME_DIRNAME,
 )
-from ..infrastructure.schemas import UnexpectedError, UserFacingError
+from ..infrastructure.macros import try_access_path
+from ..infrastructure.schemas import (
+    NPZNameToPathLookup,
+    SavedNPZName,
+    UnexpectedError,
+    UserFacingError,
+)
 from ..interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -178,24 +184,37 @@ def check_frame_range_poll_result(
     return err_list  # return even if list if empty
 
 
-def check_frame_output_dirpath(
-    frame: int, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
-) -> Path:
-    return check_data_output_dirpath(prefs, props) / PER_FRAME_DIRNAME.format(frame)
-
-
-def check_frame_npy_filepath(
-    frame: int, prefs: Mosplat_AP_Global, props: Mosplat_PG_Global, id: str
-) -> Path:
-    """raises `UserFacingError` if the NPY file doesn't exist"""
-
-    return check_frame_output_dirpath(frame, prefs, props) / f"{id}.npy"
-
-
-def check_frame_range_npy_filepaths(
-    prefs: Mosplat_AP_Global, props: Mosplat_PG_Global, id: str
-) -> Generator[Path]:
-    """generates the NPY file for all frames in curreng frame range"""
+def check_npz_filepaths_for_frame_range(
+    prefs: Mosplat_AP_Global,
+    props: Mosplat_PG_Global,
+    names: List[SavedNPZName],
+    should_exist: List[bool],
+) -> NPZNameToPathLookup:
+    """
+    generates NPZ file paths given a list of desired names and for all frames in current
+    frame range. Use `should_exist` if the npz files should already exist to raise
+    `UserFacingError` if an NPZ file does not exist where it is expected to.
+    """
     start, end = props.current_frame_range
+
+    data_dir = check_data_output_dirpath(prefs, props)
+
+    all_npz_files: NPZNameToPathLookup = {name: [] for name in names}
+
     for frame in range(start, end):
-        yield check_frame_npy_filepath(frame, prefs, props, id)
+        frame_dir = data_dir / PER_FRAME_DIRNAME.format(frame)
+
+        for idx, name in enumerate(names):
+            npz_file = frame_dir / f"{name}.npz"
+            if should_exist[idx]:
+                try:
+                    try_access_path(npz_file)  # raises the below exceptions
+                except (OSError, PermissionError, FileNotFoundError) as e:
+                    raise UserFacingError(
+                        f"Expected to find an extracted NPZ file at '{npz_file}'."
+                        "Re-extract the frame range if necessary.",
+                        e,
+                    )  # convert now to a `UserFacingError`
+            all_npz_files[name].append(npz_file)
+
+    return all_npz_files

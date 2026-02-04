@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Generator, List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple
 
-from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npy
+from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npz
 from ...infrastructure.schemas import (
+    FrameNPZStructure,
     MediaIODataset,
     ProcessedFrameRange,
+    SavedNPZName,
     UserFacingError,
 )
 from .base_ot import MosplatOperatorBase
@@ -15,7 +17,7 @@ from .base_ot import MosplatOperatorBase
 class ThreadKwargs(NamedTuple):
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
-    npy_fp_generator: Generator[Path]
+    npz_files: List[Path]
     dataset_as_dc: MediaIODataset
 
 
@@ -37,9 +39,9 @@ class Mosplat_OT_extract_frame_range(
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)
         self._frame_range: Tuple[int, int] = props.current_frame_range
-        self._npy_filepath_generator: Generator[Path] = (
-            props.generate_frame_range_npy_filepaths(prefs)
-        )
+        self._npz_files: List[Path] = props.generate_npz_filepaths_for_frame_range(
+            prefs, [SavedNPZName.RAW], [False]
+        )[SavedNPZName.RAW]
 
         return self.execute_with_package(pkg)
 
@@ -49,7 +51,7 @@ class Mosplat_OT_extract_frame_range(
             twargs=ThreadKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
-                npy_fp_generator=self._npy_filepath_generator,
+                npz_files=self._npz_files,
                 dataset_as_dc=self.data,
             ),
         )
@@ -67,15 +69,18 @@ class Mosplat_OT_extract_frame_range(
             return "FINISHED"
 
         # sync props regardless as the updated dataclass is still valid
-        pkg.props.dataset_accessor.from_dataclass(self.data)
+        self._sync_to_props(pkg.props)
         return "RUNNING_MODAL"
 
     @staticmethod
     def _operator_thread(queue, cancel_event, *, twargs):
         import cv2
+        import numpy as np
 
         start, _ = twargs.frame_range
         caps: List[cv2.VideoCapture] = []
+
+        files = twargs.updated_media_files
 
         try:
             for media in twargs.updated_media_files:
@@ -88,17 +93,20 @@ class Mosplat_OT_extract_frame_range(
             new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
             twargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
 
-            for idx, npy_filepath in enumerate(twargs.npy_fp_generator):
+            for idx, raw_npz_file in enumerate(twargs.npz_files):
                 if cancel_event.is_set():
                     return
 
-                npy_filepath.parent.mkdir(parents=True, exist_ok=True)
-
-                if not is_path_accessible(npy_filepath):
-                    note = write_frame_data_to_npy(idx, caps, npy_filepath)
+                if not is_path_accessible(raw_npz_file):
+                    raw_npz_file.parent.mkdir(parents=True, exist_ok=True)
+                    structure: FrameNPZStructure = {
+                        "frame": np.array([idx], dtype=np.int32),
+                        "media_files": np.array([str(f) for f in files], dtype=np.str_),
+                    }
+                    note = write_frame_data_to_npz(idx, caps, raw_npz_file, **structure)
                 else:
                     # TODO: Check the
-                    note = f"NPY data for frame index '{idx}' already found on disk. Skipping..."
+                    note = f"NPZ data for frame index '{idx}' already found on disk. Skipping..."
 
                 new_frame_range.end_frame = idx
                 queue.put(f"update: {note}")
