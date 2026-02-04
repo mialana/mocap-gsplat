@@ -9,12 +9,12 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional, Self
 
-from ..infrastructure.decorators import run_once_per_instance
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import UnexpectedError
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     from vggt.models.vggt import VGGT
+    import numpy as np
 
 
 class MosplatVGGTInterface(LogClassMixin):
@@ -77,6 +77,19 @@ class MosplatVGGTInterface(LogClassMixin):
                 e,
             ) from e
 
+    def run_inference(self, np_data: np.ndarray):
+        from torch import from_numpy, no_grad
+
+        if not self.model:
+            return
+
+        tensors = from_numpy(np_data)
+
+        with no_grad():
+            predictions = self.model(tensors)
+
+        pass
+
     def cleanup(self):
         """clean up expensive resources"""
         try:
@@ -86,12 +99,12 @@ class MosplatVGGTInterface(LogClassMixin):
                 del self.model
                 self.model = None
 
-                import torch
+                from torch import cuda
 
-                if torch.cuda.is_available():
-                    torch.cuda.synchronize()  # ensure all kernels finish
+                if cuda.is_available():
+                    cuda.synchronize()  # ensure all kernels finish
 
-                torch.cuda.empty_cache()  # only effective when all torch resources have been released
+                cuda.empty_cache()  # only effective when all torch resources have been released
                 gc.collect()
 
                 self.logger.info("Cleaned up model.")

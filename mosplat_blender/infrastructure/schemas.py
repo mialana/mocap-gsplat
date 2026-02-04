@@ -149,6 +149,7 @@ class OperatorIDEnum(StrEnum):
     VALIDATE_MEDIA_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()
+    RUN_INFERENCE = auto()
 
 
 class PanelIDEnum(StrEnum):

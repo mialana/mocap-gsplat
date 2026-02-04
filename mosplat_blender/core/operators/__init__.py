@@ -7,8 +7,9 @@ from .base_ot import MosplatOperatorBase, MosplatOperatorMetadata
 from .extract_frame_range_ot import Mosplat_OT_extract_frame_range
 from .initialize_model_ot import Mosplat_OT_initialize_model
 from .open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
-from .run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
 from .validate_media_file_statuses_ot import Mosplat_OT_validate_media_file_statuses
+from .run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
+from .run_inference_ot import Mosplat_OT_run_inference
 
 operator_registry: Dict[
     Type[MosplatOperatorBase],
@@ -34,6 +35,10 @@ operator_registry: Dict[
     Mosplat_OT_run_preprocess_script: MosplatOperatorMetadata(
         bl_idname=OperatorIDEnum.RUN_PREPROCESS_SCRIPT,
         bl_description="Run current preprocess script on current frame range.",
+    ),
+    Mosplat_OT_run_inference: MosplatOperatorMetadata(
+        bl_idname=OperatorIDEnum.RUN_INFERENCE,
+        bl_description="Run VGGT model inference on preprocessed image data.",
     ),
 }
 
