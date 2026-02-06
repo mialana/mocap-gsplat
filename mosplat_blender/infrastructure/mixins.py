@@ -215,7 +215,7 @@ class APAccessorMixin:
 
     @staticmethod
     def prefs(context) -> Mosplat_AP_Global:
-        from ..core.checks import check_addonpreferences
+        from core.checks import check_addonpreferences
 
         return check_addonpreferences(context.preferences)
 

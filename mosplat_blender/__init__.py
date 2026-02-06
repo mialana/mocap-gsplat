@@ -17,23 +17,21 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# save package before modifying path
+ADDON_PACKAGE_ORIGINAL = __package__ or str(Path(__file__).resolve().parent)
+
 sys.path.append(str(Path(__file__).resolve().parent))
 
-from infrastructure.schemas import EnvVariableEnum
+from infrastructure.schemas import AddonMeta, EnvVariableEnum
 from interfaces import MosplatLoggingInterface
-from main import register_addon, unregister_addon
-
-
-def clear_terminal():
-    os.system("cls" if os.name == "nt" else "clear")
 
 
 def register():
+    AddonMeta(ADDON_PACKAGE_ORIGINAL)  # initialize global addon meta
+    setup_env()
 
-    load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
-
-    # keep this module's name within env during execution
-    os.environ.setdefault(EnvVariableEnum.ROOT_MODULE_NAME, __name__)
+    # delay import of `main` until after env setup
+    from main import register_addon
 
     # initialize handlers and local "root" logger
     MosplatLoggingInterface(__name__)
@@ -42,6 +40,8 @@ def register():
 
 
 def unregister():
+    from main import unregister_addon
+
     unregister_addon()
 
     MosplatLoggingInterface.cleanup_interface()
@@ -50,3 +50,17 @@ def unregister():
         clear_terminal()  # for dev QOL
 
     os.environ.pop(EnvVariableEnum.ROOT_MODULE_NAME, None)
+
+
+def setup_env():
+    load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
+
+    # keep this module's name within env during execution
+    os.environ.setdefault(EnvVariableEnum.ROOT_MODULE_NAME, __name__)
+    os.environ.setdefault(
+        EnvVariableEnum.ADDON_PACKAGE_ORIGINAL, ADDON_PACKAGE_ORIGINAL
+    )
+
+
+def clear_terminal():
+    os.system("cls" if os.name == "nt" else "clear")

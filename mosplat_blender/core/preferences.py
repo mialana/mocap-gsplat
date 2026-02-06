@@ -10,15 +10,15 @@ from bpy.types import AddonPreferences, Context
 
 from core.checks import check_media_extensions_set
 from core.meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
-from infrastructure.constants import (
-    ADDON_BASE_ID,
-    ADDON_PREFERENCES_ID,
-    ADDON_SHORTNAME,
-    DEFAULT_PREPROCESS_MEDIA_SCRIPT,
-)
+from infrastructure.constants import DEFAULT_PREPROCESS_MEDIA_SCRIPT
+from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.macros import try_access_path
 from infrastructure.mixins import EnforceAttributesMixin
-from infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
+from infrastructure.schemas import (
+    AddonMeta,
+    UnexpectedError,
+    UserFacingError,
+)
 from interfaces import MosplatLoggingInterface as LoggingInterface
 from interfaces import MosplatVGGTInterface as VGGTInterface
 
@@ -77,12 +77,12 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
 
 class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     _meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
-    bl_idname = ADDON_PREFERENCES_ID
+    bl_idname = AddonMeta().global_prefs_id
 
     cache_dir: StringProperty(
         name="Cache Directory",
         description="Cache directory on disk used by the addon",
-        default=str(Path.home() / ".cache" / ADDON_BASE_ID),
+        default=str(Path.home() / ".cache" / AddonMeta().base_id),
         subtype="DIR_PATH",
         update=update_json_logging,
     )
@@ -204,7 +204,8 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         layout = self.layout
 
         layout.label(
-            text=f"{ADDON_SHORTNAME.capitalize()} Saved Preferences", icon="SETTINGS"
+            text=f"{AddonMeta().shortname.capitalize()} Saved Preferences",
+            icon="SETTINGS",
         )
 
         col = layout.column(align=True)

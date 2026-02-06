@@ -84,12 +84,11 @@ class MosplatLoggingInterface:
 
     @classmethod
     def retrieve_root_module_name_from_env(cls) -> str:
-        env_var = EnvVariableEnum.ROOT_MODULE_NAME
-        name_from_env = os.getenv(env_var)
+        name_from_env = os.getenv(EnvVariableEnum.ROOT_MODULE_NAME)
 
         if not name_from_env:
             raise DeveloperError(
-                f"Failed to retrieve '{env_var}' from environment for logging init."
+                f"Failed to retrieve '{EnvVariableEnum.ROOT_MODULE_NAME}' from environment for logging init."
             )
         return name_from_env
 
@@ -267,7 +266,7 @@ class MosplatLoggingInterface:
         """pops items from local queue and adds to Blender collection property"""
         from bpy import context  # local runtime import for most up-to-date context
 
-        from ..core.checks import check_propertygroup
+        from core.checks import check_propertygroup
 
         try:
             log_hub = check_propertygroup(context.scene).log_hub_accessor

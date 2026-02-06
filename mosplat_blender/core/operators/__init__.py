@@ -7,9 +7,9 @@ from core.operators.open_addon_preferences_ot import Mosplat_OT_open_addon_prefe
 from core.operators.run_inference_ot import Mosplat_OT_run_inference
 from core.operators.run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
 from core.operators.validate_media_statuses_ot import Mosplat_OT_validate_media_statuses
-from infrastructure.constants import ADDON_HUMAN_READABLE
+from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.mixins import PreregristrationFn
-from infrastructure.schemas import OperatorIDEnum
+from infrastructure.schemas import AddonMeta
 
 operator_registry: Dict[
     Type[MosplatOperatorBase],
@@ -21,7 +21,7 @@ operator_registry: Dict[
     ),
     Mosplat_OT_open_addon_preferences: MosplatOperatorMetadata(
         bl_idname=OperatorIDEnum.OPEN_ADDON_PREFERENCES,
-        bl_description=f"Quick navigation to '{ADDON_HUMAN_READABLE}' saved addon preferences.",
+        bl_description=f"Quick navigation to '{AddonMeta().human_readable_name}' saved addon preferences.",
         bl_options={"REGISTER", "MACRO"},
     ),
     Mosplat_OT_validate_media_statuses: MosplatOperatorMetadata(

@@ -16,7 +16,6 @@ from string import capwords
 from typing import Any, Final
 
 _MISSING_: Any = object()  # sentinel variable
-_GENERATED_: Any = object()
 
 _TIMER_INTERVAL_: Final[float] = 0.1
 _TIMEOUT_INTERVAL_: Final[float] = 15.0  # amount of time to wait before timeout
@@ -44,36 +43,6 @@ COLORED_FORMATTER_LEVEL_STYLES = {
         "background": "red",
     },
 }
-
-"""
-this is the `bl_idname` that blender expects our `AddonPreferences` to have.
-i.e. even though our addon id is `mosplat_blender`, the id would be the evaluated
-runtime package, which includes the extension repository and the "bl_ext" prefix.
-so if this addon is in the `user_default` repository, the id is expected to be:
-`bl_ext.user_default.mosplat_blender`.
-"""
-ADDON_PREFERENCES_ID: Final[str] = (
-    Path(__file__).resolve().parent.parent.name
-)  # current file is one level down from the one blender expects
-
-ADDON_BASE_ID: Final[str] = ADDON_PREFERENCES_ID.rpartition(".")[-1]
-
-ADDON_HUMAN_READABLE: Final[str] = capwords(ADDON_BASE_ID.replace("_", " "))
-ADDON_SHORTNAME: Final[str] = ADDON_BASE_ID.partition("_")[0]
-
-ADDON_TEMP_DIRPATH: Final[Path] = Path(tempfile.mkdtemp(prefix=ADDON_PREFERENCES_ID))
-
-"""
-the name of the pointer to `Mosplat_PG_Global` that will be placed on the 
-`bpy.context.scene` object for convenient access in operators, panels, etc.
-"""
-ADDON_GLOBAL_PROPS_NAME: Final[str] = f"{ADDON_SHORTNAME}_props"
-
-OPERATOR_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME}."
-PANEL_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_PT_"
-UI_LIST_ID_PREFIX: Final[str] = f"{ADDON_SHORTNAME.upper()}_UL_"
-
-MEDIA_IO_DATASET_JSON_FILENAME: Final[str] = f"{ADDON_SHORTNAME}_data.json"
 
 PER_FRAME_DIRNAME: Final[str] = "frame_{:04d}"
 

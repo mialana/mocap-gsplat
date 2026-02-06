@@ -9,22 +9,23 @@ from core.panels.base_pt import (
 from core.panels.log_entries_pt import Mosplat_PT_LogEntries, Mosplat_UL_log_entries
 from core.panels.main_pt import Mosplat_PT_Main
 from core.panels.preprocess_pt import Mosplat_PT_Preprocess
-from infrastructure.constants import ADDON_SHORTNAME
+from infrastructure.identifiers import PanelIDEnum, UIListIDEnum
 from infrastructure.mixins import PreregristrationFn
-from infrastructure.schemas import PanelIDEnum, UIListIDEnum
+from infrastructure.schemas import AddonMeta
 
+_ADDON_SHORTNAME = AddonMeta().shortname
 panel_registry: Dict[
     Type[MosplatPanelBase],
     MosplatPanelMetadata,
 ] = {
     Mosplat_PT_Main: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.MAIN,
-        bl_description=f"Main panel holding all '{ADDON_SHORTNAME}' panels",
+        bl_description=f"Main panel holding all '{_ADDON_SHORTNAME}' panels",
         bl_options={"HIDE_HEADER"},
     ),
     Mosplat_PT_Preprocess: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.PREPROCESS,
-        bl_description=f"Holds operations for preprocessing '{ADDON_SHORTNAME}' data",
+        bl_description=f"Holds operations for preprocessing '{_ADDON_SHORTNAME}' data",
         bl_parent_id=PanelIDEnum.MAIN,
     ),
     Mosplat_PT_LogEntries: MosplatPanelMetadata(

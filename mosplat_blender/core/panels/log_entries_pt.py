@@ -7,8 +7,9 @@ from bpy.types import bpy_prop_array
 from core.panels.base_pt import MosplatPanelBase, MosplatUIListBase
 from core.properties import Mosplat_PG_LogEntry, Mosplat_PG_LogEntryHub
 from infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
+from infrastructure.identifiers import UIListIDEnum
 from infrastructure.protocols import SupportsCollectionProperty
-from infrastructure.schemas import LogEntryLevelEnum, UIListIDEnum
+from infrastructure.schemas import LogEntryLevelEnum
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems

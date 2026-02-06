@@ -14,14 +14,10 @@ from typing import TYPE_CHECKING, List, Optional, Set, TypeGuard, cast
 
 from bpy.types import Preferences, Scene, WindowManager
 
-from infrastructure.constants import (
-    ADDON_GLOBAL_PROPS_NAME,
-    ADDON_PREFERENCES_ID,
-    MEDIA_IO_DATASET_JSON_FILENAME,
-    PER_FRAME_DIRNAME,
-)
+from infrastructure.constants import PER_FRAME_DIRNAME
 from infrastructure.macros import try_access_path
 from infrastructure.schemas import (
+    AddonMeta,
     NPZNameToPathLookup,
     SavedNPZName,
     UnexpectedError,
@@ -35,6 +31,8 @@ if TYPE_CHECKING:
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
+_ADDON_META = AddonMeta()
+
 
 def check_propertygroup(
     scene: Optional[Scene],
@@ -42,7 +40,7 @@ def check_propertygroup(
     if scene is None:  # can occur if checked at the wrong time
         raise UserFacingError("Blender scene unavailable in this context.")
     try:
-        found_properties = getattr(scene, ADDON_GLOBAL_PROPS_NAME)
+        found_properties = getattr(scene, _ADDON_META.global_props_name)
 
         if TYPE_CHECKING:
             # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
@@ -62,7 +60,7 @@ def check_addonpreferences(
         raise UserFacingError("Blender preferences unavailable in this context.")
 
     try:
-        found_preferences = prefs_ctx.addons[ADDON_PREFERENCES_ID].preferences
+        found_preferences = prefs_ctx.addons[_ADDON_META.global_prefs_id].preferences
 
         if TYPE_CHECKING:
             # OK to use `cast` here as we've guarded its existence with a try-block, and we created it
@@ -109,7 +107,9 @@ def check_data_output_dirpath(
 
 
 def check_data_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
-    return check_data_output_dirpath(prefs, props) / MEDIA_IO_DATASET_JSON_FILENAME
+    return (
+        check_data_output_dirpath(prefs, props) / _ADDON_META.media_io_dataset_filename
+    )
 
 
 def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> List[Path]:

@@ -284,11 +284,6 @@ def patch_original_file(
 
     needs_modification = formatted != source
 
-    print(new_source + "\n\n\n\n\n")
-    # print(formatted + "\n\n\n\n\n")
-    # print(source + "\n\n\n\n\n")
-    # print(formatted)
-
     print(f"({FOUND_FILE_COUNT}+) Analyzed original file patch status.")
     if VERBOSE:
         print(f"\tCurrent character count: '{len(source)}'")

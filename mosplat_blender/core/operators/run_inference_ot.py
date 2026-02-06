@@ -1,6 +1,7 @@
 from typing import NamedTuple, Tuple
 
 from core.operators.base_ot import MosplatOperatorBase
+from interfaces import MosplatVGGTInterface
 
 
 class ThreadKwargs(NamedTuple):
@@ -12,7 +13,6 @@ class Mosplat_OT_run_inference(
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
-        from ...interfaces import MosplatVGGTInterface
 
         if MosplatVGGTInterface().model is None:
             cls.poll_message_set("Model must be initialized.")

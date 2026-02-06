@@ -42,6 +42,7 @@ from core.meta.properties_meta import (
     Mosplat_PG_OperatorProgress_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
 )
+from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
 from infrastructure.protocols import SupportsCollectionProperty
 from infrastructure.schemas import (
@@ -54,7 +55,6 @@ from infrastructure.schemas import (
     MediaFileStatus,
     MediaIODataset,
     NPZNameToPathLookup,
-    OperatorIDEnum,
     OperatorProgress,
     ProcessedFrameRange,
     SavedNPZName,

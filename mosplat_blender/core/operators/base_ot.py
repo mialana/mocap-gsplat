@@ -29,12 +29,12 @@ from core.checks import (
 )
 from core.handlers import load_dataset_property_group_from_json
 from infrastructure.constants import _TIMER_INTERVAL_
+from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.macros import immutable_to_set as im_to_set
 from infrastructure.mixins import ContextAccessorMixin, CtxPackage
 from infrastructure.schemas import (
     DeveloperError,
     MediaIODataset,
-    OperatorIDEnum,
     UnexpectedError,
     UserFacingError,
 )

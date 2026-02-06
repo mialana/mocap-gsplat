@@ -19,6 +19,7 @@ from infrastructure.macros import (
     tuple_type_matches_known_tuple_type,
 )
 from infrastructure.schemas import UnexpectedError, UserFacingError
+from interfaces import MosplatVGGTInterface
 
 QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown tuples
 
@@ -34,8 +35,6 @@ class Mosplat_OT_initialize_model(
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
-        from ...interfaces import MosplatVGGTInterface
-
         if MosplatVGGTInterface().model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
@@ -165,8 +164,6 @@ class Mosplat_OT_initialize_model(
             return  # do not continue
         if cancel_event.is_set():
             return  # do not continue
-
-        from ...interfaces import MosplatVGGTInterface
 
         try:
             MosplatVGGTInterface().initialize_model(

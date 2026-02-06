@@ -9,9 +9,8 @@ from typing import Sequence, Tuple, Type, Union
 import bpy
 
 import core
-from infrastructure.constants import ADDON_GLOBAL_PROPS_NAME, ADDON_HUMAN_READABLE
 from infrastructure.mixins import PreregristrationFn
-from infrastructure.schemas import DeveloperError, UnexpectedError
+from infrastructure.schemas import AddonMeta, DeveloperError, UnexpectedError
 from interfaces import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
@@ -28,16 +27,17 @@ registration_factory: Sequence[
         PreregristrationFn,
     ],
 ] = (
-    # core.operator_factory
-    # + core.panel_factory
-    # + core.ui_list_factory
-    [core.preferences_factory]  # addon preferences is a singleton class
+    core.operator_factory
+    + core.panel_factory
+    + core.ui_list_factory
     + core.properties_factory
+    + [core.preferences_factory]  # addon preferences is a singleton class
 )
+
+ADDON_META = AddonMeta()
 
 
 def register_addon():
-    cwd = os.getcwd()
     for cls, pregistration_fn in registration_factory:
         try:
             pregistration_fn()  # we call pre-registration function here
@@ -50,7 +50,7 @@ def register_addon():
     # do not catch thrown exceptions as we should not successfully register without addon preferences or property groups
     setattr(
         bpy.types.Scene,
-        ADDON_GLOBAL_PROPS_NAME,
+        ADDON_META.global_props_name,
         bpy.props.PointerProperty(type=core.Mosplat_PG_Global),
     )
 
@@ -70,7 +70,7 @@ def register_addon():
     bpy.app.handlers.undo_post.append(core.handlers.handle_save_to_json)
     bpy.app.handlers.redo_post.append(core.handlers.handle_save_to_json)
 
-    logger.info(f"'{ADDON_HUMAN_READABLE}' addon registration completed.")
+    logger.info(f"'{ADDON_META.human_readable_name}' addon registration completed.")
     logger.info(__package__)
 
 
@@ -84,12 +84,12 @@ def unregister_addon():
             logger.error(f"Exception during unregistration of `{cls.__name__=}`")
 
     try:
-        delattr(bpy.types.Scene, ADDON_GLOBAL_PROPS_NAME)
+        delattr(bpy.types.Scene, ADDON_META.global_props_name)
     except AttributeError:
         logger.error(f"Error removing add-on properties.")
 
     try:
-        from .interfaces import MosplatVGGTInterface
+        from interfaces import MosplatVGGTInterface
 
         MosplatVGGTInterface.cleanup_interface()
     except UnexpectedError as e:
@@ -97,4 +97,4 @@ def unregister_addon():
 
     bpy.app.handlers.load_post.remove(core.handlers.handle_load_from_json)
 
-    logger.info(f"'{ADDON_HUMAN_READABLE}' addon unregistration completed.")
+    logger.info(f"'{ADDON_META.human_readable_name}' addon unregistration completed.")

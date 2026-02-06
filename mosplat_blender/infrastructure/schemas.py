@@ -6,6 +6,7 @@ dataclass member methods should raise standard library error types.
 from __future__ import annotations
 
 import json
+import os
 from abc import ABC
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum, auto
@@ -30,12 +31,6 @@ from typing import (
     cast,
 )
 
-from infrastructure.constants import (
-    ADDON_SHORTNAME,
-    OPERATOR_ID_PREFIX,
-    PANEL_ID_PREFIX,
-    UI_LIST_ID_PREFIX,
-)
 from infrastructure.macros import (
     append_if_not_equals,
     int_median,
@@ -93,101 +88,17 @@ class UnexpectedError(CustomError):
     base_msg = "Something went wrong"
 
 
-class PropertyMeta(NamedTuple):
-    id: str
-    name: str
-    description: str
-
-
-"""Enum Convenience Classes"""
+"""Meta Structural Classes"""
 
 
 class EnvVariableEnum(StrEnum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{ADDON_SHORTNAME}_{name}".upper()
+        return f"MOSPLAT_{name}".upper()  # must be static
 
     TESTING = auto()
     ROOT_MODULE_NAME = auto()
-
-
-class OperatorIDEnum(StrEnum):
-    @staticmethod
-    def _prefix():
-        return OPERATOR_ID_PREFIX
-
-    @staticmethod
-    def _category():
-        return ADDON_SHORTNAME
-
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{OPERATOR_ID_PREFIX}{name.lower()}"
-
-    @staticmethod
-    def label_factory(member: OperatorIDEnum) -> str:
-        """
-        creates the operator label from the id
-        keeping this here so this file can be a one-stop shop for metadata construction
-        """
-        return capwords(member.value.removeprefix(OPERATOR_ID_PREFIX).replace("_", " "))
-
-    @staticmethod
-    def basename_factory(member: OperatorIDEnum):
-        return member.value.rpartition(".")[-1]
-
-    @staticmethod
-    def run(member: OperatorIDEnum, *args, **kwargs):
-        from bpy import ops  # local import
-
-        getattr(getattr(ops, member._category()), member.basename_factory(member))(
-            *args, **kwargs
-        )
-
-    INITIALIZE_MODEL = auto()
-    OPEN_ADDON_PREFERENCES = auto()
-    VALIDATE_FILE_STATUSES = auto()
-    EXTRACT_FRAME_RANGE = auto()
-    RUN_PREPROCESS_SCRIPT = auto()
-    RUN_INFERENCE = auto()
-
-
-class PanelIDEnum(StrEnum):
-    @staticmethod
-    def _prefix():
-        return PANEL_ID_PREFIX
-
-    @staticmethod
-    def _category():
-        return ADDON_SHORTNAME.capitalize()
-
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{PANEL_ID_PREFIX}{name.lower()}"
-
-    @staticmethod
-    def label_factory(member: PanelIDEnum):
-        """
-        creates the panel label from the id
-        keeping this here so this file can be a one-stop shop for metadata construction
-        """
-        return capwords(member.value.removeprefix(PANEL_ID_PREFIX).replace("_", " "))
-
-    MAIN = auto()
-    PREPROCESS = auto()
-    LOG_ENTRIES = auto()
-
-
-class UIListIDEnum(StrEnum):
-    @staticmethod
-    def _prefix():
-        return UI_LIST_ID_PREFIX
-
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return f"{UI_LIST_ID_PREFIX}{name.lower()}"
-
-    LOG_ENTRIES = auto()
+    ADDON_PACKAGE_ORIGINAL = auto()
 
 
 BlenderEnumItem: TypeAlias = Tuple[str, str, str]  # this is (ID, Name, Description)
@@ -222,6 +133,77 @@ class SavedNPZName(StrEnum):
 
 
 NPZNameToPathLookup: TypeAlias = Dict[SavedNPZName, List[Path]]
+
+
+class AddonMeta:
+    instance: ClassVar[Optional[Self]] = None
+
+    def __new__(cls, *args) -> Self:
+        if cls.instance:
+            return cls.instance  # early return if already exists
+        cls.instance = super().__new__(cls)
+        return cls.instance
+
+    def __init__(self, full_id: Optional[str] = None):
+        if not full_id:
+            full_id = os.environ.get(EnvVariableEnum.ADDON_PACKAGE_ORIGINAL)
+            if not full_id:
+                raise DeveloperError("`AddonMeta` canot retrieve its full ID")
+
+        self.__full_id: str = full_id
+
+    @property
+    def base_id(self) -> str:
+        return self.__full_id.rpartition(".")[-1]
+
+    @property
+    def human_readable_name(self) -> str:
+        return capwords(self.base_id.replace("_", " "))
+
+    @property
+    def shortname(self) -> str:
+        return self.base_id.partition("_")[0]
+
+    @property
+    def global_props_name(self) -> str:
+        """
+        the name of the pointer to `Mosplat_PG_Global` that will be placed on the
+        `bpy.context.scene` object for convenient access in operators, panels, etc.
+        """
+        return f"{self.__full_id}_props"
+
+    @property
+    def global_prefs_id(self) -> str:
+        """
+        this is the `bl_idname` that blender expects our `AddonPreferences` to have.
+        i.e. even though our addon id is `mosplat_blender`, the id would be the evaluated
+        runtime package, which includes the extension repository and the "bl_ext" prefix.
+        so if this addon is in the `user_default` repository, the id is expected to be:
+        `bl_ext.user_default.mosplat_blender`.
+        """
+        return self.__full_id
+
+    @property
+    def global_operator_prefix(self) -> str:
+        return f"{self.shortname}."
+
+    @property
+    def global_panel_prefix(self) -> str:
+        return f"{self.shortname.upper()}_PT_"
+
+    @property
+    def global_ui_list_prefix(self) -> str:
+        return f"{self.shortname.upper()}_UL_"
+
+    @property
+    def media_io_dataset_filename(self) -> str:
+        return f"{self.shortname}_data.json"
+
+
+class PropertyMeta(NamedTuple):
+    id: str
+    name: str
+    description: str
 
 
 class FrameNPZStructure(TypedDict):

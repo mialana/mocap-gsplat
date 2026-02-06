@@ -3,7 +3,8 @@ from pathlib import Path
 
 from core.panels.base_pt import MosplatPanelBase, column_factory
 from core.properties import Mosplat_PG_MediaIODataset
-from infrastructure.schemas import EnvVariableEnum, MediaFileStatus, OperatorIDEnum
+from infrastructure.identifiers import OperatorIDEnum
+from infrastructure.schemas import EnvVariableEnum, MediaFileStatus
 
 _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")
 
