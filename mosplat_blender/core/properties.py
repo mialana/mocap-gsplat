@@ -15,6 +15,7 @@ from bpy.props import (
     StringProperty,
 )
 from bpy.types import Context, PropertyGroup
+
 from core.checks import (
     check_current_media_dirpath,
     check_data_json_filepath,

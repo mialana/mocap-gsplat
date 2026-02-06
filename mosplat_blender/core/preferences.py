@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Set
 
 from bpy.props import IntProperty, StringProperty
 from bpy.types import AddonPreferences, Context
+
 from core.checks import check_media_extensions_set
 from core.meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
 from infrastructure.constants import (

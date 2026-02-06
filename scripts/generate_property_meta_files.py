@@ -21,14 +21,17 @@ BLENDER_PROPERTY_TYPES = {
     "IntVectorProperty",
 }
 
+pyproject_toml_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+ISORT_CONFIG = isort.Config(settings_file=str(pyproject_toml_path))
+
 timestamp: datetime = datetime.now()
-timestamp_str = f"# {timestamp} \n# created using '{Path(__file__).name}'\n"
+TIMESTAMP_STR = f"# {timestamp} \n# created using '{Path(__file__).name}'\n"
 
 
-check_only: bool = False
-verbose: bool = True
-found_file_count: int = 0
-modification_count: int = 0  # tracks how many files need modification / are modified
+CHECK_ONLY: bool = False
+VERBOSE: bool = True
+FOUND_FILE_COUNT: int = 0
+MODIFICATION_COUNT: int = 0  # tracks how many files need modification / are modified
 SCHEMAS_MODULE: Path = Path()
 ADDON_SRC_DIR: Path = Path()
 
@@ -274,23 +277,28 @@ def patch_original_file(
 
     new_source = module.code
 
-    sorted = isort.code(new_source)  # sort with isort
+    sorted = isort.code(new_source, config=ISORT_CONFIG)  # sort with isort
 
     # format with black
     formatted = black.format_str(sorted, mode=black.FileMode())
 
     needs_modification = formatted != source
 
-    print(f"({found_file_count}+) Analyzed original file patch status.")
-    if verbose:
+    print(new_source + "\n\n\n\n\n")
+    # print(formatted + "\n\n\n\n\n")
+    # print(source + "\n\n\n\n\n")
+    # print(formatted)
+
+    print(f"({FOUND_FILE_COUNT}+) Analyzed original file patch status.")
+    if VERBOSE:
         print(f"\tCurrent character count: '{len(source)}'")
         print(f"\tPatched character count: '{len(formatted)}'")
         print(f"\tNeeds modification: '{needs_modification}'")
 
-    global modification_count
-    modification_count += int(needs_modification)
+    global MODIFICATION_COUNT
+    MODIFICATION_COUNT += int(needs_modification)
 
-    if check_only and (verbose or needs_modification):
+    if CHECK_ONLY and (VERBOSE or needs_modification):
         print(
             f"Original File Check Result: {('failed' if needs_modification else 'success').upper()}"
         )
@@ -363,8 +371,8 @@ def generate_meta_file(py_file: Path):
     if not extractor.classes:
         return  # doesn't contain blender properties
 
-    global found_file_count
-    found_file_count += 1
+    global FOUND_FILE_COUNT
+    FOUND_FILE_COUNT += 1
 
     meta_dir = py_file.parent / "meta"
     meta_dir.mkdir(exist_ok=True)
@@ -374,7 +382,7 @@ def generate_meta_file(py_file: Path):
     meta_exists = meta_path.exists()
 
     meta_lines = [
-        timestamp_str,
+        TIMESTAMP_STR,
         "",
         f"from {dot_abs_path(SCHEMAS_MODULE, ADDON_SRC_DIR)} import PropertyMeta",
         "from typing import NamedTuple",
@@ -401,18 +409,18 @@ def generate_meta_file(py_file: Path):
         meta_lines.append("")
 
     meta_code = "\n".join(meta_lines)
-    sorted = isort.code(meta_code)
+    sorted = isort.code(meta_code, config=ISORT_CONFIG)
     formatted = black.format_str(sorted, mode=black.FileMode())  # format with black
 
     needs_modification = diff_meta_file(meta_path, formatted)
 
-    global modification_count
-    modification_count += int(needs_modification)
+    global MODIFICATION_COUNT
+    MODIFICATION_COUNT += int(needs_modification)
 
     print(
-        f"({found_file_count}) Found file containing Blender properties: '{py_file.name}'"
+        f"({FOUND_FILE_COUNT}) Found file containing Blender properties: '{py_file.name}'"
     )
-    if verbose:
+    if VERBOSE:
         print(
             f"\tClasses found containing Blender properties: '{len(extractor.classes)}'"
         )
@@ -420,7 +428,7 @@ def generate_meta_file(py_file: Path):
         print(f"\tHas meta file been generated previously: '{meta_exists}'")
         print(f"\tNeeds modification: '{needs_modification}'")
 
-    if check_only and (verbose or needs_modification):
+    if CHECK_ONLY and (VERBOSE or needs_modification):
         print(
             f"Meta File Check Result: {('Failed' if needs_modification else 'Success').upper()}"
         )
@@ -479,9 +487,9 @@ def main(
     check: bool = False,
     quiet: bool = False,
 ):
-    global check_only, verbose, SCHEMAS_MODULE, ADDON_SRC_DIR
-    check_only = check
-    verbose = not quiet
+    global CHECK_ONLY, VERBOSE, SCHEMAS_MODULE, ADDON_SRC_DIR
+    CHECK_ONLY = check
+    VERBOSE = not quiet
 
     ADDON_SRC_DIR = addon_src_dir
     CORE_MODULE = ADDON_SRC_DIR / "core"
@@ -496,11 +504,11 @@ def main(
 
     print("Done.")
 
-    if check_only and modification_count > 0:
-        raise SystemExit(f"'{modification_count}' files still need changes applied.")
+    if CHECK_ONLY and MODIFICATION_COUNT > 0:
+        raise SystemExit(f"'{MODIFICATION_COUNT}' files still need changes applied.")
 
     print(
-        f"{'Files needing modification' if check_only else 'Files modified'}: '{modification_count}'"
+        f"{'Files needing modification' if CHECK_ONLY else 'Files modified'}: '{MODIFICATION_COUNT}'"
     )
 
 
