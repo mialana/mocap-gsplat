@@ -53,11 +53,7 @@ so if this addon is in the `user_default` repository, the id is expected to be:
 `bl_ext.user_default.mosplat_blender`.
 """
 ADDON_PREFERENCES_ID: Final[str] = (
-    __package__.rpartition(".")[
-        0
-    ]  # remove last part of `__package__` since this file is in a subdirectory
-    if __package__
-    else Path(__file__).resolve().parent.parent.name
+    Path(__file__).resolve().parent.parent.name
 )  # current file is one level down from the one blender expects
 
 ADDON_BASE_ID: Final[str] = ADDON_PREFERENCES_ID.rpartition(".")[-1]

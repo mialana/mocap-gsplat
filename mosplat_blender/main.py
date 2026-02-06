@@ -3,22 +3,16 @@ main entrypoint for addon.
 moves implementation logic and imports out of `__init__.py`.
 """
 
+import os
 from typing import Sequence, Tuple, Type, Union
 
 import bpy
 
-from . import core
-from .core.checks import check_addonpreferences
-from .core.handlers import (
-    handle_load_from_json,
-    handle_load_from_json_timer_entrypoint,
-    handle_reset_properties,
-    handle_save_to_json,
-)
-from .infrastructure.constants import ADDON_GLOBAL_PROPS_NAME, ADDON_HUMAN_READABLE
-from .infrastructure.mixins import PreregristrationFn
-from .infrastructure.schemas import DeveloperError, UnexpectedError
-from .interfaces import MosplatLoggingInterface
+import core
+from infrastructure.constants import ADDON_GLOBAL_PROPS_NAME, ADDON_HUMAN_READABLE
+from infrastructure.mixins import PreregristrationFn
+from infrastructure.schemas import DeveloperError, UnexpectedError
+from interfaces import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
@@ -34,16 +28,16 @@ registration_factory: Sequence[
         PreregristrationFn,
     ],
 ] = (
-    core.operator_factory
-    + core.panel_factory
-    + core.ui_list_factory
-    + [core.preferences_factory]  # addon preferences is a singleton class
+    # core.operator_factory
+    # + core.panel_factory
+    # + core.ui_list_factory
+    [core.preferences_factory]  # addon preferences is a singleton class
     + core.properties_factory
 )
 
 
 def register_addon():
-    bpy.utils.register_classes_factory
+    cwd = os.getcwd()
     for cls, pregistration_fn in registration_factory:
         try:
             pregistration_fn()  # we call pre-registration function here
@@ -60,21 +54,24 @@ def register_addon():
         bpy.props.PointerProperty(type=core.Mosplat_PG_Global),
     )
 
-    addon_preferences: core.Mosplat_AP_Global = check_addonpreferences(
+    addon_preferences: core.Mosplat_AP_Global = core.checks.check_addonpreferences(
         bpy.context.preferences
     )
 
     MosplatLoggingInterface().init_handlers_from_addon_prefs(addon_preferences)
 
     # try load from JSON every file load and after registration occurs
-    bpy.app.handlers.load_post.append(handle_load_from_json)
-    bpy.app.handlers.load_post.append(handle_reset_properties)
-    bpy.app.timers.register(handle_load_from_json_timer_entrypoint, first_interval=0)
+    bpy.app.handlers.load_post.append(core.handlers.handle_load_from_json)
+    bpy.app.handlers.load_post.append(core.handlers.handle_reset_properties)
+    bpy.app.timers.register(
+        core.handlers.handle_load_from_json_timer_entrypoint, first_interval=0
+    )
 
-    bpy.app.handlers.undo_post.append(handle_save_to_json)
-    bpy.app.handlers.redo_post.append(handle_save_to_json)
+    bpy.app.handlers.undo_post.append(core.handlers.handle_save_to_json)
+    bpy.app.handlers.redo_post.append(core.handlers.handle_save_to_json)
 
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon registration completed.")
+    logger.info(__package__)
 
 
 def unregister_addon():
@@ -98,6 +95,6 @@ def unregister_addon():
     except UnexpectedError as e:
         logger.error(f"Error during VGGT cleanup: {str(e)}")
 
-    bpy.app.handlers.load_post.remove(handle_load_from_json)
+    bpy.app.handlers.load_post.remove(core.handlers.handle_load_from_json)
 
     logger.info(f"'{ADDON_HUMAN_READABLE}' addon unregistration completed.")

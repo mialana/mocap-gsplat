@@ -30,13 +30,13 @@ from typing import (
     cast,
 )
 
-from .constants import (
+from infrastructure.constants import (
     ADDON_SHORTNAME,
     OPERATOR_ID_PREFIX,
     PANEL_ID_PREFIX,
     UI_LIST_ID_PREFIX,
 )
-from .macros import (
+from infrastructure.macros import (
     append_if_not_equals,
     int_median,
     try_access_path,
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     import numpy as np
     from cv2 import VideoCapture
 
-    from ..core.properties import Mosplat_PG_MediaIODataset
+    from core.properties import Mosplat_PG_MediaIODataset
 
 
 class CustomError(ABC, RuntimeError):
@@ -146,7 +146,7 @@ class OperatorIDEnum(StrEnum):
 
     INITIALIZE_MODEL = auto()
     OPEN_ADDON_PREFERENCES = auto()
-    VALIDATE_MEDIA_FILE_STATUSES = auto()
+    VALIDATE_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()
     RUN_INFERENCE = auto()

@@ -1,17 +1,17 @@
 from typing import Callable, Dict, List, Tuple, Type
 
-from ...infrastructure.constants import ADDON_SHORTNAME
-from ...infrastructure.mixins import PreregristrationFn
-from ...infrastructure.schemas import PanelIDEnum, UIListIDEnum
-from .base_pt import (
+from core.panels.base_pt import (
     MosplatPanelBase,
     MosplatPanelMetadata,
     MosplatUIListBase,
     MosplatUIListMetadata,
 )
-from .log_entries_pt import Mosplat_PT_LogEntries, Mosplat_UL_log_entries
-from .main_pt import Mosplat_PT_Main
-from .preprocess_pt import Mosplat_PT_Preprocess
+from core.panels.log_entries_pt import Mosplat_PT_LogEntries, Mosplat_UL_log_entries
+from core.panels.main_pt import Mosplat_PT_Main
+from core.panels.preprocess_pt import Mosplat_PT_Preprocess
+from infrastructure.constants import ADDON_SHORTNAME
+from infrastructure.mixins import PreregristrationFn
+from infrastructure.schemas import PanelIDEnum, UIListIDEnum
 
 panel_registry: Dict[
     Type[MosplatPanelBase],

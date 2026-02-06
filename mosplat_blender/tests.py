@@ -6,7 +6,7 @@ actually called within the add-on's runtime.
 
 import os
 
-from .interfaces.logging_interface import MosplatLoggingInterface
+from interfaces.logging_interface import MosplatLoggingInterface
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 

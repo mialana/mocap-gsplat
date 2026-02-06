@@ -21,9 +21,9 @@ from typing import (
     Union,
 )
 
-from .constants import _MISSING_
-from .protocols import SupportsCollectionProperty, SupportsDataclass
-from .schemas import DeveloperError, EnvVariableEnum
+from infrastructure.constants import _MISSING_
+from infrastructure.protocols import SupportsCollectionProperty, SupportsDataclass
+from infrastructure.schemas import DeveloperError, EnvVariableEnum
 
 S = TypeVar("S")
 
@@ -43,8 +43,8 @@ class CtxPackage(NamedTuple):
 if TYPE_CHECKING:
     from bpy.types import Context
 
-    from ..core.preferences import Mosplat_AP_Global
-    from ..core.properties import Mosplat_PG_Global
+    from core.preferences import Mosplat_AP_Global
+    from core.properties import Mosplat_PG_Global
 
 
 class LogClassMixin:
@@ -60,7 +60,7 @@ class LogClassMixin:
 
     @classmethod
     def _create_logger_for_class(cls, label: Optional[str] = None):
-        from ..interfaces import MosplatLoggingInterface
+        from interfaces import MosplatLoggingInterface
 
         cls.class_logger = MosplatLoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{label if label else cls.__name__}"
@@ -211,7 +211,7 @@ class APAccessorMixin:
     from bpy.types import Context  # local import
 
     if TYPE_CHECKING:
-        from ..core.preferences import Mosplat_AP_Global
+        from core.preferences import Mosplat_AP_Global
 
     @staticmethod
     def prefs(context) -> Mosplat_AP_Global:
@@ -226,11 +226,11 @@ class PGAccessorMixin:
     from bpy.types import Context  # local import
 
     if TYPE_CHECKING:
-        from ..core.properties import Mosplat_PG_Global
+        from core.properties import Mosplat_PG_Global
 
     @staticmethod
     def props(context: Context) -> Mosplat_PG_Global:
-        from ..core.checks import check_propertygroup
+        from core.checks import check_propertygroup
 
         return check_propertygroup(context.scene)
 

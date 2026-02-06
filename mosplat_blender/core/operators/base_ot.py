@@ -22,19 +22,23 @@ from typing import (
 
 from bpy.types import Context, Event, Operator, Timer, WindowManager
 
-from ...infrastructure.constants import _TIMER_INTERVAL_
-from ...infrastructure.macros import immutable_to_set as im_to_set
-from ...infrastructure.mixins import ContextAccessorMixin, CtxPackage
-from ...infrastructure.schemas import (
+from core.checks import (
+    check_addonpreferences,
+    check_propertygroup,
+    check_window_manager,
+)
+from core.handlers import load_dataset_property_group_from_json
+from infrastructure.constants import _TIMER_INTERVAL_
+from infrastructure.macros import immutable_to_set as im_to_set
+from infrastructure.mixins import ContextAccessorMixin, CtxPackage
+from infrastructure.schemas import (
     DeveloperError,
     MediaIODataset,
     OperatorIDEnum,
     UnexpectedError,
     UserFacingError,
 )
-from ...interfaces.worker_interface import QT, MosplatWorkerInterface
-from ..checks import check_addonpreferences, check_propertygroup, check_window_manager
-from ..handlers import load_dataset_property_group_from_json
+from interfaces.worker_interface import QT, MosplatWorkerInterface
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
@@ -47,8 +51,8 @@ if TYPE_CHECKING:
 
     OpResultSetLike: TypeAlias = Union[OpResultTuple, OpResultSet]
 
-    from ..preferences import Mosplat_AP_Global
-    from ..properties import Mosplat_PG_Global
+    from core.preferences import Mosplat_AP_Global
+    from core.properties import Mosplat_PG_Global
 
 K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
 

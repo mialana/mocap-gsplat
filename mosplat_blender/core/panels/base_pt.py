@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, Literal, Optional, Set, TypeAlias
 
 from bpy.types import Context, Panel, UILayout, UIList
 
-from ...infrastructure.mixins import ContextAccessorMixin, CtxPackage
-from ...infrastructure.schemas import (
+from core.checks import check_addonpreferences, check_propertygroup
+from infrastructure.mixins import ContextAccessorMixin, CtxPackage
+from infrastructure.schemas import (
     PanelIDEnum,
     UnexpectedError,
     UserFacingError,
 )
-from ..checks import check_addonpreferences, check_propertygroup
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems

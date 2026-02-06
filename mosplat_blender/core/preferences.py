@@ -7,27 +7,27 @@ from typing import TYPE_CHECKING, Set
 
 from bpy.props import IntProperty, StringProperty
 from bpy.types import AddonPreferences, Context
-
-from ..infrastructure.constants import (
+from core.checks import check_media_extensions_set
+from core.meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
+from infrastructure.constants import (
     ADDON_BASE_ID,
     ADDON_PREFERENCES_ID,
     ADDON_SHORTNAME,
     DEFAULT_PREPROCESS_MEDIA_SCRIPT,
 )
-from ..infrastructure.macros import try_access_path
-from ..infrastructure.mixins import EnforceAttributesMixin
-from ..infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
-from ..interfaces.logging_interface import MosplatLoggingInterface
-from .checks import check_media_extensions_set
-from .meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
+from infrastructure.macros import try_access_path
+from infrastructure.mixins import EnforceAttributesMixin
+from infrastructure.schemas import OperatorIDEnum, UnexpectedError, UserFacingError
+from interfaces import MosplatLoggingInterface as LoggingInterface
+from interfaces import MosplatVGGTInterface as VGGTInterface
 
 if TYPE_CHECKING:
-    from .preferences import Mosplat_AP_Global
+    from core.preferences import Mosplat_AP_Global
 
 
 def update_stdout_logging(self: Mosplat_AP_Global, _: Context):
     try:
-        MosplatLoggingInterface().init_stdout_handler(
+        LoggingInterface().init_stdout_handler(
             log_fmt=self.stdout_log_format,
             log_date_fmt=self.stdout_date_log_format,
         )
@@ -38,7 +38,7 @@ def update_stdout_logging(self: Mosplat_AP_Global, _: Context):
 
 def update_json_logging(self: Mosplat_AP_Global, _: Context):
     try:
-        MosplatLoggingInterface().init_json_handler(
+        LoggingInterface().init_json_handler(
             log_fmt=self.json_log_format,
             log_date_fmt=self.json_date_log_format,
             outdir=self.json_log_dir,
@@ -50,20 +50,18 @@ def update_json_logging(self: Mosplat_AP_Global, _: Context):
 
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
-    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES)
+    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES)
     self.logger.info(f"'{self._meta.media_extensions.name}' updated.")
 
 
 def update_model_preferences(self: Mosplat_AP_Global, context: Context):
-    from ..interfaces.vggt_interface import MosplatVGGTInterface as interface
-
-    if interface().model is not None:
-        if interface().cache_dir != self.vggt_model_dir:
+    if VGGTInterface().model is not None:
+        if VGGTInterface().cache_dir != self.vggt_model_dir:
             self.logger.warning(
                 "Changed model cache dir, next init will take a while."
                 "Change back to previous directory if this is not desired."
             )
-        elif interface().hf_id != self.vggt_hf_id:
+        elif VGGTInterface().hf_id != self.vggt_hf_id:
             self.logger.warning(
                 "Changed Hugging Face ID for model, next init will take a while."
                 "Change back to previous ID if this is not desired."
@@ -71,7 +69,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
         else:
             return  # prefs did not change from what is currently initialized with.
         try:
-            interface.cleanup_interface()
+            VGGTInterface.cleanup_interface()
         except UnexpectedError as e:
             self.logger.warning(str(e))
 
@@ -150,7 +148,7 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
 
     json_log_format: StringProperty(
         name="JSON Log Format",
-        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="%(asctime)s %(levelname)s %(name)s %(pathname)s %(classname)s %(funcName)s %(lineno)s %(thread)d %(message)s",
         update=update_json_logging,
     )
@@ -164,7 +162,7 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
 
     stdout_log_format: StringProperty(
         name="STDOUT Log Format",
-        description=f"`logging.Formatter` format string. Refer to `{MosplatLoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
+        description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
         update=update_stdout_logging,
     )

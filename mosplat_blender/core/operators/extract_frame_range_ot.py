@@ -3,15 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
-from ...infrastructure.macros import is_path_accessible, write_frame_data_to_npz
-from ...infrastructure.schemas import (
+from core.operators.base_ot import MosplatOperatorBase
+from infrastructure.macros import is_path_accessible, write_frame_data_to_npz
+from infrastructure.schemas import (
     FrameNPZStructure,
     MediaIODataset,
     ProcessedFrameRange,
     SavedNPZName,
     UserFacingError,
 )
-from .base_ot import MosplatOperatorBase
 
 
 class ThreadKwargs(NamedTuple):

@@ -1,15 +1,15 @@
-from typing import Callable, Dict, List, Tuple, Type
+from typing import Dict, List, Tuple, Type
 
-from ...infrastructure.constants import ADDON_HUMAN_READABLE
-from ...infrastructure.mixins import PreregristrationFn
-from ...infrastructure.schemas import OperatorIDEnum
-from .base_ot import MosplatOperatorBase, MosplatOperatorMetadata
-from .extract_frame_range_ot import Mosplat_OT_extract_frame_range
-from .initialize_model_ot import Mosplat_OT_initialize_model
-from .open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
-from .run_inference_ot import Mosplat_OT_run_inference
-from .run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
-from .validate_media_file_statuses_ot import Mosplat_OT_validate_media_file_statuses
+from core.operators.base_ot import MosplatOperatorBase, MosplatOperatorMetadata
+from core.operators.extract_frame_range_ot import Mosplat_OT_extract_frame_range
+from core.operators.initialize_model_ot import Mosplat_OT_initialize_model
+from core.operators.open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
+from core.operators.run_inference_ot import Mosplat_OT_run_inference
+from core.operators.run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
+from core.operators.validate_media_statuses_ot import Mosplat_OT_validate_media_statuses
+from infrastructure.constants import ADDON_HUMAN_READABLE
+from infrastructure.mixins import PreregristrationFn
+from infrastructure.schemas import OperatorIDEnum
 
 operator_registry: Dict[
     Type[MosplatOperatorBase],
@@ -24,8 +24,8 @@ operator_registry: Dict[
         bl_description=f"Quick navigation to '{ADDON_HUMAN_READABLE}' saved addon preferences.",
         bl_options={"REGISTER", "MACRO"},
     ),
-    Mosplat_OT_validate_media_file_statuses: MosplatOperatorMetadata(
-        bl_idname=OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES,
+    Mosplat_OT_validate_media_statuses: MosplatOperatorMetadata(
+        bl_idname=OperatorIDEnum.VALIDATE_FILE_STATUSES,
         bl_description="Check frame count, width, and height of all media files found in current media directory.",
     ),
     Mosplat_OT_extract_frame_range: MosplatOperatorMetadata(

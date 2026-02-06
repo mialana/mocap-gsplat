@@ -7,8 +7,8 @@ from typing import Callable, Generic, Optional, TypeVar
 
 QT = TypeVar("QT")  # types elements of worker queue
 
-from ..infrastructure.decorators import record_work_time
-from ..infrastructure.mixins import LogClassMixin
+from infrastructure.decorators import record_work_time
+from infrastructure.mixins import LogClassMixin
 
 
 class MosplatWorkerInterface(Generic[QT], LogClassMixin):

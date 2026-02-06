@@ -4,12 +4,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, List, NamedTuple, Tuple, cast
 
-from ...infrastructure.constants import PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME
-from ...infrastructure.macros import (
+from core.operators.base_ot import MosplatOperatorBase
+from infrastructure.constants import PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME
+from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
 )
-from ...infrastructure.schemas import (
+from infrastructure.schemas import (
     DeveloperError,
     FrameNPZStructure,
     MediaIODataset,
@@ -17,7 +18,6 @@ from ...infrastructure.schemas import (
     SavedNPZName,
     UserFacingError,
 )
-from .base_ot import MosplatOperatorBase
 
 
 class ThreadKwargs(NamedTuple):

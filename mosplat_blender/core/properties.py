@@ -15,25 +15,7 @@ from bpy.props import (
     StringProperty,
 )
 from bpy.types import Context, PropertyGroup
-
-from ..infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
-from ..infrastructure.protocols import SupportsCollectionProperty
-from ..infrastructure.schemas import (
-    AppliedPreprocessScript,
-    BlenderEnumItem,
-    GlobalData,
-    LogEntry,
-    LogEntryHub,
-    LogEntryLevelEnum,
-    MediaFileStatus,
-    MediaIODataset,
-    NPZNameToPathLookup,
-    OperatorIDEnum,
-    OperatorProgress,
-    ProcessedFrameRange,
-    SavedNPZName,
-)
-from .checks import (
+from core.checks import (
     check_current_media_dirpath,
     check_data_json_filepath,
     check_data_output_dirpath,
@@ -41,7 +23,7 @@ from .checks import (
     check_media_files,
     check_npz_filepaths_for_frame_range,
 )
-from .meta.properties_meta import (
+from core.meta.properties_meta import (
     MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META,
     MOSPLAT_PG_GLOBAL_META,
     MOSPLAT_PG_LOGENTRY_META,
@@ -59,9 +41,26 @@ from .meta.properties_meta import (
     Mosplat_PG_OperatorProgress_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
 )
+from infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
+from infrastructure.protocols import SupportsCollectionProperty
+from infrastructure.schemas import (
+    AppliedPreprocessScript,
+    BlenderEnumItem,
+    GlobalData,
+    LogEntry,
+    LogEntryHub,
+    LogEntryLevelEnum,
+    MediaFileStatus,
+    MediaIODataset,
+    NPZNameToPathLookup,
+    OperatorIDEnum,
+    OperatorProgress,
+    ProcessedFrameRange,
+    SavedNPZName,
+)
 
 if TYPE_CHECKING:
-    from .preferences import Mosplat_AP_Global
+    from core.preferences import Mosplat_AP_Global
 
 LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
     member.to_blender_enum_item() for member in LogEntryLevelEnum
@@ -69,7 +68,7 @@ LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
 
 
 def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
-    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_MEDIA_FILE_STATUSES, "INVOKE_DEFAULT")
+    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
 
     self.logger.info(f"'{self._meta.current_media_dir.name}' updated.")
 

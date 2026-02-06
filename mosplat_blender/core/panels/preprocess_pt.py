@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
 
-from ...infrastructure.schemas import EnvVariableEnum, MediaFileStatus, OperatorIDEnum
-from ..properties import Mosplat_PG_MediaIODataset
-from .base_pt import MosplatPanelBase, column_factory
+from core.panels.base_pt import MosplatPanelBase, column_factory
+from core.properties import Mosplat_PG_MediaIODataset
+from infrastructure.schemas import EnvVariableEnum, MediaFileStatus, OperatorIDEnum
 
 _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")
 

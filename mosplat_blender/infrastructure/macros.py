@@ -29,7 +29,7 @@ from typing import (
 if TYPE_CHECKING:
     import cv2  # static only import of risky module
 
-    from .schemas import FrameNPZStructure
+    from infrastructure.schemas import FrameNPZStructure
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)

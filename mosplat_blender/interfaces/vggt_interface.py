@@ -9,8 +9,8 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional, Self
 
-from ..infrastructure.mixins import LogClassMixin
-from ..infrastructure.schemas import UnexpectedError
+from infrastructure.mixins import LogClassMixin
+from infrastructure.schemas import UnexpectedError
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     import numpy as np

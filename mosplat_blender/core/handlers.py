@@ -8,13 +8,13 @@ import bpy
 from bpy.app.handlers import persistent
 from bpy.types import Scene
 
-from ..infrastructure.schemas import MediaIODataset
-from ..interfaces.logging_interface import MosplatLoggingInterface
-from .checks import check_addonpreferences, check_propertygroup
+from core.checks import check_addonpreferences, check_propertygroup
+from infrastructure.schemas import MediaIODataset
+from interfaces.logging_interface import MosplatLoggingInterface
 
 if TYPE_CHECKING:
-    from .preferences import Mosplat_AP_Global
-    from .properties import Mosplat_PG_Global
+    from core.preferences import Mosplat_AP_Global
+    from core.properties import Mosplat_PG_Global
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 

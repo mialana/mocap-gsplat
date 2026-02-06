@@ -12,13 +12,16 @@ are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logg
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .infrastructure.schemas import EnvVariableEnum
-from .interfaces import MosplatLoggingInterface
-from .main import register_addon, unregister_addon
+sys.path.append(str(Path(__file__).resolve().parent))
+
+from infrastructure.schemas import EnvVariableEnum
+from interfaces import MosplatLoggingInterface
+from main import register_addon, unregister_addon
 
 
 def clear_terminal():
@@ -26,6 +29,7 @@ def clear_terminal():
 
 
 def register():
+
     load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
 
     # keep this module's name within env during execution

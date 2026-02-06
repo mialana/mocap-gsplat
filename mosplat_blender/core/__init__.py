@@ -8,11 +8,17 @@ This is opposed to `infrastructure`, where `__init__.py` is empty, and individua
 
 from typing import List, Tuple, Type
 
-from ..infrastructure.mixins import PreregristrationFn
-from .operators import MosplatOperatorBase, operator_factory
-from .panels import MosplatPanelBase, MosplatUIListBase, panel_factory, ui_list_factory
-from .preferences import Mosplat_AP_Global
-from .properties import (
+import core.checks as checks
+import core.handlers as handlers
+from core.operators import MosplatOperatorBase, operator_factory
+from core.panels import (
+    MosplatPanelBase,
+    MosplatUIListBase,
+    panel_factory,
+    ui_list_factory,
+)
+from core.preferences import Mosplat_AP_Global
+from core.properties import (
     Mosplat_PG_AppliedPreprocessScript,
     Mosplat_PG_Global,
     Mosplat_PG_LogEntry,
@@ -23,6 +29,7 @@ from .properties import (
     Mosplat_PG_ProcessedFrameRange,
     MosplatPropertyGroupBase,
 )
+from infrastructure.mixins import PreregristrationFn
 
 preferences_factory: Tuple[Type[Mosplat_AP_Global], PreregristrationFn] = (
     Mosplat_AP_Global,

@@ -30,6 +30,7 @@ verbose: bool = True
 found_file_count: int = 0
 modification_count: int = 0  # tracks how many files need modification / are modified
 SCHEMAS_MODULE: Path = Path()
+ADDON_SRC_DIR: Path = Path()
 
 
 class PropertyGroupMetaExtractor(cst.CSTVisitor):
@@ -142,7 +143,7 @@ class MetaImportInjector(cst.CSTTransformer):
         import_node = cst.ImportFrom(
             module=self._from_dotted_name(self.module_name),
             names=[cst.ImportAlias(cst.Name(s)) for s in sorted(self.symbols)],
-            relative=[cst.Dot()],
+            relative=(),
         )
 
         body: list[cst.CSTNode] = list(updated_node.body)
@@ -263,7 +264,7 @@ def patch_original_file(
     source = py_file.read_text(encoding="utf-8")
     module = cst.parse_module(source)
 
-    module_name = dot_rel_path(py_file, meta_path)
+    module_name = dot_abs_path(meta_path, ADDON_SRC_DIR)
 
     module = module.visit(MetaImportInjector(module_name, meta_symbols))
 
@@ -324,6 +325,22 @@ def dot_rel_path(source_path: Path, dest_path: Path) -> str:
         return dots
 
 
+def dot_abs_path(dest_path: Path, root_dir) -> str:
+    dest_path = dest_path.resolve()
+
+    rel = os.path.relpath(dest_path, start=root_dir)
+
+    # drop ".py"
+    rel = os.path.splitext(rel)[0]
+
+    parts = rel.split(os.sep)
+
+    if parts:
+        return ".".join(parts)
+    else:
+        return rel
+
+
 def diff_meta_file(meta_path: Path, formatted_new_text: str) -> bool:
     """returns true if there is a difference"""
 
@@ -359,7 +376,7 @@ def generate_meta_file(py_file: Path):
     meta_lines = [
         timestamp_str,
         "",
-        f"from {dot_rel_path(meta_path, SCHEMAS_MODULE)} import PropertyMeta",
+        f"from {dot_abs_path(SCHEMAS_MODULE, ADDON_SRC_DIR)} import PropertyMeta",
         "from typing import NamedTuple",
         "",
     ]
@@ -462,12 +479,13 @@ def main(
     check: bool = False,
     quiet: bool = False,
 ):
-    global check_only, verbose, SCHEMAS_MODULE
+    global check_only, verbose, SCHEMAS_MODULE, ADDON_SRC_DIR
     check_only = check
     verbose = not quiet
 
-    CORE_MODULE = addon_src_dir / "core"
-    SCHEMAS_MODULE = addon_src_dir / "infrastructure" / "schemas.py"
+    ADDON_SRC_DIR = addon_src_dir
+    CORE_MODULE = ADDON_SRC_DIR / "core"
+    SCHEMAS_MODULE = ADDON_SRC_DIR / "infrastructure" / "schemas.py"
 
     py_files = [file for file in CORE_MODULE.rglob("*.py")]
 
@@ -489,13 +507,13 @@ def main(
 if __name__ == "__main__":
     args = get_args()
 
-    ADDON_SRC_DIR: Path = (
+    addon_src_dir: Path = (
         args.addon_src_dir
         or Path(__file__).resolve().parent.parent / ADDON_HUMAN_READABLE
     )
 
     main(
-        addon_src_dir=ADDON_SRC_DIR,
+        addon_src_dir=addon_src_dir,
         extra_files=args.files,
         check=args.check,
         quiet=args.quiet,

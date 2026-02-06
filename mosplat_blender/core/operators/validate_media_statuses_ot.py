@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
-from ...infrastructure.schemas import MediaFileStatus, MediaIODataset
-from .base_ot import MosplatOperatorBase
+from core.operators.base_ot import MosplatOperatorBase
+from infrastructure.schemas import MediaFileStatus, MediaIODataset
 
 
 class ThreadKwargs(NamedTuple):
@@ -12,7 +12,7 @@ class ThreadKwargs(NamedTuple):
     dataset_as_dc: MediaIODataset
 
 
-class Mosplat_OT_validate_media_file_statuses(
+class Mosplat_OT_validate_media_statuses(
     MosplatOperatorBase[Tuple[bool, str], ThreadKwargs]
 ):
     def _contexted_invoke(self, pkg, event):

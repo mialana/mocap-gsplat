@@ -8,17 +8,17 @@ from typing import Final, NamedTuple, Tuple
 
 import bpy
 
-from ...infrastructure.constants import (
+from core.operators.base_ot import MosplatOperatorBase
+from infrastructure.constants import (
     _TIMEOUT_INTERVAL_,
     DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
 )
-from ...infrastructure.macros import (
+from infrastructure.macros import (
     kill_subprocess_cross_platform,
     try_access_path,
     tuple_type_matches_known_tuple_type,
 )
-from ...infrastructure.schemas import UnexpectedError, UserFacingError
-from .base_ot import MosplatOperatorBase
+from infrastructure.schemas import UnexpectedError, UserFacingError
 
 QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown tuples
 

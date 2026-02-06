@@ -10,28 +10,28 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, TypeAlias, TypeGuard, cast
+from typing import TYPE_CHECKING, List, Optional, Set, TypeGuard, cast
 
 from bpy.types import Preferences, Scene, WindowManager
 
-from ..infrastructure.constants import (
+from infrastructure.constants import (
     ADDON_GLOBAL_PROPS_NAME,
     ADDON_PREFERENCES_ID,
     MEDIA_IO_DATASET_JSON_FILENAME,
     PER_FRAME_DIRNAME,
 )
-from ..infrastructure.macros import try_access_path
-from ..infrastructure.schemas import (
+from infrastructure.macros import try_access_path
+from infrastructure.schemas import (
     NPZNameToPathLookup,
     SavedNPZName,
     UnexpectedError,
     UserFacingError,
 )
-from ..interfaces import MosplatLoggingInterface
+from interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
-    from .preferences import Mosplat_AP_Global
-    from .properties import Mosplat_PG_Global
+    from core.preferences import Mosplat_AP_Global
+    from core.properties import Mosplat_PG_Global
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
