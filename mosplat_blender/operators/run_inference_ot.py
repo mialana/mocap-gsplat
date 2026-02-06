@@ -1,15 +1,15 @@
 from typing import NamedTuple, Tuple
 
-from core.operators.base_ot import MosplatOperatorBase
 from interfaces import MosplatVGGTInterface
+from operators.base_ot import MosplatOperatorBase
 
 
-class ThreadKwargs(NamedTuple):
+class ProcessKwargs(NamedTuple):
     pass
 
 
 class Mosplat_OT_run_inference(
-    MosplatOperatorBase[Tuple[str, int, int, str], ThreadKwargs]
+    MosplatOperatorBase[Tuple[str, int, int, str], ProcessKwargs]
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
@@ -29,13 +29,13 @@ class Mosplat_OT_run_inference(
     def _contexted_execute(self, pkg):
         prefs = pkg.prefs
 
-        self.launch_thread(
+        self.launch_subprocess(
             pkg.context,
-            twargs=ThreadKwargs(),
+            pwargs=ProcessKwargs(),
         )
 
         return "RUNNING_MODAL"
 
     @staticmethod
-    def _operator_thread(queue, cancel_event, *, twargs):
+    def _operator_subprocess(queue, cancel_event, *, pwargs):
         pass

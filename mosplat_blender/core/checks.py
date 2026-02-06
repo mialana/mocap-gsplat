@@ -12,8 +12,6 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Set, TypeGuard, cast
 
-from bpy.types import Preferences, Scene, WindowManager
-
 from infrastructure.constants import PER_FRAME_DIRNAME
 from infrastructure.macros import try_access_path
 from infrastructure.schemas import (
@@ -26,6 +24,8 @@ from infrastructure.schemas import (
 from interfaces import MosplatLoggingInterface
 
 if TYPE_CHECKING:
+    from bpy.types import Preferences, Scene, WindowManager
+
     from core.preferences import Mosplat_AP_Global
     from core.properties import Mosplat_PG_Global
 

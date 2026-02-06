@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
-from core.operators.base_ot import MosplatOperatorBase
 from infrastructure.macros import is_path_accessible, write_frame_data_to_npz
 from infrastructure.schemas import (
     FrameNPZStructure,
@@ -12,9 +11,10 @@ from infrastructure.schemas import (
     SavedNPZName,
     UserFacingError,
 )
+from operators.base_ot import MosplatOperatorBase
 
 
-class ThreadKwargs(NamedTuple):
+class ProcessKwargs(NamedTuple):
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
     npz_files: List[Path]
@@ -22,7 +22,7 @@ class ThreadKwargs(NamedTuple):
 
 
 class Mosplat_OT_extract_frame_range(
-    MosplatOperatorBase[str, ThreadKwargs],
+    MosplatOperatorBase[str, ProcessKwargs],
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
@@ -46,9 +46,9 @@ class Mosplat_OT_extract_frame_range(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        self.launch_thread(
+        self.launch_subprocess(
             pkg.context,
-            twargs=ThreadKwargs(
+            pwargs=ProcessKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 npz_files=self._npz_files,
@@ -73,17 +73,17 @@ class Mosplat_OT_extract_frame_range(
         return "RUNNING_MODAL"
 
     @staticmethod
-    def _operator_thread(queue, cancel_event, *, twargs):
+    def _operator_subprocess(queue, cancel_event, *, pwargs):
         import cv2
         import numpy as np
 
-        start, _ = twargs.frame_range
+        start, _ = pwargs.frame_range
         caps: List[cv2.VideoCapture] = []
 
-        files = twargs.updated_media_files
+        files = pwargs.updated_media_files
 
         try:
-            for media in twargs.updated_media_files:
+            for media in pwargs.updated_media_files:
                 cap = cv2.VideoCapture(str(media))
                 if not cap.isOpened():
                     raise UserFacingError(f"Could not open media file: {media}")
@@ -91,9 +91,9 @@ class Mosplat_OT_extract_frame_range(
 
             # create a new frame range with both limits at start
             new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
-            twargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
+            pwargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
 
-            for idx, raw_npz_file in enumerate(twargs.npz_files):
+            for idx, raw_npz_file in enumerate(pwargs.npz_files):
                 if cancel_event.is_set():
                     return
 

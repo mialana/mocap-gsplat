@@ -5,6 +5,7 @@ provides the interface between the add-on and the VGGT model.
 from __future__ import annotations
 
 import gc
+import multiprocessing.synchronize as mp_sync
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional, Self
@@ -39,7 +40,7 @@ class MosplatVGGTInterface(LogClassMixin):
         self,
         hf_id: str,
         model_cache_dir: Path,
-        cancel_event: threading.Event,
+        cancel_event: mp_sync.Event,
     ):
         try:
             from vggt.models.vggt import VGGT

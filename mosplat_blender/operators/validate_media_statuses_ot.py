@@ -3,17 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
-from core.operators.base_ot import MosplatOperatorBase
 from infrastructure.schemas import MediaFileStatus, MediaIODataset
+from operators.base_ot import MosplatOperatorBase
 
 
-class ThreadKwargs(NamedTuple):
+class ProcessKwargs(NamedTuple):
     updated_media_files: List[Path]
     dataset_as_dc: MediaIODataset
 
 
 class Mosplat_OT_validate_media_statuses(
-    MosplatOperatorBase[Tuple[bool, str], ThreadKwargs]
+    MosplatOperatorBase[Tuple[bool, str], ProcessKwargs]
 ):
     def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
@@ -24,9 +24,9 @@ class Mosplat_OT_validate_media_statuses(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        self.launch_thread(
+        self.launch_subprocess(
             pkg.context,
-            twargs=ThreadKwargs(
+            pwargs=ProcessKwargs(
                 updated_media_files=self._media_files, dataset_as_dc=self.data
             ),
         )
@@ -46,11 +46,11 @@ class Mosplat_OT_validate_media_statuses(
         return "RUNNING_MODAL"
 
     @staticmethod
-    def _operator_thread(queue, cancel_event, *, twargs):
-        dataset_as_dc = twargs.dataset_as_dc
+    def _operator_subprocess(queue, cancel_event, *, pwargs):
+        dataset_as_dc = pwargs.dataset_as_dc
         status_lookup, accumulator = dataset_as_dc.status_accumulator()
 
-        for file in twargs.updated_media_files:
+        for file in pwargs.updated_media_files:
             if cancel_event.is_set():
                 return  # simply return as new queue items will not be read anymore
             queue_item = (True, f"Validated media file: '{file}'")

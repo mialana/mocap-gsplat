@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Optional, Tuple
 
-import bpy
-from bpy.app.handlers import persistent
-from bpy.types import Scene
-
 from core.checks import check_addonpreferences, check_propertygroup
-from infrastructure.schemas import MediaIODataset
+from infrastructure.schemas import EnvVariableEnum, MediaIODataset
 from interfaces.logging_interface import MosplatLoggingInterface
 
 if TYPE_CHECKING:
+    from bpy.types import Scene
+
     from core.preferences import Mosplat_AP_Global
     from core.properties import Mosplat_PG_Global
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
+
+if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
+
+    from bpy.app.handlers import persistent
+else:
+    persistent = lambda c: c
 
 
 @persistent
@@ -28,7 +33,9 @@ def handle_load_from_json(scene: Scene):
 
 def handle_load_from_json_timer_entrypoint(scene: Optional[Scene] = None) -> None:
     """entrypoint for `bpy.app.timers`"""
-    scene = scene or bpy.context.scene
+    from bpy import context
+
+    scene = scene or context.scene
     props = check_propertygroup(scene)
 
     try:
@@ -44,8 +51,10 @@ def handle_load_from_json_timer_entrypoint(scene: Optional[Scene] = None) -> Non
 def load_dataset_property_group_from_json(
     props: Mosplat_PG_Global, prefs: Optional[Mosplat_AP_Global] = None
 ) -> Tuple[MediaIODataset, str]:
+    from bpy import context
+
     """base entrypoint for restoring directly to property group"""
-    prefs = prefs or check_addonpreferences(bpy.context.preferences)
+    prefs = prefs or check_addonpreferences(context.preferences)
 
     result = load_dataset_dataclass_from_json(props, prefs)
     props.dataset_accessor.from_dataclass(result[0])  # transfer data to property group
@@ -70,15 +79,19 @@ def load_dataset_dataclass_from_json(
 
 @persistent
 def handle_save_to_json(scene: Scene):
+    from bpy import context
+
     props = check_propertygroup(scene)
-    prefs = check_addonpreferences(bpy.context.preferences)
+    prefs = check_addonpreferences(context.preferences)
 
     props.dataset_accessor.to_JSON(props.data_json_filepath(prefs))
 
 
 @persistent
 def handle_reset_properties(scene: Scene):
-    scene = scene or bpy.context.scene
+    from bpy import context
+
+    scene = scene or context.scene
     props = check_propertygroup(scene)
 
     meta = props._meta

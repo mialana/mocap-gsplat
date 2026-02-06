@@ -10,7 +10,6 @@ from typing import List, Tuple, Type
 
 import core.checks as checks
 import core.handlers as handlers
-from core.operators import MosplatOperatorBase, operator_factory
 from core.panels import (
     MosplatPanelBase,
     MosplatUIListBase,

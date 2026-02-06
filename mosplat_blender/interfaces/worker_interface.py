@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-import threading
+import multiprocessing as mp
+import multiprocessing.synchronize as mp_sync
+import os
 from datetime import datetime
-from queue import Empty, Queue
-from typing import Callable, Generic, Optional, TypeVar
+from queue import Empty
+from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
 QT = TypeVar("QT")  # types elements of worker queue
 
+from infrastructure.constants import _TIMEOUT_IMMEDIATE_
 from infrastructure.decorators import record_work_time
 from infrastructure.mixins import LogClassMixin
+from infrastructure.schemas import EnvVariableEnum
+
+StartWorkCallback: TypeAlias = Optional[Callable[[float], None]]
+EndWorkCallback: TypeAlias = Optional[Callable[[float, float], None]]
 
 
 class MosplatWorkerInterface(Generic[QT], LogClassMixin):
@@ -23,35 +30,34 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
     def __init__(
         self,
         owner_name: str,
-        worker_fn: Callable[[Queue[QT], threading.Event], None],
+        worker_fn: Callable[[mp.Queue[QT], mp_sync.Event], None],
         *,
         use_start_work_callback: bool = True,
-        start_work_callback: Optional[Callable[[float], None]] = None,
+        start_work_callback: StartWorkCallback = None,
         use_end_work_callback: bool = True,
-        end_work_callback: Optional[Callable[[float, float], None]] = None,
+        end_work_callback: EndWorkCallback = None,
     ):
+        self._ctx = mp.get_context("spawn")
+
         # create queue and cancel event
-        self._queue: Queue[QT] = Queue[QT]()
-        self._cancel_event: threading.Event = threading.Event()
+        self._queue: mp.Queue[QT] = self._ctx.Queue()
+        self._cancel_event: mp_sync.Event = self._ctx.Event()
 
         # set up start work callback unless opt-ed out
-        self._start_work_callback = (
-            (start_work_callback or self._default_start_work_callback)
-            if use_start_work_callback
-            else None
-        )
-        self._end_work_callback = (
-            (end_work_callback or self._default_end_work_callback)
-            if use_end_work_callback
-            else None
-        )
+        self._start_work_callback: StartWorkCallback = None
+        self._end_work_callback: EndWorkCallback = None
 
-        self._wrapped_fn = record_work_time(
-            worker_fn, self._start_work_callback, self._end_work_callback
-        )
+        if use_start_work_callback:
+            self._start_work_callback = (
+                start_work_callback or self._default_start_work_callback
+            )
+        if use_end_work_callback:
+            self._end_work_callback = (
+                end_work_callback or self._default_end_work_callback
+            )
 
-        self._thread = threading.Thread(
-            target=self._wrapped_fn,
+        self._process = self._ctx.Process(
+            target=worker_fn,
             args=(self._queue, self._cancel_event),
             daemon=True,
         )
@@ -63,8 +69,10 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
         return str(self._id) if self._id is not None else self._owner_name
 
     def start(self):
-        self._thread.start()
-        self._id = self._thread.native_id
+        os.environ.setdefault(EnvVariableEnum.SUBPROCESS_FLAG, "1")
+        self._process.start()
+        os.environ.pop(EnvVariableEnum.SUBPROCESS_FLAG)
+        self._id = self._process.pid
 
     def cancel(self):
         self._cancel_event.set()
@@ -75,6 +83,16 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
 
     def cleanup(self):
         self.cancel()
+
+        if self._process.is_alive():
+            self._process.join(timeout=_TIMEOUT_IMMEDIATE_)
+
+        if self._process.is_alive():
+            self.logger.warning(
+                f"Process '{self.identifier}' did not exit in time and was terminated."
+            )
+            self._process.terminate()
+            self._process.join()
 
         # drain queue
         while True:
@@ -94,14 +112,14 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
         start: str = datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
 
         self.logger.info(
-            f"Worker thread for '{self._owner_name}' started with ID '{self._id}' at time '{start}'."
+            f"Worker process for '{self._owner_name}' started with ID '{self._id}' at time '{start}'."
         )
 
     def _default_end_work_callback(self, end_time: float, time_elapsed: float):
         end: str = datetime.fromtimestamp(end_time).strftime("%H:%M:%S")
 
         self.logger.info(
-            f"Worker thread for '{self._owner_name}' with ID '{self._id}' ended at time '{end}'."
+            f"Worker process for '{self._owner_name}' with ID '{self._id}' ended at time '{end}'."
         )
 
         self.logger.info(f"Total time elapsed: '{time_elapsed:.2f}' seconds")

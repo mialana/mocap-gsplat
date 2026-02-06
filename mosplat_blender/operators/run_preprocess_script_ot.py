@@ -4,7 +4,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, List, NamedTuple, Tuple, cast
 
-from core.operators.base_ot import MosplatOperatorBase
 from infrastructure.constants import PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
     get_required_function,
@@ -18,9 +17,10 @@ from infrastructure.schemas import (
     SavedNPZName,
     UserFacingError,
 )
+from operators.base_ot import MosplatOperatorBase
 
 
-class ThreadKwargs(NamedTuple):
+class ProcessKwargs(NamedTuple):
     preprocess_fn: Callable
     npz_file_lookup: NPZNameToPathLookup
     media_files: List[Path]
@@ -28,7 +28,7 @@ class ThreadKwargs(NamedTuple):
 
 
 class Mosplat_OT_run_preprocess_script(
-    MosplatOperatorBase[Tuple[str, str], ThreadKwargs],
+    MosplatOperatorBase[Tuple[str, str], ProcessKwargs],
 ):
     @classmethod
     def _contexted_poll(cls, pkg) -> bool:
@@ -76,9 +76,9 @@ class Mosplat_OT_run_preprocess_script(
             self.logger.error(msg)
             return "FINISHED"
 
-        self.launch_thread(
+        self.launch_subprocess(
             pkg.context,
-            twargs=ThreadKwargs(
+            pwargs=ProcessKwargs(
                 preprocess_fn=self._preprocess_fn,
                 npz_file_lookup=self._npz_file_lookup,
                 media_files=self._media_files,
@@ -107,16 +107,16 @@ class Mosplat_OT_run_preprocess_script(
             return "RUNNING_MODAL"
 
     @staticmethod
-    def _operator_thread(queue, cancel_event, *, twargs):
+    def _operator_subprocess(queue, cancel_event, *, pwargs):
         import numpy as np
         from numpy.lib import npyio
 
-        fn = twargs.preprocess_fn
+        fn = pwargs.preprocess_fn
         # as strings and `Counter` collection type
-        media_files_counter = Counter(twargs.media_files)
+        media_files_counter = Counter(pwargs.media_files)
 
-        raw_npz_files = twargs.npz_file_lookup[SavedNPZName.RAW]
-        preprocessed_npz_files = twargs.npz_file_lookup[SavedNPZName.PREPROCESSED]
+        raw_npz_files = pwargs.npz_file_lookup[SavedNPZName.RAW]
+        preprocessed_npz_files = pwargs.npz_file_lookup[SavedNPZName.PREPROCESSED]
         for idx, files in enumerate(zip(raw_npz_files, preprocessed_npz_files)):
             if cancel_event.is_set():
                 return
@@ -138,7 +138,7 @@ class Mosplat_OT_run_preprocess_script(
                 if media_files_counter != Counter(media_files):
                     raise ValueError(
                         f"Media files did not match."
-                        f"\nExpected Files: '{twargs.media_files}'"
+                        f"\nExpected Files: '{pwargs.media_files}'"
                         f"\nExtracted Files: '{media_files}'"
                     )
             except (OSError, ValueError, TypeError) as e:

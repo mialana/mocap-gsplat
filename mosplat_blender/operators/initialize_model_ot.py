@@ -3,14 +3,10 @@ import os
 import subprocess
 from functools import partial
 from pathlib import Path
-from queue import Queue
 from typing import Final, NamedTuple, Tuple
 
-import bpy
-
-from core.operators.base_ot import MosplatOperatorBase
 from infrastructure.constants import (
-    _TIMEOUT_INTERVAL_,
+    _TIMEOUT_LAZY_,
     DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
 )
 from infrastructure.macros import (
@@ -20,18 +16,19 @@ from infrastructure.macros import (
 )
 from infrastructure.schemas import UnexpectedError, UserFacingError
 from interfaces import MosplatVGGTInterface
+from operators.base_ot import MosplatOperatorBase
 
 QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown tuples
 
 
-class ThreadKwargs(NamedTuple):
+class ProcessKwargs(NamedTuple):
     proc: subprocess.Popen
     hf_id: str
     model_cache_dir: Path
 
 
 class Mosplat_OT_initialize_model(
-    MosplatOperatorBase[Tuple[str, int, int, str], ThreadKwargs]
+    MosplatOperatorBase[Tuple[str, int, int, str], ProcessKwargs]
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
@@ -93,12 +90,14 @@ class Mosplat_OT_initialize_model(
             return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
+        from bpy import app
+
         prefs = pkg.prefs
 
         # start the model download from a separate subprocess
         self._proc: subprocess.Popen = subprocess.Popen(
             [
-                bpy.app.binary_path,
+                app.binary_path,
                 "--factory-startup",
                 "-b",
                 "--python",
@@ -117,9 +116,9 @@ class Mosplat_OT_initialize_model(
 
         self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
 
-        self.launch_thread(
+        self.launch_subprocess(
             pkg.context,
-            twargs=ThreadKwargs(
+            pwargs=ProcessKwargs(
                 proc=self._proc,
                 hf_id=prefs.vggt_hf_id,
                 model_cache_dir=prefs.vggt_model_dir,
@@ -135,6 +134,8 @@ class Mosplat_OT_initialize_model(
         return super()._contexted_modal(pkg, event)
 
     def cleanup(self, pkg):
+        from bpy import app
+
         self.wm(pkg.context).progress_end()  # stop progress
         progress = pkg.props.progress_accessor
         progress.in_use = False
@@ -148,16 +149,16 @@ class Mosplat_OT_initialize_model(
         still cleans up the subprocess
         """
         if hasattr(self, "_proc"):
-            bpy.app.timers.register(
+            app.timers.register(
                 partial(kill_subprocess_cross_platform, self._proc.pid),
-                first_interval=_TIMEOUT_INTERVAL_,  # no orphaned processes here!
+                first_interval=_TIMEOUT_LAZY_,  # no orphaned processes here!
             )
         return super().cleanup(pkg)
 
     @staticmethod
-    def _operator_thread(queue, cancel_event, *, twargs):
+    def _operator_subprocess(queue, cancel_event, *, pwargs):
         try:
-            _wait_and_update_queue_loop(twargs.proc, queue)
+            _wait_and_update_queue_loop(pwargs.proc, queue)
         except (subprocess.CalledProcessError, UnexpectedError) as e:
             # put on queue to stop modal just in case, though it probably will not be read
             queue.put(("error", -1, -1, str(e)))
@@ -167,7 +168,7 @@ class Mosplat_OT_initialize_model(
 
         try:
             MosplatVGGTInterface().initialize_model(
-                twargs.hf_id, twargs.model_cache_dir, cancel_event
+                pwargs.hf_id, pwargs.model_cache_dir, cancel_event
             )
 
             queue.put(("done", -1, -1, "Successfully downloaded & init VGGT model!"))
@@ -175,9 +176,7 @@ class Mosplat_OT_initialize_model(
             queue.put(("error", -1, -1, str(e)))
 
 
-def _wait_and_update_queue_loop(
-    proc: subprocess.Popen, queue: Queue[Tuple[str, int, int, str]]
-):
+def _wait_and_update_queue_loop(proc: subprocess.Popen, queue):
     if proc.stdout is None:
         raise UnexpectedError("Process stdout pointer is not available.")
 

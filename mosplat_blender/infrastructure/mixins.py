@@ -98,16 +98,6 @@ class EnforceAttributesMixin(Generic[M], LogClassMixin):
     in the effort of increasing consistency in the codebase.
     """
 
-    from bpy import types
-
-    RegistrationClasses: TypeAlias = Union[
-        types.Panel,
-        types.UIList,
-        types.Operator,
-        types.PropertyGroup,
-        types.AddonPreferences,
-    ]
-
     @classmethod
     def preregistration(cls, **kwargs):
         """
@@ -208,9 +198,9 @@ class DataclassInteropMixin(Generic[D]):
 class APAccessorMixin:
     """a mixin class for any class that wants local access to global preferences"""
 
-    from bpy.types import Context  # local import
-
     if TYPE_CHECKING:
+        from bpy.types import Context  # local import
+
         from core.preferences import Mosplat_AP_Global
 
     @staticmethod
@@ -223,9 +213,9 @@ class APAccessorMixin:
 class PGAccessorMixin:
     """a mixin class for any class that wants local access to global properties"""
 
-    from bpy.types import Context  # local import
-
     if TYPE_CHECKING:
+        from bpy.types import Context  # local import
+
         from core.properties import Mosplat_PG_Global
 
     @staticmethod

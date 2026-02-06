@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import contextlib
-import threading
+import multiprocessing as mp
+import multiprocessing.synchronize as mp_sync
+import os
 from dataclasses import dataclass
 from functools import partial
-from queue import Queue
 from typing import (
     TYPE_CHECKING,
+    Callable,
     ClassVar,
     Final,
     Generic,
@@ -20,31 +22,43 @@ from typing import (
     Union,
 )
 
-from bpy.types import Context, Event, Operator, Timer, WindowManager
-
-from core.checks import (
-    check_addonpreferences,
-    check_propertygroup,
-    check_window_manager,
-)
-from core.handlers import load_dataset_property_group_from_json
 from infrastructure.constants import _TIMER_INTERVAL_
 from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.macros import immutable_to_set as im_to_set
 from infrastructure.mixins import ContextAccessorMixin, CtxPackage
 from infrastructure.schemas import (
     DeveloperError,
+    EnvVariableEnum,
     MediaIODataset,
     UnexpectedError,
     UserFacingError,
 )
 from interfaces.worker_interface import QT, MosplatWorkerInterface
 
+if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
+    from bpy.types import Operator, Timer  # pyright: ignore[reportRedeclaration]
+
+    from core.checks import (
+        check_addonpreferences,
+        check_propertygroup,
+        check_window_manager,
+    )
+    from core.handlers import load_dataset_property_group_from_json
+else:
+    Operator: TypeAlias = object
+    Timer: TypeAlias = object
+    check_addonpreferences = lambda c: c
+    check_propertygroup = lambda c: c
+    check_window_manager = lambda c: c
+    load_dataset_property_group_from_json = lambda c: c
+
+
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
     from bpy.stub_internal.rna_enums import (
         OperatorTypeFlagItems,
     )
+    from bpy.types import Context, Event, WindowManager
 
     OpResultSet: TypeAlias = Set[OpResult]
     OpResultTuple: TypeAlias = Union[Tuple[OpResult, ...], OpResult]
@@ -54,7 +68,9 @@ if TYPE_CHECKING:
     from core.preferences import Mosplat_AP_Global
     from core.properties import Mosplat_PG_Global
 
-K = TypeVar("K", bound=NamedTuple)  # type of kwargs to async thread
+OPERATOR_PROCESS_ENTRYPOINT_FN = "process_entrypoint"
+
+K = TypeVar("K", bound=NamedTuple)  # type of kwargs to process
 
 
 @dataclass
@@ -79,7 +95,7 @@ class MosplatOperatorMetadata:
 
 
 class MosplatOperatorBase(
-    Generic[QT, K], Operator, ContextAccessorMixin[MosplatOperatorMetadata]
+    Generic[QT, K], ContextAccessorMixin[MosplatOperatorMetadata], Operator
 ):
     __worker: Optional[MosplatWorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
@@ -263,10 +279,22 @@ class MosplatOperatorBase(
             handle()
             raise  # this needs to be raised
 
-    def launch_thread(self, context: Context, *, twargs: K):
-        """`twargs` as in keyword args made of a immutable tuple"""
+    def launch_subprocess(self, context: Context, *, pwargs: K):
+        """`pwargs` as in keyword args for subprocess"""
 
-        worker_fn = partial(self._operator_thread, twargs=twargs)
+        try:
+            process_entrypoint: Callable = self._operator_subprocess.__globals__[
+                OPERATOR_PROCESS_ENTRYPOINT_FN
+            ]
+            assert isinstance(process_entrypoint, Callable)
+        except (KeyError, AssertionError) as e:
+            raise DeveloperError(
+                f"'{self.bl_idname}' wants to use a process worker, "
+                "but does not properly define a global process entrypoint function.",
+                e,
+            ) from e
+
+        worker_fn = partial(process_entrypoint, pwargs=pwargs)
 
         self.worker = MosplatWorkerInterface(self.bl_idname, worker_fn)
         self.worker.start()
@@ -278,11 +306,13 @@ class MosplatOperatorBase(
         wm.modal_handler_add(self)
 
     @staticmethod
-    def _operator_thread(queue: Queue[QT], cancel_event: threading.Event, *, twargs: K):
+    def _operator_subprocess(
+        queue: mp.Queue[QT], cancel_event: mp_sync.Event, *, pwargs: K
+    ):
         """
         this function is required IF it's a modal operator.
         otherwise, this error is safe & correct as the pathway will never be seen.
-        `twargs` stands for both 'thread kwargs' and 'tuple kwargs'
+        `pwargs` stands for both 'process kwargs'
         """
         raise NotImplementedError
 

@@ -1,15 +1,15 @@
 from typing import Dict, List, Tuple, Type
 
-from core.operators.base_ot import MosplatOperatorBase, MosplatOperatorMetadata
-from core.operators.extract_frame_range_ot import Mosplat_OT_extract_frame_range
-from core.operators.initialize_model_ot import Mosplat_OT_initialize_model
-from core.operators.open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
-from core.operators.run_inference_ot import Mosplat_OT_run_inference
-from core.operators.run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
-from core.operators.validate_media_statuses_ot import Mosplat_OT_validate_media_statuses
 from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.mixins import PreregristrationFn
 from infrastructure.schemas import AddonMeta
+from operators.base_ot import MosplatOperatorBase, MosplatOperatorMetadata
+from operators.extract_frame_range_ot import Mosplat_OT_extract_frame_range
+from operators.initialize_model_ot import Mosplat_OT_initialize_model
+from operators.open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
+from operators.run_inference_ot import Mosplat_OT_run_inference
+from operators.run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
+from operators.validate_media_statuses_ot import Mosplat_OT_validate_media_statuses
 
 operator_registry: Dict[
     Type[MosplatOperatorBase],

@@ -15,8 +15,6 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 # save package before modifying path
 ADDON_PACKAGE_ORIGINAL = __package__ or str(Path(__file__).resolve().parent)
 
@@ -49,10 +47,14 @@ def unregister():
     if EnvVariableEnum.TESTING in os.environ:
         clear_terminal()  # for dev QOL
 
-    os.environ.pop(EnvVariableEnum.ROOT_MODULE_NAME, None)
+    for var in EnvVariableEnum:
+        if var.value in os.environ:
+            os.environ.pop(var.value, None)
 
 
 def setup_env():
+    from dotenv import load_dotenv
+
     load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
 
     # keep this module's name within env during execution

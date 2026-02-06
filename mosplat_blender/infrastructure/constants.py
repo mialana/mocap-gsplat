@@ -10,15 +10,14 @@ misspelled or renamed in one location and not in another.
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
-from string import capwords
 from typing import Any, Final
 
 _MISSING_: Any = object()  # sentinel variable
 
 _TIMER_INTERVAL_: Final[float] = 0.1
-_TIMEOUT_INTERVAL_: Final[float] = 15.0  # amount of time to wait before timeout
+_TIMEOUT_LAZY_: Final[float] = 10.0  # amount of time to wait before timeout
+_TIMEOUT_IMMEDIATE_: Final[float] = 0.5
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {

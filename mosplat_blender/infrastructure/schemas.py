@@ -99,6 +99,7 @@ class EnvVariableEnum(StrEnum):
     TESTING = auto()
     ROOT_MODULE_NAME = auto()
     ADDON_PACKAGE_ORIGINAL = auto()
+    SUBPROCESS_FLAG = auto()
 
 
 BlenderEnumItem: TypeAlias = Tuple[str, str, str]  # this is (ID, Name, Description)

@@ -12,13 +12,14 @@ import core
 from infrastructure.mixins import PreregristrationFn
 from infrastructure.schemas import AddonMeta, DeveloperError, UnexpectedError
 from interfaces import MosplatLoggingInterface
+from operators import MosplatOperatorBase, operator_factory
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
 
 registration_factory: Sequence[
     Tuple[
         Union[
-            Type[core.MosplatOperatorBase],
+            Type[MosplatOperatorBase],
             Type[core.MosplatPanelBase],
             Type[core.MosplatUIListBase],
             Type[core.Mosplat_AP_Global],
@@ -27,7 +28,7 @@ registration_factory: Sequence[
         PreregristrationFn,
     ],
 ] = (
-    core.operator_factory
+    operator_factory
     + core.panel_factory
     + core.ui_list_factory
     + core.properties_factory
