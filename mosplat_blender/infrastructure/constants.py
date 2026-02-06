@@ -58,7 +58,7 @@ ADDON_PREFERENCES_ID: Final[str] = (
     ]  # remove last part of `__package__` since this file is in a subdirectory
     if __package__
     else Path(__file__).resolve().parent.parent.name
-)  # current package is one level down from the one blender expects
+)  # current file is one level down from the one blender expects
 
 ADDON_BASE_ID: Final[str] = ADDON_PREFERENCES_ID.rpartition(".")[-1]
 

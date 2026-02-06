@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-
 import torch
 from torchvision.models.segmentation import fcn_resnet50
 

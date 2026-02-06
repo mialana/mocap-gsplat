@@ -13,8 +13,8 @@ from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import UnexpectedError
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
-    from vggt.models.vggt import VGGT
     import numpy as np
+    from vggt.models.vggt import VGGT
 
 
 class MosplatVGGTInterface(LogClassMixin):
