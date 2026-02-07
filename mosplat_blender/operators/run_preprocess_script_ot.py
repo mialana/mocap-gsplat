@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import Callable, List, NamedTuple, Tuple, cast
+from typing import Callable, List, NamedTuple, Optional, Tuple, cast
 
 from infrastructure.constants import PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
@@ -28,7 +28,7 @@ class ProcessKwargs(NamedTuple):
 
 
 class Mosplat_OT_run_preprocess_script(
-    MosplatOperatorBase[Tuple[str, str], ProcessKwargs],
+    MosplatOperatorBase[Tuple[str, str, Optional[MediaIODataset]], ProcessKwargs],
 ):
     @classmethod
     def _contexted_poll(cls, pkg) -> bool:
@@ -91,7 +91,7 @@ class Mosplat_OT_run_preprocess_script(
         return "RUNNING_MODAL"
 
     def _queue_callback(self, pkg, event, next):
-        status, msg = next
+        status, msg, new_data = next
         if status == "error":
             self.logger.error(msg)
         elif status == "warning":  # if sent a warning via queue
@@ -100,6 +100,10 @@ class Mosplat_OT_run_preprocess_script(
             self.logger.info(msg)
         else:
             self.logger.debug(msg)
+
+        if new_data:
+            self.data = new_data
+            self._sync_to_props(pkg.props)
 
         if status == "done" or status == "error":
             return "FINISHED"  # error still needs finished as blender data was modified
@@ -146,18 +150,18 @@ class Mosplat_OT_run_preprocess_script(
                     f"Data used to create NPZ file did not match currrent state of media directory or NPZ files are corrupted. Behavior is unpredictable. Delete the NPZ files and re-extract frame data to clean up data state.",
                     e,
                 )
-                queue.put(("error", msg))
+                queue.put(("error", msg, None))
                 break
             try:
                 processed_data = fn(frame_idx, media_files, npz_file.get("data"))
                 npz_structure["data"] = processed_data
                 np.savez(preprocessed, **cast(dict, npz_structure))
-                queue.put(("update", f"Finished processing frame '{frame_idx}'"))
+                queue.put(("update", f"Finished processing frame '{frame_idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(
                     f"Could not run script on frame '{frame_idx}'", e
                 )
-                queue.put(("error", msg))
+                queue.put(("error", msg, None))
                 break
 
 

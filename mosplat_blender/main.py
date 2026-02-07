@@ -71,7 +71,6 @@ def register_addon():
     bpy.app.handlers.redo_post.append(core.handlers.handle_save_to_json)
 
     logger.info(f"'{ADDON_META.human_readable_name}' addon registration completed.")
-    logger.info(__package__)
 
 
 def unregister_addon():

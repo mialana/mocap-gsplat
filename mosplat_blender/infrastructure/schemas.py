@@ -39,6 +39,7 @@ from infrastructure.macros import (
 
 if TYPE_CHECKING:
     import numpy as np
+    import torchcodec.decoders
     from cv2 import VideoCapture
 
     from core.properties import Mosplat_PG_MediaIODataset
@@ -303,6 +304,25 @@ class MediaFileStatus:
             or self.file_size == -1
         )
 
+    def from_torchcodec(self, metadata: torchcodec.decoders.VideoStreamMetadata):
+        stat = Path(self.filepath).stat()
+
+        frame_count = metadata.num_frames
+        width = metadata.width
+        height = metadata.height
+
+        if not all([frame_count, width, height]):
+            self.mark_invalid()
+        else:
+            self.overwrite(
+                is_valid=True,
+                frame_count=cast(int, frame_count),
+                width=cast(int, width),
+                height=cast(int, height),
+                mod_time=stat.st_mtime,
+                file_size=stat.st_size,
+            )
+
     def matches_dataset(
         self, dataset: Union[MediaIODataset, Mosplat_PG_MediaIODataset]
     ) -> Tuple[bool, bool, bool]:
@@ -315,60 +335,6 @@ class MediaFileStatus:
     @classmethod
     def as_lookup(cls, statuses: List[MediaFileStatus]) -> Dict[str, MediaFileStatus]:
         return {s.filepath: s for s in statuses}
-
-    def extract_from_filepath(self):
-        """use opencv to get width, height, and frame count of media"""
-        import cv2
-
-        cap = cv2.VideoCapture(self.filepath)
-        if not cap.isOpened():
-            self.mark_invalid()
-            raise OSError(f"Could not open media file: '{self.filepath}'")
-
-        stat = Path(self.filepath).stat()
-
-        self.overwrite(
-            is_valid=True,
-            frame_count=self._extract_frame_count(cap),
-            width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or -1,  # if returns 0
-            height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or -1,  # if returns 0
-            mod_time=stat.st_mtime,
-            file_size=stat.st_size,
-        )
-
-        cap.release()
-        return
-
-    @staticmethod
-    def _extract_frame_count(cap: VideoCapture) -> int:
-        import cv2
-
-        frame_count = -1
-        cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # seek to end
-        duration_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-
-        if fps > 0 and duration_ms > 0:
-            estimated = int(round((duration_ms / 1000.0) * fps))
-            if estimated > 0:
-                frame_count = estimated
-        else:
-            reported = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if 0 < reported < 2**32 - 1:
-                frame_count = reported
-            else:
-                cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 0.0)  # return seek to start
-
-                count = 0
-                while True:
-                    ret, _ = cap.read()
-                    if not ret:
-                        break
-                    count += 1
-
-                frame_count = count
-
-        return frame_count
 
 
 @dataclass

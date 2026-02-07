@@ -10,12 +10,14 @@ import multiprocessing.synchronize as mp_sync
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple
 
+from infrastructure.mixins import LogClassMixin
+
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     import numpy as np
     from vggt.models.vggt import VGGT
 
 
-class MosplatVGGTInterface:
+class MosplatVGGTInterface(LogClassMixin):
     instance: ClassVar[Optional[Self]] = None
 
     def __new__(cls) -> Self:

@@ -11,8 +11,18 @@
             }
         ]
     },
+
+    "workbench.colorCustomizations": {},
+    "triggerTaskOnSave.tasks": {
+        "prereload": ["*.py"],
+        "restart": true
+    },
+    "triggerTaskOnSave.resultIndicator": "statusBar.background",
+    "triggerTaskOnSave.failureColour": "#ff0000",
+    "triggerTaskOnSave.successColour": "#00ff00",
     "blender.addon.reloadOnSave": false,
     "blender.addon.logLevel": "info",
     "blender.addon.buildTaskName": "prereload",
-    "blender.addon.justMyCode": false
+    "blender.addon.justMyCode": true,
+    "blender.addon.sourceDirectory": "./mosplat_blender"
 }

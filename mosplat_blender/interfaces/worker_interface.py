@@ -58,22 +58,13 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
 
     def start(self):
         os.environ.setdefault(EnvVariableEnum.SUBPROCESS_FLAG, "1")
-        self._start_timer()
-
         try:
             self._process.start()
         finally:  # ensure flag never stays in env
             os.environ.pop(EnvVariableEnum.SUBPROCESS_FLAG)
         self._pid = self._process.pid
 
-        def watcher():
-            self._process.join()
-            self._end_timer()
-
-        threading.Thread(
-            target=watcher,
-            daemon=True,
-        ).start()  # start a thread that simply joins the process and handles end
+        self._start_timer()  # start timer after process begins so that pid exists
 
     def cancel(self):
         self._cancel_event.set()
@@ -100,6 +91,7 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
 
     def force_terminate(self):
         self.cleanup()
+
         if self._pid:
             kill_subprocess_cross_platform(self._pid)
 
@@ -111,6 +103,15 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
             f"Worker process for '{self._owner_name}' started with ID '{self.identifier}' at time '{start}'."
         )
         self._start_counter = time.perf_counter()
+
+        def watcher():
+            self._process.join()
+            self._end_timer()
+
+        threading.Thread(
+            target=watcher,
+            daemon=True,
+        ).start()  # start a thread that simply joins the process and handles end
 
     def _end_timer(self):
         if not self._start_counter:

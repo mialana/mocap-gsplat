@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Optional, Tuple
 
 from infrastructure.macros import is_path_accessible, write_frame_data_to_npz
 from infrastructure.schemas import (
@@ -22,7 +22,7 @@ class ProcessKwargs(NamedTuple):
 
 
 class Mosplat_OT_extract_frame_range(
-    MosplatOperatorBase[str, ProcessKwargs],
+    MosplatOperatorBase[Tuple[str, Optional[MediaIODataset]], ProcessKwargs],
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
@@ -59,17 +59,20 @@ class Mosplat_OT_extract_frame_range(
         return "RUNNING_MODAL"
 
     def _queue_callback(self, pkg, event, next):
-        if next == "done":
+        status, new_data = next
+        if status == "done":
             self.cleanup(pkg)  # write props (as dataclass) to JSON
             return "FINISHED"
-        elif next.startswith("update"):  # if sent an error message via queue
+        elif status.startswith("update"):  # if sent an error message via queue
             self.logger.debug(next)
         else:
             self.logger.error(next)
             return "FINISHED"
 
         # sync props regardless as the updated dataclass is still valid
-        self._sync_to_props(pkg.props)
+        if new_data:
+            self.data = new_data
+            self._sync_to_props(pkg.props)
         return "RUNNING_MODAL"
 
     @staticmethod
@@ -80,6 +83,7 @@ class Mosplat_OT_extract_frame_range(
         start, _ = pwargs.frame_range
         caps: List[cv2.VideoCapture] = []
 
+        data = pwargs.dataset_as_dc
         files = pwargs.updated_media_files
 
         try:
@@ -91,7 +95,7 @@ class Mosplat_OT_extract_frame_range(
 
             # create a new frame range with both limits at start
             new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
-            pwargs.dataset_as_dc.processed_frame_ranges.append(new_frame_range)
+            data.processed_frame_ranges.append(new_frame_range)
 
             for idx, raw_npz_file in enumerate(pwargs.npz_files):
                 if cancel_event.is_set():
@@ -105,18 +109,18 @@ class Mosplat_OT_extract_frame_range(
                     }
                     note = write_frame_data_to_npz(idx, caps, raw_npz_file, **structure)
                 else:
-                    # TODO: Check the
                     note = f"NPZ data for frame index '{idx}' already found on disk. Skipping..."
 
                 new_frame_range.end_frame = idx
-                queue.put(f"update: {note}")
+                queue.put((f"update: {note}", data))
         except (UserFacingError, OSError) as e:
-            queue.put(str(e))  # exit early wherever error occurs and put error on queue
+            # exit early wherever error occurs and put error on queue
+            queue.put((str(e), None))
         finally:
             for cap in caps:
                 cap.release()
 
-        queue.put("done")
+        queue.put(("done", None))
 
 
 def process_entrypoint(*args, **kwargs):

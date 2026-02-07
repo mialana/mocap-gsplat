@@ -35,16 +35,14 @@
             "label": "prereload",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
-            "args": [
-                "${workspaceFolder}/scripts/prereload.py"
-            ],
+            "args": ["${workspaceFolder}/scripts/prereload.py"],
             "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "presentation": {
-                "reveal": "always",
+                "reveal": "silent",
                 "panel": "dedicated",
                 "clear": true
             }

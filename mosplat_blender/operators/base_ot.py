@@ -342,6 +342,10 @@ class MosplatOperatorBase(
         else:
             return self.__data
 
+    @data.setter
+    def data(self, new_data: MediaIODataset) -> None:
+        self.__data = new_data
+
     def wm(self, context: Context) -> WindowManager:
         if not (wm := context.window_manager):
             raise UnexpectedError("Poll-guard failed for window manager.")
