@@ -82,8 +82,8 @@ class MosplatLoggingInterface:
         self._blender_log_entry_queue = Queue()
         self._blender_session_index_tracker = 0
 
-    @classmethod
-    def retrieve_root_module_name_from_env(cls) -> str:
+    @staticmethod
+    def retrieve_root_module_name_from_env() -> str:
         name_from_env = os.getenv(EnvVariableEnum.ROOT_MODULE_NAME)
 
         if not name_from_env:
@@ -100,8 +100,12 @@ class MosplatLoggingInterface:
         cls.instance.cleanup()
         cls.instance = None
 
-    @staticmethod
-    def configure_logger_instance(name: str) -> logging.Logger:
+    @classmethod
+    def configure_logger_instance(cls, name: str) -> logging.Logger:
+        root_name = cls.retrieve_root_module_name_from_env()
+        if not root_name in name:
+            name = f"{root_name}.{name}"  # to ensure propogation
+
         logger: logging.Logger = logging.getLogger(name)
         # set logger to most verbose
         logger.setLevel(logging.DEBUG)

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Optional, Tuple
 
+from bpy.app.handlers import persistent
+
 from core.checks import check_addonpreferences, check_propertygroup
-from infrastructure.schemas import EnvVariableEnum, MediaIODataset
+from infrastructure.schemas import MediaIODataset
 from interfaces.logging_interface import MosplatLoggingInterface
 
 if TYPE_CHECKING:
@@ -16,12 +17,6 @@ if TYPE_CHECKING:
     from core.properties import Mosplat_PG_Global
 
 logger = MosplatLoggingInterface.configure_logger_instance(__name__)
-
-if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
-
-    from bpy.app.handlers import persistent
-else:
-    persistent = lambda c: c
 
 
 @persistent

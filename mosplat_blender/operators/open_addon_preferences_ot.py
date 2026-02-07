@@ -34,8 +34,8 @@ class Mosplat_OT_open_addon_preferences(
 
     def _queue_callback(self, pkg, event, next):
         status, payload = next
-        self.logger.info(status)
-        self.logger.info(payload)
+        self.logger.warning(status)
+        self.logger.warning(payload)
 
         if status == "done":
             self.logger.warning("finished")
@@ -44,6 +44,8 @@ class Mosplat_OT_open_addon_preferences(
 
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
+        import torchcodec
+
         queue.put(("hello from process", 5))
 
         import time

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import gc
 import multiprocessing.synchronize as mp_sync
-import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional, Self
 

@@ -66,17 +66,11 @@ class LogClassMixin:
             f"{cls.__module__}.logclass{label if label else cls.__name__}"
         )
 
-    @classmethod
-    def __init_subclass__(cls, label: Optional[str] = None, /, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        cls._create_logger_for_class(label)  # create logger for subclasses
-
     @property
     def logger(self) -> logging.Logger:
         cls = self.__class__
         if cls.class_logger is _MISSING_:
-            cls._create_logger_for_class()
+            cls._create_logger_for_class()  # lazy init
         return cls.class_logger
 
 
@@ -103,6 +97,9 @@ class EnforceAttributesMixin(Generic[M], LogClassMixin):
         """
         ran at registration time of the class.
         """
+        if cls.class_logger is _MISSING_:
+            cls._create_logger_for_class()  # lazy init
+
         if EnvVariableEnum.TESTING in os.environ:
             cls._enforce_mixin_attributes()
 

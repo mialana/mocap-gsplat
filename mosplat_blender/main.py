@@ -3,7 +3,6 @@ main entrypoint for addon.
 moves implementation logic and imports out of `__init__.py`.
 """
 
-import os
 from typing import Sequence, Tuple, Type, Union
 
 import bpy
