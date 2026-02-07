@@ -71,3 +71,7 @@ class Mosplat_OT_validate_media_statuses(
 
         queue.put((True, "done"))  # signal done
         return
+
+
+def process_entrypoint(*args, **kwargs):
+    Mosplat_OT_validate_media_statuses._operator_subprocess(*args, **kwargs)

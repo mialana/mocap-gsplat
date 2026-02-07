@@ -12,7 +12,7 @@ from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
 QT = TypeVar("QT")  # types elements of worker queue
 
-from infrastructure.constants import _TIMEOUT_IMMEDIATE_
+from infrastructure.macros import kill_subprocess_cross_platform
 from infrastructure.mixins import LogClassMixin
 from infrastructure.schemas import EnvVariableEnum
 
@@ -43,7 +43,7 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
             args=(self._queue, self._cancel_event),
             daemon=True,
         )
-        self._id: Optional[int] = None
+        self._pid: Optional[int] = None
         self._owner_name: str = owner_name
 
         self.start_time: Optional[float] = None
@@ -54,7 +54,7 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
 
     @property
     def identifier(self) -> str:
-        return str(self._id) if self._id is not None else self._owner_name
+        return str(self._pid) if self._pid is not None else self._owner_name
 
     def start(self):
         os.environ.setdefault(EnvVariableEnum.SUBPROCESS_FLAG, "1")
@@ -64,7 +64,7 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
             self._process.start()
         finally:  # ensure flag never stays in env
             os.environ.pop(EnvVariableEnum.SUBPROCESS_FLAG)
-        self._id = self._process.pid
+        self._pid = self._process.pid
 
         def watcher():
             self._process.join()
@@ -77,20 +77,12 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
 
     def cancel(self):
         self._cancel_event.set()
-        self.logger.debug(f"Thread '{self.identifier}' was cancelled.")
 
-    def was_cancelled(self):
-        return self._cancel_event.is_set()
+    def is_alive(self):
+        return not self._cancel_event.is_set() and self._process.is_alive()
 
     def cleanup(self):
         self.cancel()
-
-        if self._process.is_alive():
-            self._process.join(timeout=_TIMEOUT_IMMEDIATE_)
-
-        if self._process.is_alive():
-            self._process.terminate()
-            self._process.join()
 
         # drain queue
         while True:
@@ -105,6 +97,11 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
             return self._queue.get_nowait()
         except Empty:
             return None
+
+    def force_terminate(self):
+        self.cleanup()
+        if self._pid:
+            kill_subprocess_cross_platform(self._pid)
 
     def _start_timer(self):
         self.start_time = datetime.now().timestamp()

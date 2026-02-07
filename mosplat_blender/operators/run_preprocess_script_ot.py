@@ -159,3 +159,7 @@ class Mosplat_OT_run_preprocess_script(
                 )
                 queue.put(("error", msg))
                 break
+
+
+def process_entrypoint(*args, **kwargs):
+    Mosplat_OT_run_preprocess_script._operator_subprocess(*args, **kwargs)

@@ -5,19 +5,17 @@ provides the interface between the add-on and the VGGT model.
 from __future__ import annotations
 
 import gc
+import multiprocessing as mp
 import multiprocessing.synchronize as mp_sync
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Optional, Self
-
-from infrastructure.mixins import LogClassMixin
-from infrastructure.schemas import UnexpectedError
+from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     import numpy as np
     from vggt.models.vggt import VGGT
 
 
-class MosplatVGGTInterface(LogClassMixin):
+class MosplatVGGTInterface:
     instance: ClassVar[Optional[Self]] = None
 
     def __new__(cls) -> Self:
@@ -39,43 +37,57 @@ class MosplatVGGTInterface(LogClassMixin):
         self,
         hf_id: str,
         model_cache_dir: Path,
+        queue: mp.Queue[Tuple[str, int, int, str]],
         cancel_event: mp_sync.Event,
     ):
         try:
+            self.download_model(hf_id, model_cache_dir, queue, cancel_event)
+
             from vggt.models.vggt import VGGT
 
             if all([self.model, self.hf_id, self.model_cache_dir]):
-                self.logger.warning("Initialization already occurred.")
+                queue.put(("done", -1, -1, "Initialization already occurred."))
                 return  # initialization did not occur
-            elif any([self.model, self.hf_id, self.model_cache_dir]):
-                self.logger.warning(
-                    "Model seems to be partially initialized. "
-                    "Cleaning up before re-trying initialization."
-                )
-                self.cleanup()
 
             # initialize model from the downloaded local model cache
             self.model = VGGT.from_pretrained(hf_id, cache_dir=model_cache_dir)
-
-            self.logger.info("Initialization finished.")
 
             # store the values used for initialization upon success
             self.hf_id = hf_id
             self.model_cache_dir = model_cache_dir
 
             if cancel_event.is_set():
-                self.logger.warning("Cancellation occurred during initialization.")
                 # if cancel event was set at some point cleanup the resources now
                 self.cleanup()
+                return
+
+            queue.put(("done", -1, -1, "Initialization finished."))
 
         except Exception as e:
             self.cleanup()
-            raise UnexpectedError(
-                "Error while initializing model."
-                f"\nHugging Face ID: '{hf_id}'"
-                f"\nModel Cache Dir: '{model_cache_dir}'",
-                e,
-            ) from e
+            queue.put(("error", -1, -1, str(e)))
+
+    def download_model(
+        self,
+        hf_id: str,
+        model_cache_dir: Path,
+        queue: mp.Queue[Tuple[str, int, int, str]],
+        cancel_event: mp_sync.Event,
+    ):
+        from huggingface_hub import hf_hub_download
+        from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
+
+        hf_hub_download(
+            repo_id=hf_id,
+            filename=SAFETENSORS_SINGLE_FILE,
+            cache_dir=str(model_cache_dir),
+            tqdm_class=make_tqdm_class(queue),
+        )
+        if cancel_event.is_set():
+            # if cancel event was set at some point cleanup the resources now
+            self.cleanup()
+            return
+        queue.put(("update", -1, -1, "Download finished."))
 
     def run_inference(self, np_data: np.ndarray):
         from torch import from_numpy, no_grad
@@ -106,18 +118,41 @@ class MosplatVGGTInterface(LogClassMixin):
 
                 cuda.empty_cache()  # only effective when all torch resources have been released
                 gc.collect()
-
-                self.logger.info("Cleaned up model.")
         except Exception as e:
-            raise UnexpectedError("Error while cleaning up model.", e) from e
+            raise RuntimeError("Error while cleaning up model.") from e
 
         self.hf_id = None
         self.cache_dir = None
-
-        self.logger.info("Removed initialization variables.")
 
     @classmethod
     def cleanup_interface(cls):
         if cls.instance:
             cls.instance.cleanup()
         cls.instance = None  # set instance to none
+
+
+def make_tqdm_class(queue: mp.Queue[Tuple[str, int, int, str]]):
+    from huggingface_hub.utils.tqdm import tqdm
+
+    class ProgressTqdm(tqdm):
+        def __init__(
+            self,
+            *args,
+            **kwargs,
+        ):
+            self._queue = queue
+            kwargs["disable"] = False
+            super().__init__(*args, **kwargs)
+
+        def display(self, *args, **kwargs):
+            if self.total:
+                self._queue.put(
+                    (
+                        "progress",
+                        int(float(self.n) / 100.0),  # convert from bytes to mb
+                        int(float(self.total) / 100.0),
+                        "",
+                    )
+                )
+
+    return ProgressTqdm

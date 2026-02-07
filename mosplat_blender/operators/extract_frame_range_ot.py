@@ -117,3 +117,7 @@ class Mosplat_OT_extract_frame_range(
                 cap.release()
 
         queue.put("done")
+
+
+def process_entrypoint(*args, **kwargs):
+    Mosplat_OT_extract_frame_range._operator_subprocess(*args, **kwargs)

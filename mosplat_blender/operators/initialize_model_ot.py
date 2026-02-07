@@ -22,7 +22,6 @@ QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown
 
 
 class ProcessKwargs(NamedTuple):
-    proc: subprocess.Popen
     hf_id: str
     model_cache_dir: Path
 
@@ -45,81 +44,44 @@ class Mosplat_OT_initialize_model(
         props = pkg.props
         wm = self.wm(pkg.context)
         progress = props.progress_accessor
-        if status == "progress":
-            if not progress.in_use and total > 0:
-                wm.progress_begin(current, total)  # start progress bar if needed
-                progress.in_use = True  # mark usage of global progress props
-                progress.total = total
-            if total != progress.total:  # in case total changes
-                wm.progress_end()
-                wm.progress_begin(current, total)
-                progress.total = total
+        fmt = f"QUEUE {status.upper()} - {msg}"
+        match status:
+            case "progress":
+                if not progress.in_use and total > 0:
+                    wm.progress_begin(current, total)  # start progress bar if needed
+                    progress.in_use = True  # mark usage of global progress props
+                    progress.total = total
+                if total != progress.total:  # in case total changes
+                    wm.progress_end()
+                    wm.progress_begin(current, total)
+                    progress.total = total
 
-            wm.progress_update(current)
-            progress.current = current
-            self.logger.debug(f"{current} / {total}")
-        else:
-            fmt = f"QUEUE {status.upper()} - {msg}"
-            if status == "error":
+                wm.progress_update(current)
+                progress.current = current
+            case "error":
                 self.logger.error(fmt)
                 return "FINISHED"  # return finished as blender data has been modified
-
-            elif status == "warning":
+            case "warning":
                 self.logger.warning(fmt)
-            elif status == "debug":
-                self.logger.debug(fmt)
-            else:
+            case "done":
                 self.logger.info(fmt)
-            if status == "done":
-                return "FINISHED"  # finish
-        return "RUNNING_MODAL"
+            case _:
+                self.logger.debug(fmt)
 
-    def _contexted_invoke(self, pkg, event):
-        script = DOWNLOAD_HF_WITH_PROGRESS_SCRIPT
-
-        try:
-            try_access_path(DOWNLOAD_HF_WITH_PROGRESS_SCRIPT)
-        except (FileNotFoundError, OSError, PermissionError) as e:
-            raise UserFacingError(
-                f"'{script} not accessible at runtime."
-                "This is a production-level script and should not be moved.",
-                e,
-            ) from e
-        else:
-            self._subprocess_script = script
-            return self.execute_with_package(pkg)
+        match status:
+            case "error" | "done":
+                return "FINISHED"
+            case _:
+                return "RUNNING_MODAL"
 
     def _contexted_execute(self, pkg):
-        from bpy import app
-
         prefs = pkg.prefs
 
-        # start the model download from a separate subprocess
-        self._proc: subprocess.Popen = subprocess.Popen(
-            [
-                app.binary_path,
-                "--factory-startup",
-                "-b",
-                "--python",
-                self._subprocess_script,
-                "--",
-                prefs.vggt_hf_id,
-                str(prefs.vggt_model_dir),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            universal_newlines=True,
-            encoding="utf-8",
-            preexec_fn=getattr(os, "setsid", None),  # TODO: cross-platform check
-        )
-
-        self.logger.info(f"Downloading model from subprocess. PID: {self._proc.pid}")
+        self.logger.debug(f"Downloading model with subprocess.")
 
         self.launch_subprocess(
             pkg.context,
             pwargs=ProcessKwargs(
-                proc=self._proc,
                 hf_id=prefs.vggt_hf_id,
                 model_cache_dir=prefs.vggt_model_dir,
             ),
@@ -129,8 +91,8 @@ class Mosplat_OT_initialize_model(
 
     def _contexted_modal(self, pkg, event):
         # check cancellation on timer callback, kill subprocess if needed
-        if self.worker and self.worker.was_cancelled():
-            kill_subprocess_cross_platform(self._proc.pid)
+        if self.worker and not self.worker.is_alive():
+            self.worker.force_terminate()
         return super()._contexted_modal(pkg, event)
 
     def cleanup(self, pkg):
@@ -148,9 +110,9 @@ class Mosplat_OT_initialize_model(
         this ensures that cancellation that never reaches the next modal call 
         still cleans up the subprocess
         """
-        if hasattr(self, "_proc"):
+        if self.worker and self.worker._pid:
             app.timers.register(
-                partial(kill_subprocess_cross_platform, self._proc.pid),
+                partial(kill_subprocess_cross_platform, self.worker._pid),
                 first_interval=_TIMEOUT_LAZY_,  # no orphaned processes here!
             )
         return super().cleanup(pkg)
@@ -158,17 +120,8 @@ class Mosplat_OT_initialize_model(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         try:
-            _wait_and_update_queue_loop(pwargs.proc, queue)
-        except (subprocess.CalledProcessError, UnexpectedError) as e:
-            # put on queue to stop modal just in case, though it probably will not be read
-            queue.put(("error", -1, -1, str(e)))
-            return  # do not continue
-        if cancel_event.is_set():
-            return  # do not continue
-
-        try:
             MosplatVGGTInterface().initialize_model(
-                pwargs.hf_id, pwargs.model_cache_dir, cancel_event
+                pwargs.hf_id, pwargs.model_cache_dir, queue, cancel_event
             )
 
             queue.put(("done", -1, -1, "Successfully downloaded & init VGGT model!"))
@@ -176,31 +129,5 @@ class Mosplat_OT_initialize_model(
             queue.put(("error", -1, -1, str(e)))
 
 
-def _wait_and_update_queue_loop(proc: subprocess.Popen, queue):
-    if proc.stdout is None:
-        raise UnexpectedError("Process stdout pointer is not available.")
-
-    for line in proc.stdout:  # continues until EOF has been reached
-        try:
-            converted = ast.literal_eval(line)
-            if isinstance(converted, tuple) and tuple_type_matches_known_tuple_type(
-                converted, QUEUE_DEFAULT_TUPLE
-            ):
-                queue.put(converted)  # good to go
-                continue
-        except (ValueError, SyntaxError, TypeError):
-            pass  # ignore errors raised from trying to evaluate the line as a tuple
-        if isinstance(line, str) and (stripped := line.strip()):
-            # place other output in queue under msg
-            queue.put(("debug", -1, -1, stripped))
-
-    # avoid concurrency issues with `poll` when stdout is released by process
-    ret: int = proc.wait()
-    if ret != 0:
-        e = subprocess.CalledProcessError(ret, proc.args)
-        e.add_note(
-            "NOTE: Occurred while downloading Hugging Face model via subprocess."
-        )
-        raise e
-
-    return  # proc existed successfully
+def process_entrypoint(*args, **kwargs):
+    Mosplat_OT_initialize_model._operator_subprocess(*args, **kwargs)

@@ -39,3 +39,7 @@ class Mosplat_OT_run_inference(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         pass
+
+
+def process_entrypoint(*args, **kwargs):
+    Mosplat_OT_run_inference._operator_subprocess(*args, **kwargs)
