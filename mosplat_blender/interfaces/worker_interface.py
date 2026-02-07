@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-import multiprocessing.synchronize as mp_sync
 import multiprocessing.context as mp_ctx
+import multiprocessing.synchronize as mp_sync
 import os
+import threading
 import time
 from datetime import datetime
-import threading
 from queue import Empty
 from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
