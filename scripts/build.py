@@ -286,7 +286,7 @@ def generate_blender_manifest_toml(ctx: BuildContext):
     )
     WHEELS_STR = "wheels = [\n" + ",\n".join(wheels) + "\n]"
 
-    with open(ctx.MANIFEST_TOML_TXT_FILE, "r", encoding="utf-8") as f:
+    with ctx.MANIFEST_TOML_TXT_FILE.open(mode="r", encoding="utf-8") as f:
         next(f)  # skip the comment on the first line
         template = f.read()
 
@@ -297,7 +297,7 @@ def generate_blender_manifest_toml(ctx: BuildContext):
         wheels_block=WHEELS_STR,
     )
 
-    with open(ctx.manifest_toml_file, "w", encoding="utf-8") as f:
+    with ctx.manifest_toml_file.open(mode="w", encoding="utf-8") as f:
         f.write(ctx.timestamp_str)
         f.write(template)
 

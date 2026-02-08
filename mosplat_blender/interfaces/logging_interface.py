@@ -242,7 +242,7 @@ class LoggingInterface:
                 self._root_logger.removeHandler(saved_handler)
                 saved_handler.close()
 
-                self.max_entries_stored = max_entries_stored
+                self._blender_max_entries_stored = max_entries_stored
             return True
         except Exception as e:
             raise UserFacingError("Config for Blender handler failed.", e) from e
@@ -297,7 +297,10 @@ class LoggingInterface:
 
                 entry.full_message = full_msg
 
-                while len(entries) > self.max_entries_stored:
+                while (
+                    self._blender_max_entries_stored >= 0  # eliminate infinite loops
+                    and len(entries) > self._blender_max_entries_stored
+                ):
                     entries.remove(0)
                 log_hub.logs_active_index = len(entries) - 1
 

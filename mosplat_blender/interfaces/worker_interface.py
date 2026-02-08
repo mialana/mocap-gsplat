@@ -21,7 +21,7 @@ StartWorkCallback: TypeAlias = Optional[Callable[[float], None]]
 EndWorkCallback: TypeAlias = Optional[Callable[[float, float], None]]
 
 
-class MosplatWorkerInterface(Generic[QT], LogClassMixin):
+class WorkerInterface(Generic[QT], LogClassMixin):
     """
     this is a clean abstraction for blender operators that require similar "worker" behavior in a subprocess
 
@@ -81,6 +81,9 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
     def was_cancelled(self):
         return not self._cancel_event.is_set()
 
+    def is_alive(self):
+        return self._process.is_alive()
+
     def cleanup(self):
         self.cancel()
 
@@ -99,8 +102,6 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
             return None
 
     def force_terminate(self):
-        self.cleanup()
-
         if self._pid:
             kill_subprocess_cross_platform(self._pid)
 

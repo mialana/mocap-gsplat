@@ -16,8 +16,8 @@ from typing import Any, Final
 _MISSING_: Any = object()  # sentinel variable
 
 _TIMER_INTERVAL_: Final[float] = 0.1
-_TIMEOUT_LAZY_: Final[float] = 10.0  # amount of time to wait before timeout
-_TIMEOUT_IMMEDIATE_: Final[float] = 0.5
+_TIMEOUT_LAZY_: Final[float] = 10.0  # timeout can occur lazily
+_TIMEOUT_IMMEDIATE_: Final[float] = 1.0  # timeout should occur more or less immediately
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {
@@ -50,7 +50,7 @@ DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
 
 # path location of the shipped preprocess script
 DEFAULT_PREPROCESS_SCRIPT: Final[str] = str(
-    Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_video_rotations.py"
+    Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_camera_rotations.py"
 )
 # target function in script
 PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"

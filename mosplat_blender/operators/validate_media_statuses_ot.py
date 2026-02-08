@@ -36,7 +36,7 @@ class Mosplat_OT_validate_media_statuses(
         # sync props regardless as the updated dataclass is still valid
         if new_data:
             self.data = new_data
-            self._sync_to_props(pkg.props)
+            self.sync_to_props(pkg.props)
         return super()._queue_callback(pkg, event, next)
 
     @staticmethod
@@ -46,7 +46,8 @@ class Mosplat_OT_validate_media_statuses(
 
         files, data = pwargs
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
+        device: torch.device = torch.device(device_str)
 
         status_lookup, accumulator = data.status_accumulator()
 

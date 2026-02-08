@@ -18,15 +18,11 @@ from typing import (
     ClassVar,
     Dict,
     List,
-    Literal,
     NamedTuple,
-    NotRequired,
     Optional,
-    Required,
     Self,
     Tuple,
     TypeAlias,
-    TypedDict,
     Union,
     cast,
 )
@@ -39,7 +35,6 @@ from infrastructure.macros import (
 
 if TYPE_CHECKING:
     import torchcodec.decoders
-    from torch import Tensor
 
     from core.properties import Mosplat_PG_MediaIOMetadata
 
@@ -224,9 +219,8 @@ class FrameTensorMetadata(NamedTuple):
     @classmethod
     def from_dict(cls, d: Dict[str, str]) -> Self:
         try:
-            return cls(
-                frame_idx=int(d["frame_idx"]), media_files=json.loads(d["media_files"])
-            )
+            files = [Path(file_str) for file_str in json.loads(d["media_files"])]
+            return cls(frame_idx=int(d["frame_idx"]), media_files=files)
         except (KeyError, json.JSONDecodeError) as e:
             raise OSError(str(e)) from e
 
@@ -253,6 +247,7 @@ class AppliedPreprocessScript:
 class ProcessedFrameRange:
     start_frame: int
     end_frame: int
+    out_file_formatters: List[str]
     applied_preprocess_script: AppliedPreprocessScript = field(
         default_factory=lambda: AppliedPreprocessScript(
             file_path="", mod_time=-1.0, file_size=-1
@@ -463,3 +458,33 @@ class MediaIOMetadata:
         self.is_valid_media_directory = True  # start fresh
 
         return status_lookup, self._accumulate_media_status
+
+    def get_frame_range(self, start: int, end: int) -> Optional[ProcessedFrameRange]:
+        return next(
+            (
+                frame_range
+                for frame_range in self.processed_frame_ranges
+                if (frame_range.start_frame == start and frame_range.end_frame == end)
+            ),
+            None,
+        )
+
+    def add_frame_range(self, frame_range: ProcessedFrameRange) -> bool:
+        start = frame_range.start_frame
+        end = frame_range.end_frame
+        self.processed_frame_ranges.append(frame_range)
+        existing_frame_range = self.get_frame_range(start, end)
+
+        if not existing_frame_range:
+            return True  # processed a new frame range
+
+        # new frame range overrides old
+        self.processed_frame_ranges.remove(existing_frame_range)
+
+        if frame_range.out_file_formatters:
+            # delete all processed data from existing range
+            for idx in range(start, end):
+                for formatter in frame_range.out_file_formatters:
+                    file: Path = Path(formatter.format(frame_idx=idx)).resolve()
+                    file.unlink(missing_ok=True)  # delete
+        return False  # already existed

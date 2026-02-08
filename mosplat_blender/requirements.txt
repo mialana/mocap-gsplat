@@ -23,6 +23,7 @@ python-json-logger
 coloredlogs
 python-dotenv
 psutil
+jaxtyping
 
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"

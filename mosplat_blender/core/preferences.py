@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Set
 
@@ -28,14 +27,17 @@ if TYPE_CHECKING:
 LoggingHandler = LoggingInterface.LoggingHandler
 
 
-def update_logging(self: Mosplat_AP_Global, _: Context, *, handler: LoggingHandler):
-    try:
-        LoggingInterface().init_handler(handler, self)
-        self.logger.info(f"{handler} logging updated.")
-    except UserFacingError as e:
-        self.logger.error(
-            UserFacingError.make_msg(f"{handler} log settings invalid.", e)
-        )
+def make_update_logging_fn(handler: LoggingHandler):
+    def update_logging(self: Mosplat_AP_Global, _: Context):
+        try:
+            LoggingInterface().init_handler(handler, self)
+            self.logger.info(f"{handler} logging updated.")
+        except UserFacingError as e:
+            self.logger.error(
+                UserFacingError.make_msg(f"{handler} log settings invalid.", e)
+            )
+
+    return update_logging
 
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
@@ -72,14 +74,14 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         description="Cache directory on disk used by the addon",
         default=str(Path.home() / ".cache" / AddonMeta().base_id),
         subtype="DIR_PATH",
-        update=partial(update_logging, handler=LoggingHandler.JSON),
+        update=make_update_logging_fn(handler=LoggingHandler.JSON),
     )
 
     cache_subdir_logs: StringProperty(
         name="Logs Cache Subdirectory",
         description="Subdirectory in cache directory for JSON logs",
         default="log",
-        update=partial(update_logging, handler=LoggingHandler.JSON),
+        update=make_update_logging_fn(handler=LoggingHandler.JSON),
     )
 
     cache_subdir_model: StringProperty(
@@ -125,42 +127,42 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         name="JSON Logging Filename Format",
         description="strftime-compatible filename pattern",
         default="mosplat_%Y-%m-%d_%H-%M-%S.log",
-        update=partial(update_logging, handler=LoggingHandler.JSON),
+        update=make_update_logging_fn(handler=LoggingHandler.JSON),
     )
 
     json_date_log_format: StringProperty(
         name="JSON Logging Date Format",
         description="strftime format for JSON log timestamps",
         default="%Y-%m-%d %H:%M:%S",
-        update=partial(update_logging, handler=LoggingHandler.JSON),
+        update=make_update_logging_fn(handler=LoggingHandler.JSON),
     )
 
     json_log_format: StringProperty(
         name="JSON Logging Format",
         description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="%(asctime)s %(levelname)s %(name)s %(pathname)s %(classname)s %(funcName)s %(lineno)s %(thread)d %(message)s",
-        update=partial(update_logging, handler=LoggingHandler.JSON),
+        update=make_update_logging_fn(handler=LoggingHandler.JSON),
     )
 
     stdout_date_log_format: StringProperty(
         name="STDOUT Logging Date Format",
         description="strftime format for console log timestamps",
         default="%I:%M:%S %p",
-        update=partial(update_logging, handler=LoggingHandler.STDOUT),
+        update=make_update_logging_fn(handler=LoggingHandler.STDOUT),
     )
 
     stdout_log_format: StringProperty(
         name="STDOUT Logging Log Format",
         description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
-        update=partial(update_logging, handler=LoggingHandler.STDOUT),
+        update=make_update_logging_fn(handler=LoggingHandler.STDOUT),
     )
 
     blender_max_log_entries: IntProperty(
         name="BLENDER Logging Max Entries",
         description="The max amount of log entries that will be stored as Blender data and displayed in UI.",
         default=DEFAULT_MAX_LOG_ENTRIES,
-        update=partial(update_logging, handler=LoggingHandler.BLENDER),
+        update=make_update_logging_fn(handler=LoggingHandler.BLENDER),
     )
 
     vggt_hf_id: StringProperty(

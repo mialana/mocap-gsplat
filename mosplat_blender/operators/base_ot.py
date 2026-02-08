@@ -33,7 +33,7 @@ from infrastructure.schemas import (
     UnexpectedError,
     UserFacingError,
 )
-from interfaces.worker_interface import QT, MosplatWorkerInterface
+from interfaces.worker_interface import QT, WorkerInterface
 
 if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
     from bpy.types import Operator, Timer  # pyright: ignore[reportRedeclaration]
@@ -97,7 +97,7 @@ class MosplatOperatorMetadata:
 class MosplatOperatorBase(
     Generic[QT, K], ContextAccessorMixin[MosplatOperatorMetadata], Operator
 ):
-    __worker: Optional[MosplatWorkerInterface[QT]] = None
+    __worker: Optional[WorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
     __data: Optional[MediaIOMetadata] = None
 
@@ -186,6 +186,7 @@ class MosplatOperatorBase(
 
     def modal(self, context, event) -> OpResultSet:
         pkg = self.package(context)
+
         if event.type in {"ESC"}:
             self.logger.info(f"'{self.bl_idname}' cancelled by user.")
             self.cleanup(pkg)
@@ -213,10 +214,6 @@ class MosplatOperatorBase(
 
         return "RUNNING_MODAL"
 
-    def _sync_to_props(self, props: Mosplat_PG_Global):
-        """sync global properties with owned copy of data"""
-        props.metadata_accessor.from_dataclass(self.data)
-
     def _queue_callback(self, pkg: CtxPackage, event: Event, next: QT) -> OpResultTuple:
         """
         an entrypoint for when a new element is placed in the queue during `modal`.
@@ -241,24 +238,9 @@ class MosplatOperatorBase(
             case "done":
                 self.logger.info(msg)
                 return "FINISHED"  # return finished as blender data has been modified
-            case _:
+            case "update":
                 self.logger.debug(msg)
         return "RUNNING_MODAL"
-
-    def commit_data_to_json(self, pkg: CtxPackage):
-        # update JSON with current state of PG as source of truth
-        try:
-            json_filepath = pkg.props.media_io_metadata_filepath(pkg.prefs)
-            pkg.props.metadata_accessor.to_JSON(json_filepath)
-            self.logger.info(
-                f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
-            )
-        except UserFacingError as e:
-            msg = DeveloperError.make_msg(
-                f"Error occurred while committing data from '{self.bl_idname}' back to JSON.",
-                e,
-            )
-            self.logger.warning(msg)
 
     def cleanup(self, pkg: CtxPackage):
         self.commit_data_to_json(pkg)
@@ -298,6 +280,25 @@ class MosplatOperatorBase(
             handle()
             raise  # this needs to be raised
 
+    def sync_to_props(self, props: Mosplat_PG_Global):
+        """sync global properties with owned copy of data"""
+        props.metadata_accessor.from_dataclass(self.data)
+
+    def commit_data_to_json(self, pkg: CtxPackage):
+        # update JSON with current state of PG as source of truth
+        try:
+            json_filepath = pkg.props.media_io_metadata_filepath(pkg.prefs)
+            pkg.props.metadata_accessor.to_JSON(json_filepath)
+            self.logger.info(
+                f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
+            )
+        except UserFacingError as e:
+            msg = DeveloperError.make_msg(
+                f"Error occurred while committing data from '{self.bl_idname}' back to JSON.",
+                e,
+            )
+            self.logger.warning(msg)
+
     def launch_subprocess(self, context: Context, *, pwargs: K):
         """`pwargs` as in keyword args for subprocess"""
 
@@ -315,7 +316,7 @@ class MosplatOperatorBase(
 
         worker_fn = partial(process_entrypoint, pwargs=pwargs)
 
-        self.worker = MosplatWorkerInterface(self.bl_idname, worker_fn)
+        self.worker = WorkerInterface(self.bl_idname, worker_fn)
         self.worker.start()
 
         wm = self.wm(context)
@@ -338,11 +339,11 @@ class MosplatOperatorBase(
     """instance properties backed by mangled class attributes"""
 
     @property
-    def worker(self) -> Optional[MosplatWorkerInterface[QT]]:
+    def worker(self) -> Optional[WorkerInterface[QT]]:
         return self.__worker
 
     @worker.setter
-    def worker(self, wkr: Optional[MosplatWorkerInterface[QT]]):
+    def worker(self, wkr: Optional[WorkerInterface[QT]]):
         self.__worker = wkr
 
     @property

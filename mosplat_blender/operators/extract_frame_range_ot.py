@@ -18,7 +18,7 @@ from operators.base_ot import MosplatOperatorBase
 class ProcessKwargs(NamedTuple):
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
-    out_file_format: str
+    out_file_formatter: str
     data: MediaIOMetadata
 
 
@@ -40,7 +40,7 @@ class Mosplat_OT_extract_frame_range(
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)
         self._frame_range: Tuple[int, int] = tuple(props.frame_range)
-        self._out_file_format: str = props.generate_safetensor_filepath_formats(
+        self._out_file_formatter: str = props.generate_safetensor_filepath_formatters(
             prefs, [SavedTensorFileName.RAW]
         )[SavedTensorFileName.RAW]
 
@@ -52,7 +52,7 @@ class Mosplat_OT_extract_frame_range(
             pwargs=ProcessKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
-                out_file_format=self._out_file_format,
+                out_file_formatter=self._out_file_formatter,
                 data=self.data,
             ),
         )
@@ -64,7 +64,7 @@ class Mosplat_OT_extract_frame_range(
         # sync props regardless as the updated dataclass is still valid
         if new_data:
             self.data = new_data
-            self._sync_to_props(pkg.props)
+            self.sync_to_props(pkg.props)
         return super()._queue_callback(pkg, event, next)
 
     @staticmethod
@@ -73,13 +73,14 @@ class Mosplat_OT_extract_frame_range(
         from safetensors.torch import save_file
         from torchcodec.decoders import VideoDecoder
 
-        files, (start, end), out_file_format, data = pwargs
+        files, (start, end), out_file_formatter, data = pwargs
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
+        device: torch.device = torch.device(device_str)
 
         decoders: List[VideoDecoder] = []
         try:
-            for media_file in pwargs.updated_media_files:
+            for media_file in files:
                 dec = VideoDecoder(media_file, device=device)
                 decoders.append(dec)
         except (UserFacingError, OSError) as e:
@@ -87,14 +88,16 @@ class Mosplat_OT_extract_frame_range(
             queue.put(("error", str(e), None))
 
         # create a new frame range with both limits at start
-        new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
-        data.processed_frame_ranges.append(new_frame_range)
+        new_frame_range = ProcessedFrameRange(
+            start_frame=start, end_frame=start, out_file_formatters=[out_file_formatter]
+        )
+        data.add_frame_range(new_frame_range)
 
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
 
-            out_file = Path(out_file_format.format(frame_idx=idx))
+            out_file = Path(out_file_formatter.format(frame_idx=idx))
 
             if is_path_accessible(out_file):
                 note = f"Safetensor data for frame '{idx}' already found on disk."

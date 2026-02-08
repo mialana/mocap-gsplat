@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Generic, List, Tuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Final, Generic, List, Tuple, TypeAlias
 
 from bpy.props import (
     BoolProperty,
@@ -31,6 +31,7 @@ from core.meta.properties_meta import (
     MOSPLAT_PG_MEDIAFILESTATUS_META,
     MOSPLAT_PG_MEDIAIOMETADATA_META,
     MOSPLAT_PG_OPERATORPROGRESS_META,
+    MOSPLAT_PG_OUTFILEFORMATTER_META,
     MOSPLAT_PG_PROCESSEDFRAMERANGE_META,
     Mosplat_PG_AppliedPreprocessScript_Meta,
     Mosplat_PG_Global_Meta,
@@ -39,6 +40,7 @@ from core.meta.properties_meta import (
     Mosplat_PG_MediaFileStatus_Meta,
     Mosplat_PG_MediaIOMetadata_Meta,
     Mosplat_PG_OperatorProgress_Meta,
+    Mosplat_PG_OutFileFormatter_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
 )
 from infrastructure.constants import PER_FRAME_DIRNAME
@@ -92,21 +94,34 @@ class Mosplat_PG_AppliedPreprocessScript(
     file_size: IntProperty(name="File Size", default=-1)
 
 
+class Mosplat_PG_OutFileFormatter(MosplatPropertyGroupBase):
+    _meta: Mosplat_PG_OutFileFormatter_Meta = MOSPLAT_PG_OUTFILEFORMATTER_META
+
+    formatter: StringProperty(name="Formatter")
+
+
 class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
     _meta: Mosplat_PG_ProcessedFrameRange_Meta = MOSPLAT_PG_PROCESSEDFRAMERANGE_META
     __dataclass_type__ = ProcessedFrameRange
 
     start_frame: IntProperty(name="Start Frame", min=0)
     end_frame: IntProperty(name="End Frame", min=0)
+    out_file_formatters: CollectionProperty(
+        name="Out File Formatters", type=Mosplat_PG_OutFileFormatter
+    )
     applied_preprocess_script: PointerProperty(
         name="Applied Preprocess Script", type=Mosplat_PG_AppliedPreprocessScript
     )
 
     @property
-    def script_accessor(
-        self,
-    ) -> Mosplat_PG_AppliedPreprocessScript:
+    def script_accessor(self) -> Mosplat_PG_AppliedPreprocessScript:
         return self.applied_preprocess_script
+
+    @property
+    def formatters_accessor(
+        self,
+    ) -> SupportsCollectionProperty[Mosplat_PG_OutFileFormatter]:
+        return self.out_file_formatters
 
 
 class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
@@ -253,7 +268,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
     media_directory: StringProperty(
         name="Media Directory",
         description="Filepath to directory containing media files to be processed.",
-        default=str(Path.home()),
+        default=str(Path.home() / "Desktop" / "caroline_shot"),
         subtype="DIR_PATH",
         update=update_media_directory,
         options={"SKIP_SAVE"},
@@ -329,7 +344,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
             )
         return result
 
-    def generate_safetensor_filepath_formats(
+    def generate_safetensor_filepath_formatters(
         self, prefs: Mosplat_AP_Global, names: List[SavedTensorFileName]
     ) -> TensorFileFormatLookup:
         data_dir = check_media_output_dir(prefs, self)
