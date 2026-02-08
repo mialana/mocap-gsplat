@@ -8,13 +8,15 @@ import gc
 import multiprocessing as mp
 import multiprocessing.synchronize as mp_sync
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple
+from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple, TypeAlias
 
 from infrastructure.mixins import LogClassMixin
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     import numpy as np
     from vggt.models.vggt import VGGT
+
+QueueTuple: TypeAlias = Tuple[str, str, int, int]
 
 
 class MosplatVGGTInterface(LogClassMixin):
@@ -39,7 +41,7 @@ class MosplatVGGTInterface(LogClassMixin):
         self,
         hf_id: str,
         model_cache_dir: Path,
-        queue: mp.Queue[Tuple[str, int, int, str]],
+        queue: mp.Queue[QueueTuple],
         cancel_event: mp_sync.Event,
     ):
         try:
@@ -48,7 +50,7 @@ class MosplatVGGTInterface(LogClassMixin):
             from vggt.models.vggt import VGGT
 
             if all([self.model, self.hf_id, self.model_cache_dir]):
-                queue.put(("done", -1, -1, "Initialization already occurred."))
+                queue.put(("done", "Initialization already occurred.", -1, -1))
                 return  # initialization did not occur
 
             # initialize model from the downloaded local model cache
@@ -63,17 +65,17 @@ class MosplatVGGTInterface(LogClassMixin):
                 self.cleanup()
                 return
 
-            queue.put(("done", -1, -1, "Initialization finished."))
+            queue.put(("done", "Initialization finished.", -1, -1))
 
         except Exception as e:
             self.cleanup()
-            queue.put(("error", -1, -1, str(e)))
+            queue.put(("error", str(e), -1, -1))
 
     def download_model(
         self,
         hf_id: str,
         model_cache_dir: Path,
-        queue: mp.Queue[Tuple[str, int, int, str]],
+        queue: mp.Queue[QueueTuple],
         cancel_event: mp_sync.Event,
     ):
         from huggingface_hub import hf_hub_download
@@ -89,7 +91,7 @@ class MosplatVGGTInterface(LogClassMixin):
             # if cancel event was set at some point cleanup the resources now
             self.cleanup()
             return
-        queue.put(("update", -1, -1, "Download finished."))
+        queue.put(("update", "Download finished.", -1, -1))
 
     def run_inference(self, np_data: np.ndarray):
         from torch import from_numpy, no_grad
@@ -133,7 +135,7 @@ class MosplatVGGTInterface(LogClassMixin):
         cls.instance = None  # set instance to none
 
 
-def make_tqdm_class(queue: mp.Queue[Tuple[str, int, int, str]]):
+def make_tqdm_class(queue: mp.Queue[QueueTuple]):
     from huggingface_hub.utils.tqdm import tqdm
 
     class ProgressTqdm(tqdm):
@@ -151,9 +153,9 @@ def make_tqdm_class(queue: mp.Queue[Tuple[str, int, int, str]]):
                 self._queue.put(
                     (
                         "progress",
+                        "",
                         int(float(self.n) / 100.0),  # convert from bytes to mb
                         int(float(self.total) / 100.0),
-                        "",
                     )
                 )
 

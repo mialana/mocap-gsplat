@@ -11,10 +11,10 @@ from infrastructure.macros import (
 )
 from infrastructure.schemas import (
     DeveloperError,
-    FrameNPZStructure,
+    FrameTensorMetadata,
     MediaIODataset,
-    NPZNameToPathLookup,
-    SavedNPZName,
+    SavedTensorFileName,
+    STNameToPathLookup,
     UserFacingError,
 )
 from operators.base_ot import MosplatOperatorBase
@@ -22,7 +22,7 @@ from operators.base_ot import MosplatOperatorBase
 
 class ProcessKwargs(NamedTuple):
     preprocess_fn: Callable
-    npz_file_lookup: NPZNameToPathLookup
+    st_file_lookup: STNameToPathLookup
     media_files: List[Path]
     dataset_as_dc: MediaIODataset
 
@@ -44,9 +44,11 @@ class Mosplat_OT_run_preprocess_script(
 
         self._media_files: List[Path] = props.media_files(prefs)
         self._preprocess_script = prefs.preprocess_media_script_filepath
-        self._npz_file_lookup: NPZNameToPathLookup = (
-            props.generate_npz_filepaths_for_frame_range(
-                prefs, [SavedNPZName.RAW, SavedNPZName.PREPROCESSED], [True, False]
+        self._st_file_lookup: STNameToPathLookup = (
+            props.generate_st_filepaths_for_frame_range(
+                prefs,
+                [SavedTensorFileName.RAW, SavedTensorFileName.PREPROCESSED],
+                [True, False],
             )
         )
 
@@ -80,7 +82,7 @@ class Mosplat_OT_run_preprocess_script(
             pkg.context,
             pwargs=ProcessKwargs(
                 preprocess_fn=self._preprocess_fn,
-                npz_file_lookup=self._npz_file_lookup,
+                st_file_lookup=self._st_file_lookup,
                 media_files=self._media_files,
                 dataset_as_dc=self.data,
             ),
@@ -92,23 +94,11 @@ class Mosplat_OT_run_preprocess_script(
 
     def _queue_callback(self, pkg, event, next):
         status, msg, new_data = next
-        if status == "error":
-            self.logger.error(msg)
-        elif status == "warning":  # if sent a warning via queue
-            self.logger.warning(msg)
-        elif status == "done":
-            self.logger.info(msg)
-        else:
-            self.logger.debug(msg)
-
+        # sync props regardless as the updated dataclass is still valid
         if new_data:
             self.data = new_data
             self._sync_to_props(pkg.props)
-
-        if status == "done" or status == "error":
-            return "FINISHED"  # error still needs finished as blender data was modified
-        else:
-            return "RUNNING_MODAL"
+        return super()._queue_callback(pkg, event, next)
 
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
@@ -119,25 +109,25 @@ class Mosplat_OT_run_preprocess_script(
         # as strings and `Counter` collection type
         media_files_counter = Counter(pwargs.media_files)
 
-        raw_npz_files = pwargs.npz_file_lookup[SavedNPZName.RAW]
-        preprocessed_npz_files = pwargs.npz_file_lookup[SavedNPZName.PREPROCESSED]
-        for idx, files in enumerate(zip(raw_npz_files, preprocessed_npz_files)):
+        raw_st_files = pwargs.st_file_lookup[SavedTensorFileName.RAW]
+        preprocessed_st_files = pwargs.st_file_lookup[SavedTensorFileName.PREPROCESSED]
+        for idx, files in enumerate(zip(raw_st_files, preprocessed_st_files)):
             if cancel_event.is_set():
                 return
 
             raw, preprocessed = files
             try:
-                npz_file: npyio.NpzFile = np.load(raw, mmap_mode=None)
-                npz_structure = FrameNPZStructure(**dict(npz_file.items()))
+                st_file: npyio.NpzFile = np.load(raw, mmap_mode=None)
+                st_structure = FrameTensorMetadata(**dict(st_file.items()))
                 # converts to native int
-                frame_idx: int = npz_structure.get("frame")[0]
+                frame_idx: int = st_structure.get("frame")[0]
                 if frame_idx != idx:
                     raise DeveloperError(
                         "Saved frame index should match iteration index.\n"
                         f"Expected Index: '{idx}'\nExtracted Index: '{frame_idx}'"
                     )
                 media_files: List[Path] = [
-                    Path(s) for s in npz_structure.get("media_files")
+                    Path(s) for s in st_structure.get("media_files")
                 ]
                 if media_files_counter != Counter(media_files):
                     raise ValueError(
@@ -147,15 +137,15 @@ class Mosplat_OT_run_preprocess_script(
                     )
             except (OSError, ValueError, TypeError) as e:
                 msg = UserFacingError.make_msg(
-                    f"Data used to create NPZ file did not match currrent state of media directory or NPZ files are corrupted. Behavior is unpredictable. Delete the NPZ files and re-extract frame data to clean up data state.",
+                    f"Data used to create safetensor file '{raw}' did not match currrent state of media directory or ST files are corrupted. Behavior is unpredictable. Delete the safetensor files in the frame range and re-extract frame data to clean up data state.",
                     e,
                 )
                 queue.put(("error", msg, None))
                 break
             try:
-                processed_data = fn(frame_idx, media_files, npz_file.get("data"))
-                npz_structure["data"] = processed_data
-                np.savez(preprocessed, **cast(dict, npz_structure))
+                processed_data = fn(frame_idx, media_files, st_file.get("data"))
+                st_structure["data"] = processed_data
+                np.savez(preprocessed, **cast(dict, st_structure))
                 queue.put(("update", f"Finished processing frame '{frame_idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(

@@ -27,9 +27,10 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    import cv2  # static only import of risky module
+    from torch import Tensor
+    from torchcodec.decoders import VideoDecoder
 
-    from infrastructure.schemas import FrameNPZStructure
+    from infrastructure.schemas import FrameTensorMetadata
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
@@ -105,33 +106,6 @@ def kill_subprocess_cross_platform(pid: int):
             parent.kill()
         except psutil.NoSuchProcess:
             pass  # this requires no exception-raising
-
-
-def write_frame_data_to_npz(
-    frame_idx: int,
-    caps: List[cv2.VideoCapture],
-    out_path: Path,
-    **kwargs: Unpack[FrameNPZStructure],
-):
-    """raises `OSError` if `cv2` could not read any frame."""
-    import cv2
-    import numpy as np
-
-    images: List[cv2.typing.MatLike] = []
-    for cap in caps:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-        ret, frame = cap.read()
-        if not ret:
-            raise OSError(f"Failed to read frame: '{frame_idx}'")
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).astype(np.uint8)  # BGR to RGB
-        images.append(frame)
-
-    stacked = np.stack(images, axis=0, dtype=np.uint8)
-    kwargs["data"] = stacked
-
-    np.savez(out_path, **cast(dict, kwargs))  # cast for type-checking here
-
-    return f"Frame index '{frame_idx}' finished with stacked images shape '{stacked.shape}'."
 
 
 def import_module_from_path_dynamic(path: Path) -> ModuleType:

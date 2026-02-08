@@ -224,7 +224,23 @@ class MosplatOperatorBase(
         this function is required IF it's a modal operator.
         otherwise, the `NotImplementedError` pathway will never be seen.
         """
-        raise NotImplementedError
+        if len(next) < 2:
+            raise NotImplementedError
+
+        status = next[0]
+        msg = next[1]
+        match status:
+            case "error":
+                self.logger.error(msg)
+                return "FINISHED"  # return finished as blender data has been modified
+            case "warning":
+                self.logger.warning(msg)
+            case "done":
+                self.logger.info(msg)
+                return "FINISHED"  # return finished as blender data has been modified
+            case _:
+                self.logger.debug(msg)
+        return "RUNNING_MODAL"
 
     def commit_data_to_json(self, pkg: CtxPackage):
         # update JSON with current state of PG as source of truth

@@ -1,24 +1,12 @@
-import ast
-import os
-import subprocess
 from functools import partial
 from pathlib import Path
-from typing import Final, NamedTuple, Tuple
+from typing import NamedTuple, Tuple
 
-from infrastructure.constants import (
-    _TIMEOUT_LAZY_,
-    DOWNLOAD_HF_WITH_PROGRESS_SCRIPT,
-)
-from infrastructure.macros import (
-    kill_subprocess_cross_platform,
-    try_access_path,
-    tuple_type_matches_known_tuple_type,
-)
-from infrastructure.schemas import UnexpectedError, UserFacingError
+from infrastructure.constants import _TIMEOUT_LAZY_
+from infrastructure.macros import kill_subprocess_cross_platform
+from infrastructure.schemas import UnexpectedError
 from interfaces import MosplatVGGTInterface
 from operators.base_ot import MosplatOperatorBase
-
-QUEUE_DEFAULT_TUPLE: Final = ("", 0, 0, "")  # for runtime check against unknown tuples
 
 
 class ProcessKwargs(NamedTuple):
@@ -27,7 +15,10 @@ class ProcessKwargs(NamedTuple):
 
 
 class Mosplat_OT_initialize_model(
-    MosplatOperatorBase[Tuple[str, int, int, str], ProcessKwargs]
+    MosplatOperatorBase[
+        Tuple[str, str, int, int],
+        ProcessKwargs,
+    ]
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
@@ -40,39 +31,24 @@ class Mosplat_OT_initialize_model(
         return True
 
     def _queue_callback(self, pkg, event, next):
-        status, current, total, msg = next
+        status, msg, current, total = next
         props = pkg.props
         wm = self.wm(pkg.context)
         progress = props.progress_accessor
-        fmt = f"QUEUE {status.upper()} - {msg}"
-        match status:
-            case "progress":
-                if not progress.in_use and total > 0:
-                    wm.progress_begin(current, total)  # start progress bar if needed
-                    progress.in_use = True  # mark usage of global progress props
-                    progress.total = total
-                if total != progress.total:  # in case total changes
-                    wm.progress_end()
-                    wm.progress_begin(current, total)
-                    progress.total = total
+        if status == "progress":
+            if not progress.in_use and total > 0:
+                wm.progress_begin(current, total)  # start progress bar if needed
+                progress.in_use = True  # mark usage of global progress props
+                progress.total = total
+            if total != progress.total:  # in case total changes
+                wm.progress_end()
+                wm.progress_begin(current, total)
+                progress.total = total
 
-                wm.progress_update(current)
-                progress.current = current
-            case "error":
-                self.logger.error(fmt)
-                return "FINISHED"  # return finished as blender data has been modified
-            case "warning":
-                self.logger.warning(fmt)
-            case "done":
-                self.logger.info(fmt)
-            case _:
-                self.logger.debug(fmt)
-
-        match status:
-            case "error" | "done":
-                return "FINISHED"
-            case _:
-                return "RUNNING_MODAL"
+            wm.progress_update(current)
+            progress.current = current
+            return "RUNNING_MODAL"
+        return super()._queue_callback(pkg, event, next)
 
     def _contexted_execute(self, pkg):
         prefs = pkg.prefs
@@ -124,9 +100,9 @@ class Mosplat_OT_initialize_model(
                 pwargs.hf_id, pwargs.model_cache_dir, queue, cancel_event
             )
 
-            queue.put(("done", -1, -1, "Successfully downloaded & init VGGT model!"))
+            queue.put(("done", "Downloaded & initialized VGGT model.", -1, -1))
         except UnexpectedError as e:
-            queue.put(("error", -1, -1, str(e)))
+            queue.put(("error", str(e), -1, -1))
 
 
 def process_entrypoint(*args, **kwargs):

@@ -59,24 +59,23 @@ class Mosplat_PT_Preprocess(MosplatPanelBase):
             ranges_box = box.box()
             ranges_box.label(text=dataset._meta.processed_frame_ranges.name)
             for r in ranges:
-                scripts = r.scripts_accessor
-                has_scripts = len(scripts) > 0
+                script = r.script_accessor
+                has_script: bool = script.file_path != ""
                 range_row = ranges_box.row()
 
-                factor = 0.25 if has_scripts else 1
+                factor = 0.25 if has_script else 1
                 split = range_row.split(factor=factor, align=True)
                 split.label(
                     text=f"{str(r.start_frame)}-{str(r.end_frame)}",
                     icon="CON_ACTION",
                 )
 
-                if has_scripts:
+                if has_script:
                     script_column = split.column(align=True)
                     script_column.alignment = "EXPAND"
-                    for script in scripts:
-                        script_row = script_column.row()
-                        script_row.alignment = "RIGHT"
-                        script_row.label(text=Path(script.script_path).name)
+                    script_row = script_column.row()
+                    script_row.alignment = "RIGHT"
+                    script_row.label(text=Path(script.file_path).name)
 
         box.row().prop(props, props._meta.current_frame_range.id)
         box.row().operator(OperatorIDEnum.EXTRACT_FRAME_RANGE)

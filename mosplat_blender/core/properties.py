@@ -22,7 +22,7 @@ from core.checks import (
     check_data_output_dirpath,
     check_frame_range_poll_result,
     check_media_files,
-    check_npz_filepaths_for_frame_range,
+    check_st_filepaths_for_frame_range,
 )
 from core.meta.properties_meta import (
     MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META,
@@ -54,10 +54,10 @@ from infrastructure.schemas import (
     LogEntryLevelEnum,
     MediaFileStatus,
     MediaIODataset,
-    NPZNameToPathLookup,
     OperatorProgress,
     ProcessedFrameRange,
-    SavedNPZName,
+    SavedTensorFileName,
+    STNameToPathLookup,
 )
 
 if TYPE_CHECKING:
@@ -91,7 +91,7 @@ class Mosplat_PG_AppliedPreprocessScript(
     )
     __dataclass_type__ = AppliedPreprocessScript
 
-    script_path: StringProperty(name="Script Path", subtype="FILE_PATH")
+    file_path: StringProperty(name="File Path", subtype="FILE_PATH")
     mod_time: FloatProperty(name="Modification Time", default=-1.0)
     file_size: IntProperty(name="File Size", default=-1)
 
@@ -102,15 +102,15 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
 
     start_frame: IntProperty(name="Start Frame", min=0)
     end_frame: IntProperty(name="End Frame", min=0)
-    applied_preprocess_scripts: CollectionProperty(
-        name="Applied Preprocess Scripts", type=Mosplat_PG_AppliedPreprocessScript
+    applied_preprocess_script: PointerProperty(
+        name="Applied Preprocess Script", type=Mosplat_PG_AppliedPreprocessScript
     )
 
     @property
-    def scripts_accessor(
+    def script_accessor(
         self,
-    ) -> SupportsCollectionProperty[Mosplat_PG_AppliedPreprocessScript]:
-        return self.applied_preprocess_scripts
+    ) -> Mosplat_PG_AppliedPreprocessScript:
+        return self.applied_preprocess_script
 
 
 class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
@@ -335,11 +335,11 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
             )
         return result
 
-    def generate_npz_filepaths_for_frame_range(
+    def generate_st_filepaths_for_frame_range(
         self,
         prefs: Mosplat_AP_Global,
-        names: List[SavedNPZName],
+        names: List[SavedTensorFileName],
         should_exist: List[bool],
-    ) -> NPZNameToPathLookup:
+    ) -> STNameToPathLookup:
         """wrapper"""
-        return check_npz_filepaths_for_frame_range(prefs, self, names, should_exist)
+        return check_st_filepaths_for_frame_range(prefs, self, names, should_exist)

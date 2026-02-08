@@ -38,9 +38,8 @@ from infrastructure.macros import (
 )
 
 if TYPE_CHECKING:
-    import numpy as np
     import torchcodec.decoders
-    from cv2 import VideoCapture
+    from torch import Tensor
 
     from core.properties import Mosplat_PG_MediaIODataset
 
@@ -129,12 +128,12 @@ class LogEntryLevelEnum(StrEnum):
             return cls["INFO"]
 
 
-class SavedNPZName(StrEnum):
+class SavedTensorFileName(StrEnum):
     RAW = auto()
     PREPROCESSED = auto()
 
 
-NPZNameToPathLookup: TypeAlias = Dict[SavedNPZName, List[Path]]
+STNameToPathLookup: TypeAlias = Dict[SavedTensorFileName, List[Path]]
 
 
 class AddonMeta:
@@ -208,20 +207,27 @@ class PropertyMeta(NamedTuple):
     description: str
 
 
-class FrameNPZStructure(TypedDict):
-    frame: Required[np.ndarray[Tuple[()], np.dtype[np.int32]]]
-    media_files: Required[np.ndarray[Tuple[int], np.dtype[np.str_]]]
-    data: NotRequired[
-        np.ndarray[
-            Tuple[int, int, int, Literal[3]],  # FRAME, H, W, RGB
-            np.dtype[np.uint8],
-        ]
-    ]
+class FrameTensorMetadata(NamedTuple):
+    frame: int
+    media_files: List[Path]
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "frame": str(self.frame),
+            "media_files": json.dumps([str(file) for file in self.media_files]),
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, str]) -> Self:
+        try:
+            return cls(frame=int(d["frame"]), media_files=json.loads(d["media_files"]))
+        except (KeyError, json.JSONDecodeError) as e:
+            raise UserFacingError(str(e)) from e
 
 
 @dataclass(frozen=True)
 class AppliedPreprocessScript:
-    script_path: str
+    file_path: str
     mod_time: float
     file_size: int
 
@@ -230,30 +236,30 @@ class AppliedPreprocessScript:
         return cls(**d)
 
     @classmethod
-    def from_script_path(cls, script_path: str) -> AppliedPreprocessScript:
-        script_filepath = Path(script_path)
+    def from_file_path(cls, file_path: str) -> AppliedPreprocessScript:
+        script_filepath = Path(file_path)
         stat = try_access_path(script_filepath)
 
-        return cls(
-            script_path=script_path, mod_time=stat.st_mtime, file_size=stat.st_size
-        )
+        return cls(file_path=file_path, mod_time=stat.st_mtime, file_size=stat.st_size)
 
 
 @dataclass
 class ProcessedFrameRange:
     start_frame: int
     end_frame: int
-    applied_preprocess_scripts: List[AppliedPreprocessScript] = field(
-        default_factory=list
+    applied_preprocess_script: AppliedPreprocessScript = field(
+        default_factory=lambda: AppliedPreprocessScript(
+            file_path="", mod_time=-1.0, file_size=-1
+        )
     )
 
     @classmethod
     def from_dict(cls, d: Dict) -> ProcessedFrameRange:
         instance = cls(**d)
-        instance.applied_preprocess_scripts = [
-            AppliedPreprocessScript.from_dict(cast(Dict, a))
-            for a in instance.applied_preprocess_scripts
-        ]
+        instance.applied_preprocess_script = AppliedPreprocessScript.from_dict(
+            cast(Dict, instance.applied_preprocess_script)
+        )
+
         return instance
 
 

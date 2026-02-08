@@ -10,7 +10,7 @@ from datetime import datetime
 from queue import Empty
 from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
-QT = TypeVar("QT")  # types elements of worker queue
+QT = TypeVar("QT", bound=tuple)  # types elements of worker queue
 
 from infrastructure.macros import kill_subprocess_cross_platform
 from infrastructure.mixins import LogClassMixin

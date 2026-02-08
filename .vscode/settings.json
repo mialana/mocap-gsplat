@@ -11,15 +11,16 @@
             }
         ]
     },
-
-    "workbench.colorCustomizations": {},
-    "triggerTaskOnSave.tasks": {
-        "prereload": ["*.py"],
-        "restart": true
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "cmd": "${workspaceFolder}/.venv/Scripts/python.exe ${workspaceFolder}/scripts/prereload.py",
+                "autoShowOutputPanel": "error",
+                "match": ".*\\.py$"
+            }
+        ],
+        "autoClearConsole": true
     },
-    "triggerTaskOnSave.resultIndicator": "statusBar.background",
-    "triggerTaskOnSave.failureColour": "#ff0000",
-    "triggerTaskOnSave.successColour": "#00ff00",
     "blender.addon.reloadOnSave": false,
     "blender.addon.logLevel": "info",
     "blender.addon.buildTaskName": "prereload",

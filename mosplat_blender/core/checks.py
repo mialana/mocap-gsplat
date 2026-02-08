@@ -16,8 +16,8 @@ from infrastructure.constants import PER_FRAME_DIRNAME
 from infrastructure.macros import try_access_path
 from infrastructure.schemas import (
     AddonMeta,
-    NPZNameToPathLookup,
-    SavedNPZName,
+    SavedTensorFileName,
+    STNameToPathLookup,
     UnexpectedError,
     UserFacingError,
 )
@@ -184,37 +184,37 @@ def check_frame_range_poll_result(
     return err_list  # return even if list if empty
 
 
-def check_npz_filepaths_for_frame_range(
+def check_st_filepaths_for_frame_range(
     prefs: Mosplat_AP_Global,
     props: Mosplat_PG_Global,
-    names: List[SavedNPZName],
+    names: List[SavedTensorFileName],
     should_exist: List[bool],
-) -> NPZNameToPathLookup:
+) -> STNameToPathLookup:
     """
-    generates NPZ file paths given a list of desired names and for all frames in current
-    frame range. Use `should_exist` if the npz files should already exist to raise
-    `UserFacingError` if an NPZ file does not exist where it is expected to.
+    generates safetensor file paths given a list of desired names and for all frames in current
+    frame range. Use `should_exist` if the st files should already exist to raise
+    `UserFacingError` if an st file does not exist where it is expected to.
     """
     start, end = props.current_frame_range
 
     data_dir = check_data_output_dirpath(prefs, props)
 
-    all_npz_files: NPZNameToPathLookup = {name: [] for name in names}
+    all_st_files: STNameToPathLookup = {name: [] for name in names}
 
     for frame in range(start, end):
         frame_dir = data_dir / PER_FRAME_DIRNAME.format(frame)
 
         for idx, name in enumerate(names):
-            npz_file = frame_dir / f"{name}.npz"
+            st_filepath = frame_dir / f"{name}.safetensors"
             if should_exist[idx]:
                 try:
-                    try_access_path(npz_file)  # raises the below exceptions
+                    try_access_path(st_filepath)  # raises the below exceptions
                 except (OSError, PermissionError, FileNotFoundError) as e:
                     raise UserFacingError(
-                        f"Expected to find an extracted NPZ file at '{npz_file}'."
+                        f"Expected to find an extracted safetensor file at '{st_filepath}'."
                         "Re-extract the frame range if necessary.",
                         e,
                     )  # convert now to a `UserFacingError`
-            all_npz_files[name].append(npz_file)
+            all_st_files[name].append(st_filepath)
 
-    return all_npz_files
+    return all_st_files
