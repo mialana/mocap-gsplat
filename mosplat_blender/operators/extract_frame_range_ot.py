@@ -39,7 +39,7 @@ class Mosplat_OT_extract_frame_range(
 
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)
-        self._frame_range: Tuple[int, int] = tuple(props.frame_range)
+        self._frame_range: Tuple[int, int] = props.frame_range_
         self._out_file_formatter: str = props.generate_safetensor_filepath_formatters(
             prefs, [SavedTensorFileName.RAW]
         )[SavedTensorFileName.RAW]
@@ -65,6 +65,9 @@ class Mosplat_OT_extract_frame_range(
         if new_data:
             self.data = new_data
             self.sync_to_props(pkg.props)
+
+        if status == "done":
+            pkg.props.was_frame_range_extracted = True
         return super()._queue_callback(pkg, event, next)
 
     @staticmethod
@@ -88,9 +91,7 @@ class Mosplat_OT_extract_frame_range(
             queue.put(("error", str(e), None))
 
         # create a new frame range with both limits at start
-        new_frame_range = ProcessedFrameRange(
-            start_frame=start, end_frame=start, out_file_formatters=[out_file_formatter]
-        )
+        new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
         data.add_frame_range(new_frame_range)
 
         for idx in range(start, end):

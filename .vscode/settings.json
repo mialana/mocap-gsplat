@@ -25,5 +25,6 @@
     "blender.addon.logLevel": "info",
     "blender.addon.buildTaskName": "prereload",
     "blender.addon.justMyCode": true,
-    "blender.addon.sourceDirectory": "./mosplat_blender"
+    "blender.addon.sourceDirectory": "./mosplat_blender",
+    "files.saveConflictResolution": "overwriteFileOnDisk"
 }

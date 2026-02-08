@@ -151,7 +151,7 @@ def check_frame_range_poll_result(
     prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
 ) -> List[str]:
     err_list = []
-    start, end = props.frame_range
+    start, end = props.frame_range_
     curr_range_name = props._meta.media_directory.name
     if start >= end:
         err_list.append(

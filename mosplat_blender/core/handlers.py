@@ -11,7 +11,7 @@ from infrastructure.schemas import MediaIOMetadata
 from interfaces.logging_interface import LoggingInterface
 
 if TYPE_CHECKING:
-    from bpy.types import Scene
+    from bpy.types import Property, Scene
 
     from core.preferences import Mosplat_AP_Global
     from core.properties import Mosplat_PG_Global
@@ -84,6 +84,10 @@ def handle_save_to_json(scene: Scene):
 
 @persistent
 def handle_reset_properties(scene: Scene):
+    handle_reset_properties_timer_entrypoint(scene)
+
+
+def handle_reset_properties_timer_entrypoint(scene: Optional[Scene] = None) -> None:
     from bpy import context
 
     scene = scene or context.scene

@@ -1,4 +1,4 @@
-# 2026-02-08 08:20:19.278444
+# 2026-02-08 12:25:54.341978
 # created using 'generate_property_meta_files.py'
 
 
@@ -13,14 +13,9 @@ class Mosplat_PG_AppliedPreprocessScript_Meta(NamedTuple):
     file_size: PropertyMeta
 
 
-class Mosplat_PG_OutFileFormatter_Meta(NamedTuple):
-    formatter: PropertyMeta
-
-
 class Mosplat_PG_ProcessedFrameRange_Meta(NamedTuple):
     start_frame: PropertyMeta
     end_frame: PropertyMeta
-    out_file_formatters: PropertyMeta
     applied_preprocess_script: PropertyMeta
 
 
@@ -66,6 +61,7 @@ class Mosplat_PG_LogEntryHub_Meta(NamedTuple):
 class Mosplat_PG_Global_Meta(NamedTuple):
     media_directory: PropertyMeta
     frame_range: PropertyMeta
+    was_frame_range_extracted: PropertyMeta
     operator_progress: PropertyMeta
     log_entry_hub: PropertyMeta
     media_io_metadata: PropertyMeta
@@ -77,16 +73,9 @@ MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META = Mosplat_PG_AppliedPreprocessScript_Met
     file_size=PropertyMeta(id="file_size", name="File Size", description=""),
 )
 
-MOSPLAT_PG_OUTFILEFORMATTER_META = Mosplat_PG_OutFileFormatter_Meta(
-    formatter=PropertyMeta(id="formatter", name="Formatter", description=""),
-)
-
 MOSPLAT_PG_PROCESSEDFRAMERANGE_META = Mosplat_PG_ProcessedFrameRange_Meta(
     start_frame=PropertyMeta(id="start_frame", name="Start Frame", description=""),
     end_frame=PropertyMeta(id="end_frame", name="End Frame", description=""),
-    out_file_formatters=PropertyMeta(
-        id="out_file_formatters", name="Out File Formatters", description=""
-    ),
     applied_preprocess_script=PropertyMeta(
         id="applied_preprocess_script", name="Applied Preprocess Script", description=""
     ),
@@ -187,6 +176,11 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
         id="frame_range",
         name="Frame Range",
         description="Start and end frame of data to be processed.",
+    ),
+    was_frame_range_extracted=PropertyMeta(
+        id="was_frame_range_extracted",
+        name="Was Frame Range Extracted",
+        description="Tracks whether the currently selected frame range extracted already.",
     ),
     operator_progress=PropertyMeta(
         id="operator_progress", name="Current Operator Progress", description=""

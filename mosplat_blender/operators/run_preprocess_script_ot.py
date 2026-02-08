@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 from collections import Counter
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, List, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
 from infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
@@ -11,14 +12,20 @@ from infrastructure.macros import (
     import_module_from_path_dynamic,
 )
 from infrastructure.schemas import (
-    DeveloperError,
+    AppliedPreprocessScript,
     FrameTensorMetadata,
     MediaIOMetadata,
     SavedTensorFileName,
     TensorFileFormatLookup,
+    UnexpectedError,
     UserFacingError,
 )
 from operators.base_ot import MosplatOperatorBase
+
+if TYPE_CHECKING:
+    import torch
+
+QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 
 
 class ProcessKwargs(NamedTuple):
@@ -30,13 +37,15 @@ class ProcessKwargs(NamedTuple):
 
 
 class Mosplat_OT_run_preprocess_script(
-    MosplatOperatorBase[Tuple[str, str, Optional[MediaIOMetadata]], ProcessKwargs],
+    MosplatOperatorBase[QueueTuple, ProcessKwargs],
 ):
     @classmethod
     def _contexted_poll(cls, pkg) -> bool:
         props = pkg.props
         cls._poll_error_msg_list.extend(props.is_valid_media_directory_poll_result)
         cls._poll_error_msg_list.extend(props.frame_range_poll_result(pkg.prefs))
+        if not pkg.props.was_frame_range_extracted:
+            cls._poll_error_msg_list.append("Frame range must be extracted.")
 
         return len(cls._poll_error_msg_list) == 0
 
@@ -46,13 +55,17 @@ class Mosplat_OT_run_preprocess_script(
 
         self._media_files: List[Path] = props.media_files(prefs)
         self._preprocess_script: Path = prefs.preprocess_media_script_file_
-        self._frame_range: Tuple[int, int] = tuple(props.frame_range)
+        self._frame_range: Tuple[int, int] = props.frame_range_
+        start, end = self._frame_range
+
+        if not self.data.get_frame_range(start, end - 1):
+            raise UserFacingError("Cannot run preprocess script on a function")
+
         self._tensor_file_formats: TensorFileFormatLookup = (
             props.generate_safetensor_filepath_formatters(
                 prefs, [SavedTensorFileName.RAW, SavedTensorFileName.PREPROCESSED]
             )
         )
-
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
@@ -83,45 +96,20 @@ class Mosplat_OT_run_preprocess_script(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
-        from safetensors import SafetensorError, safe_open
         from safetensors.torch import save_file
 
         script, files, (start, end), tensor_file_formats, data = pwargs
-
-        try:
-            module: ModuleType = import_module_from_path_dynamic(script)
-            preprocess_fn: Callable = get_required_function(
-                module, PREPROCESS_SCRIPT_FUNCTION_NAME
-            )
-            queue.put(
-                (
-                    "update",
-                    f"Found and imported function '{preprocess_fn.__qualname__}' from module '{module.__name__}'.",
-                    None,
-                )
-            )
-        except ImportError as e:
-            msg = UserFacingError.make_msg(
-                f"Cannot import selected preprocess script: '${script}'",
-                e,
-            )
-            queue.put(("error", msg, None))
-            return
-        except (AttributeError, TypeError) as e:
-            msg = UserFacingError.make_msg(
-                f"Cannot import required `${PREPROCESS_SCRIPT_FUNCTION_NAME}` function from selected preprocess script: '{script}'",
-                e,
-            )
-            queue.put(("error", msg, None))
-            return
-
         in_file_formatter = tensor_file_formats[SavedTensorFileName.RAW]
         out_file_formatter = tensor_file_formats[SavedTensorFileName.PREPROCESSED]
+
+        preprocess_fn = _retrieve_preprocess_fn(queue, script)
+        if not preprocess_fn:
+            return
 
         device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
 
         # as strings and `Counter` collection type
-        media_files_counter = Counter(pwargs.media_files)
+        media_files_counter: Counter[Path] = Counter(files)
 
         for idx in range(start, end):
             if cancel_event.is_set():
@@ -129,62 +117,107 @@ class Mosplat_OT_run_preprocess_script(
             try:
                 in_file = in_file_formatter.format(frame_idx=idx)
                 out_file = out_file_formatter.format(frame_idx=idx)
-                try:
-                    with safe_open(in_file, framework="pt", device=device_str) as f:
-                        file: safe_open = f
-                        tensor: torch.Tensor = file.get_tensor(
-                            SavedTensorFileName._tensor_key_name()
-                        )
-                        metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
-                            file.metadata()
-                        )
-                except (SafetensorError, OSError) as e:
-                    raise UserFacingError(
-                        f"Saved data in '{in_file_formatter}' is corrupted. Behavior is unpredictable. Delete the file and re-extract frame data to clean up data state.",
-                        e,
-                    ) from e
+                tensor = load_and_verify_tensor(
+                    idx, in_file, files, media_files_counter, device_str
+                )
 
-                # converts to native int
-                frame_idx = metadata.frame_idx
-                media_files = metadata.media_files
-
-                if frame_idx != idx:
-                    raise ValueError(
-                        f"Frame index used to create '{in_file_formatter}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
-                        f"\nExpected Index: '{idx}'"
-                        f"\nExtracted Index: '{frame_idx}'",
-                    )
-
-                if media_files_counter != Counter(media_files):
-                    raise ValueError(
-                        f"Media files in media directory have changed since creating '{in_file_formatter}'. Delete the file and re-extract frame data to clean up data state.",
-                        f"\nExpected Files: '{pwargs.media_files}'"
-                        f"\nMetadata Files: '{media_files}'",
-                    )
-
-                new_tensor = preprocess_fn(frame_idx, media_files, tensor)
+                new_tensor = preprocess_fn(idx, files, tensor)
                 new_metadata = FrameTensorMetadata(frame_idx=idx, media_files=files)
                 save_file(
                     {SavedTensorFileName._tensor_key_name(): new_tensor},
                     filename=out_file,
                     metadata=new_metadata.to_dict(),
                 )
-                queue.put(("update", f"Finished processing frame '{frame_idx}'", None))
+                queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
-                msg = UserFacingError.make_msg(
-                    f"Could not run script on frame '{idx}'", e
-                )
-                queue.put(("error", msg, None))
+                queue.put(("error", str(e), None))
                 continue
 
-        frame_range = data.get_frame_range(start, end)
+        frame_range = data.get_frame_range(start, end - 1)  # inclusive
         if not frame_range:
-            msg = DeveloperError.make_msg(
-                f"Should not have ran script on non-existing frame range."
-            )
+            msg = UnexpectedError.make_msg(f"Poll-guard failed.")
             queue.put(("error", msg, None))
         else:
+            frame_range.applied_preprocess_script = (
+                AppliedPreprocessScript.from_file_path(script)
+            )
             queue.put(("done", f"Ran '{script}' on frames '{start}-{end}'", data))
+
+
+def load_and_verify_tensor(
+    idx: int,
+    in_file: str,
+    files: List[Path],
+    media_files_counter: Counter[Path],
+    device_str: str,
+) -> torch.Tensor:
+    from safetensors import SafetensorError, safe_open
+
+    try:
+        with safe_open(in_file, framework="pt", device=device_str) as f:
+            file: safe_open = f
+            tensor: torch.Tensor = file.get_tensor(
+                SavedTensorFileName._tensor_key_name()
+            )
+            metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
+                file.metadata()
+            )
+    except (SafetensorError, OSError) as e:
+        raise UserFacingError(
+            f"Saved data in '{in_file}' is corrupted. Behavior is unpredictable. Delete the file and re-extract frame data to clean up data state.",
+            e,
+        ) from e
+
+    # converts to native int
+    frame_idx = metadata.frame_idx
+    media_files = metadata.media_files
+
+    if frame_idx != frame_idx:
+        raise ValueError(
+            f"Frame index used to create '{in_file}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
+            f"\nExpected Index: '{idx}'" f"\nExtracted Index: '{frame_idx}'",
+        )
+
+    if media_files_counter != Counter(media_files):
+        raise ValueError(
+            f"Media files in media directory have changed since creating '{in_file}'. Delete the file and re-extract frame data to clean up data state.",
+            f"\nExpected Files: '{files}'" f"\nMetadata Files: '{media_files}'",
+        )
+
+    return tensor
+
+
+def _retrieve_preprocess_fn(
+    queue: mp.Queue[QueueTuple], script: Path
+) -> Optional[Callable]:
+    try:
+        module: ModuleType = import_module_from_path_dynamic(script)
+        preprocess_fn: Callable = get_required_function(
+            module, PREPROCESS_SCRIPT_FUNCTION_NAME
+        )
+        queue.put(
+            (
+                "update",
+                f"Found and imported function '{preprocess_fn.__qualname__}' from module '{module.__name__}'.",
+                None,
+            )
+        )
+    except ImportError as e:
+        msg = UserFacingError.make_msg(
+            f"Cannot import selected preprocess script: '${script}'",
+            e,
+        )
+        queue.put(("error", msg, None))
+        return None
+    except (AttributeError, TypeError) as e:
+        msg = UserFacingError.make_msg(
+            f"Cannot import required `${PREPROCESS_SCRIPT_FUNCTION_NAME}` function from selected preprocess script: '{script}'",
+            e,
+        )
+        queue.put(("error", msg, None))
+        return None
+
+    return preprocess_fn
 
 
 def process_entrypoint(*args, **kwargs):

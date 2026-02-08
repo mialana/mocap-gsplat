@@ -236,18 +236,18 @@ class AppliedPreprocessScript:
         return cls(**d)
 
     @classmethod
-    def from_file_path(cls, file_path: str) -> AppliedPreprocessScript:
-        script_filepath = Path(file_path)
-        stat = try_access_path(script_filepath)
+    def from_file_path(cls, file_path: Path) -> AppliedPreprocessScript:
+        stat = try_access_path(file_path)
 
-        return cls(file_path=file_path, mod_time=stat.st_mtime, file_size=stat.st_size)
+        return cls(
+            file_path=str(file_path), mod_time=stat.st_mtime, file_size=stat.st_size
+        )
 
 
 @dataclass
 class ProcessedFrameRange:
     start_frame: int
-    end_frame: int
-    out_file_formatters: List[str]
+    end_frame: int  # inclusive
     applied_preprocess_script: AppliedPreprocessScript = field(
         default_factory=lambda: AppliedPreprocessScript(
             file_path="", mod_time=-1.0, file_size=-1
@@ -460,6 +460,7 @@ class MediaIOMetadata:
         return status_lookup, self._accumulate_media_status
 
     def get_frame_range(self, start: int, end: int) -> Optional[ProcessedFrameRange]:
+        """end must be inclusive"""
         return next(
             (
                 frame_range
@@ -472,8 +473,8 @@ class MediaIOMetadata:
     def add_frame_range(self, frame_range: ProcessedFrameRange) -> bool:
         start = frame_range.start_frame
         end = frame_range.end_frame
-        self.processed_frame_ranges.append(frame_range)
         existing_frame_range = self.get_frame_range(start, end)
+        self.processed_frame_ranges.append(frame_range)
 
         if not existing_frame_range:
             return True  # processed a new frame range
@@ -481,10 +482,4 @@ class MediaIOMetadata:
         # new frame range overrides old
         self.processed_frame_ranges.remove(existing_frame_range)
 
-        if frame_range.out_file_formatters:
-            # delete all processed data from existing range
-            for idx in range(start, end):
-                for formatter in frame_range.out_file_formatters:
-                    file: Path = Path(formatter.format(frame_idx=idx)).resolve()
-                    file.unlink(missing_ok=True)  # delete
         return False  # already existed

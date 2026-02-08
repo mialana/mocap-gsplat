@@ -31,7 +31,6 @@ from core.meta.properties_meta import (
     MOSPLAT_PG_MEDIAFILESTATUS_META,
     MOSPLAT_PG_MEDIAIOMETADATA_META,
     MOSPLAT_PG_OPERATORPROGRESS_META,
-    MOSPLAT_PG_OUTFILEFORMATTER_META,
     MOSPLAT_PG_PROCESSEDFRAMERANGE_META,
     Mosplat_PG_AppliedPreprocessScript_Meta,
     Mosplat_PG_Global_Meta,
@@ -40,7 +39,6 @@ from core.meta.properties_meta import (
     Mosplat_PG_MediaFileStatus_Meta,
     Mosplat_PG_MediaIOMetadata_Meta,
     Mosplat_PG_OperatorProgress_Meta,
-    Mosplat_PG_OutFileFormatter_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
 )
 from infrastructure.constants import PER_FRAME_DIRNAME
@@ -66,10 +64,24 @@ LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
 ]
 
 
+FrameRangeTuple: TypeAlias = Tuple[int, int]
+
+
+def update_frame_range(self: Mosplat_PG_Global, context: Context):
+    data = self.metadata_accessor.to_dataclass()
+
+    start, end = self.frame_range_
+    self.was_frame_range_extracted = bool(data.get_frame_range(start, end - 1))
+
+    self.logger.info(f"Frame range updated to '{start}-{end}'.")
+
+
 def update_media_directory(self: Mosplat_PG_Global, context: Context):
     OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
 
     self.logger.info(f"'{self._meta.media_directory.name}' updated.")
+
+    update_frame_range(self, context)
 
 
 class MosplatPropertyGroupBase(
@@ -94,21 +106,12 @@ class Mosplat_PG_AppliedPreprocessScript(
     file_size: IntProperty(name="File Size", default=-1)
 
 
-class Mosplat_PG_OutFileFormatter(MosplatPropertyGroupBase):
-    _meta: Mosplat_PG_OutFileFormatter_Meta = MOSPLAT_PG_OUTFILEFORMATTER_META
-
-    formatter: StringProperty(name="Formatter")
-
-
 class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRange]):
     _meta: Mosplat_PG_ProcessedFrameRange_Meta = MOSPLAT_PG_PROCESSEDFRAMERANGE_META
     __dataclass_type__ = ProcessedFrameRange
 
     start_frame: IntProperty(name="Start Frame", min=0)
     end_frame: IntProperty(name="End Frame", min=0)
-    out_file_formatters: CollectionProperty(
-        name="Out File Formatters", type=Mosplat_PG_OutFileFormatter
-    )
     applied_preprocess_script: PointerProperty(
         name="Applied Preprocess Script", type=Mosplat_PG_AppliedPreprocessScript
     )
@@ -116,12 +119,6 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
     @property
     def script_accessor(self) -> Mosplat_PG_AppliedPreprocessScript:
         return self.applied_preprocess_script
-
-    @property
-    def formatters_accessor(
-        self,
-    ) -> SupportsCollectionProperty[Mosplat_PG_OutFileFormatter]:
-        return self.out_file_formatters
 
 
 class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
@@ -258,9 +255,6 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase):
         return self.logs
 
 
-FrameRangeTuple: TypeAlias = Tuple[int, int]
-
-
 class Mosplat_PG_Global(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
     __dataclass_type__ = None
@@ -280,6 +274,14 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         size=2,
         default=(0, 30),
         min=0,
+        options={"SKIP_SAVE"},
+        update=update_frame_range,
+    )
+
+    was_frame_range_extracted: BoolProperty(
+        name="Was Frame Range Extracted",
+        description="Tracks whether the currently selected frame range extracted already.",
+        default=False,
         options={"SKIP_SAVE"},
     )
 

@@ -60,21 +60,18 @@ def register_addon():
 
     LoggingInterface().init_handlers_from_addon_prefs(addon_preferences)
 
-    # try load from JSON every file load and after registration occurs
-    bpy.app.handlers.load_post.append(core.handlers.handle_load_from_json)
-    bpy.app.handlers.load_post.append(core.handlers.handle_reset_properties)
-    bpy.app.timers.register(
-        core.handlers.handle_load_from_json_timer_entrypoint, first_interval=0
-    )
-
-    bpy.app.handlers.undo_post.append(core.handlers.handle_save_to_json)
-    bpy.app.handlers.redo_post.append(core.handlers.handle_save_to_json)
+    set_handlers()
 
     logger.info(f"'{ADDON_META.human_readable_name}' addon registration completed.")
 
 
 def unregister_addon():
     """essentially all operations here should be guarded with try blocks"""
+    try:
+        delattr(bpy.types.Scene, ADDON_META.global_props_name)
+    except AttributeError:
+        logger.error(f"Error removing add-on properties.")
+
     # unregister all classes
     for cls, _ in reversed(registration_factory):
         try:
@@ -83,17 +80,45 @@ def unregister_addon():
             logger.error(f"Exception during unregistration of `{cls.__name__=}`")
 
     try:
-        delattr(bpy.types.Scene, ADDON_META.global_props_name)
-    except AttributeError:
-        logger.error(f"Error removing add-on properties.")
-
-    try:
         from interfaces import VGGTInterface
 
         VGGTInterface.cleanup_interface()
     except UnexpectedError as e:
         logger.error(f"Error during VGGT cleanup: {str(e)}")
 
-    bpy.app.handlers.load_post.remove(core.handlers.handle_load_from_json)
+    unset_handlers()
 
     logger.info(f"'{ADDON_META.human_readable_name}' addon unregistration completed.")
+
+
+def set_handlers():
+    load_post = bpy.app.handlers.load_post
+    if not core.handlers.handle_load_from_json in load_post:
+        load_post.append(core.handlers.handle_load_from_json)
+    if not core.handlers.handle_reset_properties in load_post:
+        load_post.append(core.handlers.handle_reset_properties)
+
+    if not core.handlers.handle_save_to_json in bpy.app.handlers.undo_post:
+        bpy.app.handlers.undo_post.append(core.handlers.handle_save_to_json)
+    if not core.handlers.handle_save_to_json in bpy.app.handlers.redo_post:
+        bpy.app.handlers.redo_post.append(core.handlers.handle_save_to_json)
+
+    # register timers to run after add-on registration
+    bpy.app.timers.register(
+        core.handlers.handle_load_from_json_timer_entrypoint, first_interval=0
+    )
+    bpy.app.timers.register(
+        core.handlers.handle_reset_properties_timer_entrypoint, first_interval=0
+    )
+
+
+def unset_handlers():
+    load_post = bpy.app.handlers.load_post
+    if core.handlers.handle_load_from_json in load_post:
+        load_post.remove(core.handlers.handle_load_from_json)
+    if core.handlers.handle_reset_properties in load_post:
+        load_post.remove(core.handlers.handle_reset_properties)
+    if core.handlers.handle_save_to_json in bpy.app.handlers.undo_post:
+        bpy.app.handlers.undo_post.remove(core.handlers.handle_save_to_json)
+    if core.handlers.handle_save_to_json in bpy.app.handlers.redo_post:
+        bpy.app.handlers.redo_post.remove(core.handlers.handle_save_to_json)
