@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Generic, List, Tuple, Union
+from typing import TYPE_CHECKING, Final, Generic, List, Tuple, TypeAlias, Union
 
 from bpy.props import (
     BoolProperty,
@@ -17,12 +17,11 @@ from bpy.props import (
 from bpy.types import Context, PropertyGroup
 
 from core.checks import (
-    check_current_media_dirpath,
-    check_data_json_filepath,
-    check_data_output_dirpath,
     check_frame_range_poll_result,
+    check_media_directory,
     check_media_files,
-    check_st_filepaths_for_frame_range,
+    check_media_io_metadata_filepath,
+    check_media_output_dir,
 )
 from core.meta.properties_meta import (
     MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META,
@@ -30,7 +29,7 @@ from core.meta.properties_meta import (
     MOSPLAT_PG_LOGENTRY_META,
     MOSPLAT_PG_LOGENTRYHUB_META,
     MOSPLAT_PG_MEDIAFILESTATUS_META,
-    MOSPLAT_PG_MEDIAIODATASET_META,
+    MOSPLAT_PG_MEDIAIOMETADATA_META,
     MOSPLAT_PG_OPERATORPROGRESS_META,
     MOSPLAT_PG_PROCESSEDFRAMERANGE_META,
     Mosplat_PG_AppliedPreprocessScript_Meta,
@@ -38,26 +37,23 @@ from core.meta.properties_meta import (
     Mosplat_PG_LogEntry_Meta,
     Mosplat_PG_LogEntryHub_Meta,
     Mosplat_PG_MediaFileStatus_Meta,
-    Mosplat_PG_MediaIODataset_Meta,
+    Mosplat_PG_MediaIOMetadata_Meta,
     Mosplat_PG_OperatorProgress_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
 )
+from infrastructure.constants import PER_FRAME_DIRNAME
 from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
 from infrastructure.protocols import SupportsCollectionProperty
 from infrastructure.schemas import (
     AppliedPreprocessScript,
     BlenderEnumItem,
-    GlobalData,
-    LogEntry,
-    LogEntryHub,
     LogEntryLevelEnum,
     MediaFileStatus,
-    MediaIODataset,
-    OperatorProgress,
+    MediaIOMetadata,
     ProcessedFrameRange,
     SavedTensorFileName,
-    STNameToPathLookup,
+    TensorFileFormatLookup,
 )
 
 if TYPE_CHECKING:
@@ -68,10 +64,10 @@ LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
 ]
 
 
-def update_current_media_dir(self: Mosplat_PG_Global, context: Context):
+def update_media_directory(self: Mosplat_PG_Global, context: Context):
     OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
 
-    self.logger.info(f"'{self._meta.current_media_dir.name}' updated.")
+    self.logger.info(f"'{self._meta.media_directory.name}' updated.")
 
 
 class MosplatPropertyGroupBase(
@@ -125,19 +121,10 @@ class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
     mod_time: FloatProperty(name="Modification Time", default=-1.0)
     file_size: IntProperty(name="File Size", default=-1)
 
-    def matches_dataset(
-        self, dataset: Union[Mosplat_PG_MediaIODataset, MediaIODataset]
-    ) -> Tuple[bool, bool, bool]:
-        return (
-            self.frame_count == dataset.median_frame_count,
-            self.width == dataset.median_width,
-            self.height == dataset.median_height,
-        )
 
-
-class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
-    _meta: Mosplat_PG_MediaIODataset_Meta = MOSPLAT_PG_MEDIAIODATASET_META
-    __dataclass_type__ = MediaIODataset
+class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
+    _meta: Mosplat_PG_MediaIOMetadata_Meta = MOSPLAT_PG_MEDIAIOMETADATA_META
+    __dataclass_type__ = MediaIOMetadata
 
     base_directory: StringProperty(
         name="Base Directory",
@@ -195,9 +182,9 @@ class Mosplat_PG_MediaIODataset(MosplatPropertyGroupBase[MediaIODataset]):
         return self.processed_frame_ranges
 
 
-class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
+class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_OperatorProgress_Meta = MOSPLAT_PG_OPERATORPROGRESS_META
-    __dataclass_type__ = OperatorProgress
+    __dataclass_type__ = None
 
     current: IntProperty(
         name="Progress Current",
@@ -218,9 +205,9 @@ class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase[OperatorProgress]):
     )
 
 
-class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
+class Mosplat_PG_LogEntry(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_LogEntry_Meta = MOSPLAT_PG_LOGENTRY_META
-    __dataclass_type__ = LogEntry
+    __dataclass_type__ = None
 
     level: EnumProperty(
         name="Log Entry Level",
@@ -239,9 +226,9 @@ class Mosplat_PG_LogEntry(MosplatPropertyGroupBase[LogEntry]):
     )
 
 
-class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
+class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_LogEntryHub_Meta = MOSPLAT_PG_LOGENTRYHUB_META
-    __dataclass_type__ = LogEntryHub
+    __dataclass_type__ = None
 
     logs: CollectionProperty(name="Log Entries Data", type=Mosplat_PG_LogEntry)
     logs_active_index: IntProperty(name="Log Entries Active Index", default=0)
@@ -256,20 +243,23 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase[LogEntryHub]):
         return self.logs
 
 
-class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
-    _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
-    __dataclass_type__ = GlobalData
+FrameRangeTuple: TypeAlias = Tuple[int, int]
 
-    current_media_dir: StringProperty(
+
+class Mosplat_PG_Global(MosplatPropertyGroupBase):
+    _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
+    __dataclass_type__ = None
+
+    media_directory: StringProperty(
         name="Media Directory",
         description="Filepath to directory containing media files to be processed.",
         default=str(Path.home()),
         subtype="DIR_PATH",
-        update=update_current_media_dir,
+        update=update_media_directory,
         options={"SKIP_SAVE"},
     )
 
-    current_frame_range: IntVectorProperty(
+    frame_range: IntVectorProperty(
         name="Frame Range",
         description="Start and end frame of data to be processed.",
         size=2,
@@ -278,44 +268,48 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
         options={"SKIP_SAVE"},
     )
 
-    current_media_io_dataset: PointerProperty(
-        name="Media IO Dataset",
-        description="Dataset for all media I/O operations",
-        type=Mosplat_PG_MediaIODataset,
-        options={"SKIP_SAVE"},
-    )
-
-    current_operator_progress: PointerProperty(
+    operator_progress: PointerProperty(
         name="Current Operator Progress",
         type=Mosplat_PG_OperatorProgress,
         options={"SKIP_SAVE"},
     )
 
-    current_log_entry_hub: PointerProperty(
+    log_entry_hub: PointerProperty(
         name="Current Log Entry Hub", type=Mosplat_PG_LogEntryHub, options={"SKIP_SAVE"}
     )
 
+    media_io_metadata: PointerProperty(
+        name="Media IO Metadata",
+        description="Metadata for all media I/O operations",
+        type=Mosplat_PG_MediaIOMetadata,
+        options={"SKIP_SAVE"},
+    )
+
     @property
-    def dataset_accessor(self) -> Mosplat_PG_MediaIODataset:
-        return self.current_media_io_dataset
+    def metadata_accessor(self) -> Mosplat_PG_MediaIOMetadata:
+        return self.media_io_metadata
 
     @property
     def progress_accessor(self) -> Mosplat_PG_OperatorProgress:
-        return self.current_operator_progress
+        return self.operator_progress
 
     @property
     def log_hub_accessor(self) -> Mosplat_PG_LogEntryHub:
-        return self.current_log_entry_hub
+        return self.log_entry_hub
 
     @property
-    def current_media_dirpath(self) -> Path:
-        return check_current_media_dirpath(self)
+    def media_directory_(self) -> Path:
+        return check_media_directory(self)
 
-    def data_output_dirpath(self, prefs: Mosplat_AP_Global) -> Path:
-        return check_data_output_dirpath(prefs, self)
+    @property
+    def frame_range_(self) -> FrameRangeTuple:
+        return tuple(self.frame_range)
 
-    def data_json_filepath(self, prefs: Mosplat_AP_Global) -> Path:
-        return check_data_json_filepath(prefs, self)
+    def media_data_output_dir_(self, prefs: Mosplat_AP_Global) -> Path:
+        return check_media_output_dir(prefs, self)
+
+    def media_io_metadata_filepath(self, prefs: Mosplat_AP_Global) -> Path:
+        return check_media_io_metadata_filepath(prefs, self)
 
     def media_files(self, prefs: Mosplat_AP_Global) -> List[Path]:
         return check_media_files(prefs, self)
@@ -325,21 +319,21 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase[GlobalData]):
 
     @property
     def is_valid_media_directory_poll_result(self) -> List[str]:
-        dataset = self.dataset_accessor
+        data = self.metadata_accessor
 
         result = []
-        if not dataset.is_valid_media_directory:
+        if not data.is_valid_media_directory:
             result.append(
                 f"Ensure matching frame count, width, & height"
-                "of media in '{dataset.base_directory}'."
+                f"of media in '{data.base_directory}'."
             )
         return result
 
-    def generate_st_filepaths_for_frame_range(
-        self,
-        prefs: Mosplat_AP_Global,
-        names: List[SavedTensorFileName],
-        should_exist: List[bool],
-    ) -> STNameToPathLookup:
-        """wrapper"""
-        return check_st_filepaths_for_frame_range(prefs, self, names, should_exist)
+    def generate_safetensor_filepath_formats(
+        self, prefs: Mosplat_AP_Global, names: List[SavedTensorFileName]
+    ) -> TensorFileFormatLookup:
+        data_dir = check_media_output_dir(prefs, self)
+        return {
+            name: str(data_dir / PER_FRAME_DIRNAME / f"{name}.safetensors")
+            for name in names
+        }

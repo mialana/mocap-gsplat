@@ -10,10 +10,10 @@ import bpy
 import core
 from infrastructure.mixins import PreregristrationFn
 from infrastructure.schemas import AddonMeta, DeveloperError, UnexpectedError
-from interfaces import MosplatLoggingInterface
+from interfaces import LoggingInterface
 from operators import MosplatOperatorBase, operator_factory
 
-logger = MosplatLoggingInterface.configure_logger_instance(__name__)
+logger = LoggingInterface.configure_logger_instance(__name__)
 
 registration_factory: Sequence[
     Tuple[
@@ -58,7 +58,7 @@ def register_addon():
         bpy.context.preferences
     )
 
-    MosplatLoggingInterface().init_handlers_from_addon_prefs(addon_preferences)
+    LoggingInterface().init_handlers_from_addon_prefs(addon_preferences)
 
     # try load from JSON every file load and after registration occurs
     bpy.app.handlers.load_post.append(core.handlers.handle_load_from_json)
@@ -88,9 +88,9 @@ def unregister_addon():
         logger.error(f"Error removing add-on properties.")
 
     try:
-        from interfaces import MosplatVGGTInterface
+        from interfaces import VGGTInterface
 
-        MosplatVGGTInterface.cleanup_interface()
+        VGGTInterface.cleanup_interface()
     except UnexpectedError as e:
         logger.error(f"Error during VGGT cleanup: {str(e)}")
 

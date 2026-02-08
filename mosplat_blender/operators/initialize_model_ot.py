@@ -1,11 +1,8 @@
-from functools import partial
 from pathlib import Path
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
-from infrastructure.constants import _TIMEOUT_LAZY_
-from infrastructure.macros import kill_subprocess_cross_platform
 from infrastructure.schemas import UnexpectedError
-from interfaces import MosplatVGGTInterface
+from interfaces import VGGTInterface
 from operators.base_ot import MosplatOperatorBase
 
 
@@ -15,14 +12,11 @@ class ProcessKwargs(NamedTuple):
 
 
 class Mosplat_OT_initialize_model(
-    MosplatOperatorBase[
-        Tuple[str, str, int, int],
-        ProcessKwargs,
-    ]
+    MosplatOperatorBase[VGGTInterface.InitQueueTuple, ProcessKwargs]
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
-        if MosplatVGGTInterface().model is not None:
+        if VGGTInterface().model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization
         if pkg.props.progress_accessor.in_use:
@@ -59,44 +53,25 @@ class Mosplat_OT_initialize_model(
             pkg.context,
             pwargs=ProcessKwargs(
                 hf_id=prefs.vggt_hf_id,
-                model_cache_dir=prefs.vggt_model_dir,
+                model_cache_dir=prefs.cache_dir_vggt_,
             ),
         )
 
         return "RUNNING_MODAL"
 
-    def _contexted_modal(self, pkg, event):
-        # check cancellation on timer callback, kill subprocess if needed
-        if self.worker and not self.worker.is_alive():
-            self.worker.force_terminate()
-        return super()._contexted_modal(pkg, event)
-
     def cleanup(self, pkg):
-        from bpy import app
-
         self.wm(pkg.context).progress_end()  # stop progress
         progress = pkg.props.progress_accessor
         progress.in_use = False
         progress.current = -1
         progress.total = -1
 
-        """
-        register a timer that will kill the subprocess with the saved pid
-        (operator itself will leave the scope before then)
-        this ensures that cancellation that never reaches the next modal call 
-        still cleans up the subprocess
-        """
-        if self.worker and self.worker._pid:
-            app.timers.register(
-                partial(kill_subprocess_cross_platform, self.worker._pid),
-                first_interval=_TIMEOUT_LAZY_,  # no orphaned processes here!
-            )
         return super().cleanup(pkg)
 
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         try:
-            MosplatVGGTInterface().initialize_model(
+            VGGTInterface().initialize_model(
                 pwargs.hf_id, pwargs.model_cache_dir, queue, cancel_event
             )
 

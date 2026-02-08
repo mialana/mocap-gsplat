@@ -6,9 +6,9 @@ actually called within the add-on's runtime.
 
 import os
 
-from interfaces.logging_interface import MosplatLoggingInterface
+from interfaces.logging_interface import LoggingInterface
 
-logger = MosplatLoggingInterface.configure_logger_instance(__name__)
+logger = LoggingInterface.configure_logger_instance(__name__)
 
 
 def test_deps_imports():

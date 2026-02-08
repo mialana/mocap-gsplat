@@ -16,11 +16,11 @@ if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     import numpy as np
     from vggt.models.vggt import VGGT
 
-QueueTuple: TypeAlias = Tuple[str, str, int, int]
 
-
-class MosplatVGGTInterface(LogClassMixin):
+class VGGTInterface(LogClassMixin):
     instance: ClassVar[Optional[Self]] = None
+
+    InitQueueTuple: TypeAlias = Tuple[str, str, int, int]
 
     def __new__(cls) -> Self:
         """
@@ -41,7 +41,7 @@ class MosplatVGGTInterface(LogClassMixin):
         self,
         hf_id: str,
         model_cache_dir: Path,
-        queue: mp.Queue[QueueTuple],
+        queue: mp.Queue[InitQueueTuple],
         cancel_event: mp_sync.Event,
     ):
         try:
@@ -75,7 +75,7 @@ class MosplatVGGTInterface(LogClassMixin):
         self,
         hf_id: str,
         model_cache_dir: Path,
-        queue: mp.Queue[QueueTuple],
+        queue: mp.Queue[InitQueueTuple],
         cancel_event: mp_sync.Event,
     ):
         from huggingface_hub import hf_hub_download
@@ -135,7 +135,7 @@ class MosplatVGGTInterface(LogClassMixin):
         cls.instance = None  # set instance to none
 
 
-def make_tqdm_class(queue: mp.Queue[QueueTuple]):
+def make_tqdm_class(queue: mp.Queue[VGGTInterface.InitQueueTuple]):
     from huggingface_hub.utils.tqdm import tqdm
 
     class ProgressTqdm(tqdm):

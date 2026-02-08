@@ -12,6 +12,7 @@ from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
 QT = TypeVar("QT", bound=tuple)  # types elements of worker queue
 
+from infrastructure.constants import _TIMEOUT_LAZY_
 from infrastructure.macros import kill_subprocess_cross_platform
 from infrastructure.mixins import LogClassMixin
 from infrastructure.schemas import EnvVariableEnum
@@ -34,8 +35,9 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
     ):
         self._ctx: mp_ctx.SpawnContext = mp.get_context("spawn")
 
-        # create queue and cancel event
+        # create queue for process to send data back to main process
         self._queue: mp.Queue[QT] = self._ctx.Queue()
+        # create event for main process to signal subprocess to cancel itself
         self._cancel_event: mp_sync.Event = self._ctx.Event()
 
         self._process: mp_ctx.SpawnProcess = self._ctx.Process(
@@ -69,8 +71,15 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
     def cancel(self):
         self._cancel_event.set()
 
-    def is_alive(self):
-        return not self._cancel_event.is_set() and self._process.is_alive()
+        def reaper_thread():
+            # give the process an ample of time to finish, then force termination
+            self._process.join(timeout=_TIMEOUT_LAZY_)
+            self.force_terminate()
+
+        threading.Thread(target=reaper_thread, daemon=True).start()
+
+    def was_cancelled(self):
+        return not self._cancel_event.is_set()
 
     def cleanup(self):
         self.cancel()
@@ -104,14 +113,12 @@ class MosplatWorkerInterface(Generic[QT], LogClassMixin):
         )
         self._start_counter = time.perf_counter()
 
-        def watcher():
+        def watcher_thread():
+            # join the process and wait for end
             self._process.join()
             self._end_timer()
 
-        threading.Thread(
-            target=watcher,
-            daemon=True,
-        ).start()  # start a thread that simply joins the process and handles end
+        threading.Thread(target=watcher_thread, daemon=True).start()
 
     def _end_timer(self):
         if not self._start_counter:

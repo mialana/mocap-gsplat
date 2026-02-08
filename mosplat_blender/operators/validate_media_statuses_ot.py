@@ -3,17 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple
 
-from infrastructure.schemas import MediaFileStatus, MediaIODataset
+from infrastructure.schemas import MediaFileStatus, MediaIOMetadata
 from operators.base_ot import MosplatOperatorBase
 
 
 class ProcessKwargs(NamedTuple):
     updated_media_files: List[Path]
-    data: MediaIODataset
+    data: MediaIOMetadata
 
 
 class Mosplat_OT_validate_media_statuses(
-    MosplatOperatorBase[Tuple[str, str, Optional[MediaIODataset]], ProcessKwargs]
+    MosplatOperatorBase[Tuple[str, str, Optional[MediaIOMetadata]], ProcessKwargs]
 ):
     def _contexted_invoke(self, pkg, event):
         prefs = pkg.prefs
@@ -44,12 +44,13 @@ class Mosplat_OT_validate_media_statuses(
         import torch
         from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
+        files, data = pwargs
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        data = pwargs.data
         status_lookup, accumulator = data.status_accumulator()
 
-        for file in pwargs.updated_media_files:
+        for file in files:
             if cancel_event.is_set():
                 return  # simply return as new queue items will not be read anymore
             queue_item = ("update", f"Validated media file: '{file}'", data)
@@ -58,7 +59,7 @@ class Mosplat_OT_validate_media_statuses(
             status = status_lookup.get(str(file), MediaFileStatus(filepath=str(file)))
 
             # if success is already valid skip new extraction
-            if status.needs_reextraction(dataset=data):
+            if status.needs_reextraction(data=data):
                 try:
                     # create decoder here so torchcodec only needs to be imported once
                     decoder: VideoDecoder = VideoDecoder(status.filepath, device=device)
@@ -71,8 +72,8 @@ class Mosplat_OT_validate_media_statuses(
                     # change queue item and give error msg
                     queue_item = ("error", str(e), data)
 
-            accumulator(status)  # update dataset from new status
-            queue.put(queue_item)  # transmit that dataset has been updated
+            accumulator(status)  # update metadata from new status
+            queue.put(queue_item)  # transmit that metadata has been updated
 
         # get final validity
         result = ("success" if data.is_valid_media_directory else "failure").upper()

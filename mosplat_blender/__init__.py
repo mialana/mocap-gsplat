@@ -21,7 +21,7 @@ ADDON_PACKAGE_ORIGINAL = __package__ or str(Path(__file__).resolve().parent)
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from infrastructure.schemas import AddonMeta, EnvVariableEnum
-from interfaces import MosplatLoggingInterface
+from interfaces import LoggingInterface
 
 
 def register():
@@ -32,7 +32,7 @@ def register():
     from main import register_addon
 
     # initialize handlers and local "root" logger
-    MosplatLoggingInterface(__name__)
+    LoggingInterface(__name__)
 
     register_addon()
 
@@ -42,7 +42,7 @@ def unregister():
 
     unregister_addon()
 
-    MosplatLoggingInterface.cleanup_interface()
+    LoggingInterface.cleanup_interface()
 
     if EnvVariableEnum.TESTING in os.environ:
         clear_terminal()  # for dev QOL

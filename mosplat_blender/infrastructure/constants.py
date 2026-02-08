@@ -43,17 +43,17 @@ COLORED_FORMATTER_LEVEL_STYLES = {
     },
 }
 
-PER_FRAME_DIRNAME: Final[str] = "frame_{:04d}"
+PER_FRAME_DIRNAME: Final[str] = "frame_{frame_idx:04d}"
 
-MAX_LOG_ENTRIES_STORED: Final[int] = 24
+DEFAULT_MAX_LOG_ENTRIES: Final[int] = 24
 DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
 
 # path location of the shipped preprocess script
-DEFAULT_PREPROCESS_MEDIA_SCRIPT: Final[str] = str(
+DEFAULT_PREPROCESS_SCRIPT: Final[str] = str(
     Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_video_rotations.py"
 )
 # target function in script
-PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
+PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
 
 # path location of hf model download via subprocess script
 DOWNLOAD_HF_WITH_PROGRESS_SCRIPT: Final[Path] = (

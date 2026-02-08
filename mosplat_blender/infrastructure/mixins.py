@@ -18,7 +18,6 @@ from typing import (
     Type,
     TypeAlias,
     TypeVar,
-    Union,
 )
 
 from infrastructure.constants import _MISSING_
@@ -60,9 +59,9 @@ class LogClassMixin:
 
     @classmethod
     def _create_logger_for_class(cls, label: Optional[str] = None):
-        from interfaces import MosplatLoggingInterface
+        from interfaces import LoggingInterface
 
-        cls.class_logger = MosplatLoggingInterface.configure_logger_instance(
+        cls.class_logger = LoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{label if label else cls.__name__}"
         )
 
@@ -152,13 +151,16 @@ class DataclassInteropMixin(Generic[D]):
 
     # the dataclass that is synonymous to the property group.
     # will be enforced before registration.
-    __dataclass_type__: Type[D] = _MISSING_
+    __dataclass_type__: Optional[Type[D]] = _MISSING_
 
     def to_dataclass(self) -> D:
-        cls = self.__dataclass_type__
+        d_cls = self.__dataclass_type__
+        if d_cls is None:
+            cls = self.__class__
+            raise DeveloperError(f"No dataclass interop exists for {cls.__qualname__}.")
 
         kwargs = {}
-        for fld in fields(cls):
+        for fld in fields(d_cls):
             value = getattr(self, fld.name)
             if isinstance(value, DataclassInteropMixin):
                 value = value.to_dataclass()
@@ -166,9 +168,14 @@ class DataclassInteropMixin(Generic[D]):
                 value = self.collection_property_to_dataclass_list(value)
             kwargs[fld.name] = value
 
-        return cls(**kwargs)
+        return d_cls(**kwargs)
 
     def from_dataclass(self, dc: D) -> None:
+        d_cls = self.__dataclass_type__
+        if d_cls is not None and not isinstance(dc, d_cls):
+            cls = self.__class__
+            raise DeveloperError(f"No dataclass interop exists for {cls.__qualname__}.")
+
         for fld in fields(dc):
             value = getattr(dc, fld.name)
             target = getattr(self, fld.name, None)

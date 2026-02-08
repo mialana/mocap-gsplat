@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     import torchcodec.decoders
     from torch import Tensor
 
-    from core.properties import Mosplat_PG_MediaIODataset
+    from core.properties import Mosplat_PG_MediaIOMetadata
 
 
 class CustomError(ABC, RuntimeError):
@@ -129,11 +129,15 @@ class LogEntryLevelEnum(StrEnum):
 
 
 class SavedTensorFileName(StrEnum):
+    @staticmethod
+    def _tensor_key_name() -> str:
+        return "data"
+
     RAW = auto()
     PREPROCESSED = auto()
 
 
-STNameToPathLookup: TypeAlias = Dict[SavedTensorFileName, List[Path]]
+TensorFileFormatLookup: TypeAlias = Dict[SavedTensorFileName, str]
 
 
 class AddonMeta:
@@ -197,8 +201,8 @@ class AddonMeta:
         return f"{self.shortname.upper()}_UL_"
 
     @property
-    def media_io_dataset_filename(self) -> str:
-        return f"{self.shortname}_data.json"
+    def media_io_metadata_filename(self) -> str:
+        return f"{self.shortname}_metadata.json"
 
 
 class PropertyMeta(NamedTuple):
@@ -208,21 +212,23 @@ class PropertyMeta(NamedTuple):
 
 
 class FrameTensorMetadata(NamedTuple):
-    frame: int
+    frame_idx: int
     media_files: List[Path]
 
     def to_dict(self) -> Dict[str, str]:
         return {
-            "frame": str(self.frame),
+            "frame_idx": str(self.frame_idx),
             "media_files": json.dumps([str(file) for file in self.media_files]),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, str]) -> Self:
         try:
-            return cls(frame=int(d["frame"]), media_files=json.loads(d["media_files"]))
+            return cls(
+                frame_idx=int(d["frame_idx"]), media_files=json.loads(d["media_files"])
+            )
         except (KeyError, json.JSONDecodeError) as e:
-            raise UserFacingError(str(e)) from e
+            raise OSError(str(e)) from e
 
 
 @dataclass(frozen=True)
@@ -302,10 +308,10 @@ class MediaFileStatus:
         self.mod_time = -1.0
         self.file_size = -1
 
-    def needs_reextraction(self, dataset) -> bool:
+    def needs_reextraction(self, data: MediaIOMetadata) -> bool:
         return (
             not self.is_valid
-            or not all(self.matches_dataset(dataset))
+            or not all(self.matches_metadata(data))
             or self.mod_time == -1.0
             or self.file_size == -1
         )
@@ -329,13 +335,13 @@ class MediaFileStatus:
                 file_size=stat.st_size,
             )
 
-    def matches_dataset(
-        self, dataset: Union[MediaIODataset, Mosplat_PG_MediaIODataset]
+    def matches_metadata(
+        self, metadata: Union[Mosplat_PG_MediaIOMetadata, MediaIOMetadata]
     ) -> Tuple[bool, bool, bool]:
         return (
-            self.frame_count == dataset.median_frame_count,
-            self.width == dataset.median_width,
-            self.height == dataset.median_height,
+            self.frame_count == metadata.median_frame_count,
+            self.width == metadata.median_width,
+            self.height == metadata.median_height,
         )
 
     @classmethod
@@ -344,7 +350,7 @@ class MediaFileStatus:
 
 
 @dataclass
-class MediaIODataset:
+class MediaIOMetadata:
     base_directory: str
     is_valid_media_directory: bool = False
     median_frame_count: int = -1
@@ -372,7 +378,7 @@ class MediaIODataset:
         ]
 
     @classmethod
-    def from_dict(cls, d: Dict) -> MediaIODataset:
+    def from_dict(cls, d: Dict) -> MediaIOMetadata:
         instance = cls(base_directory=d["base_directory"])
         instance.load_from_dict(d)
         return instance
@@ -405,12 +411,12 @@ class MediaIODataset:
 
         except (TypeError, json.JSONDecodeError):
             json_path.unlink()  # delete the corrupted cached JSON
-            return f"The data cache existed at '{json_path}' but could not be loaded. Deleted the file and will build a new dataset from scratch."
+            return f"The data cache existed at '{json_path}' but could not be loaded. Deleted the file and will build new metadata from scratch."
 
     @classmethod
     def from_JSON(
         cls, *, json_path: Path, base_directory: Path
-    ) -> Tuple[MediaIODataset, str]:
+    ) -> Tuple[MediaIOMetadata, str]:
         instance = cls(base_directory=str(base_directory))
         load_msg = instance.load_from_JSON(json_path=json_path)
         return (instance, load_msg)
@@ -457,37 +463,3 @@ class MediaIODataset:
         self.is_valid_media_directory = True  # start fresh
 
         return status_lookup, self._accumulate_media_status
-
-
-@dataclass
-class OperatorProgress:
-    current: int = -1
-    total: int = -1
-    in_use: bool = False
-
-
-@dataclass
-class LogEntry:
-    level: str
-    message: str
-    full_message: str
-
-
-@dataclass
-class LogEntryHub:
-    logs: List[LogEntry] = field(default_factory=list)
-    logs_active_index: int = 0
-    logs_level_filter: str = LogEntryLevelEnum.ALL.value
-
-
-@dataclass
-class GlobalData:
-    current_media_dir: str = str(Path.home())
-    current_frame_range: Tuple[int, int] = field(default_factory=tuple[0, 60])
-    current_media_io_dataset: MediaIODataset = field(
-        default_factory=lambda: MediaIODataset(base_directory=str(Path.home()))
-    )
-    current_operator_progress: OperatorProgress = field(
-        default_factory=OperatorProgress
-    )
-    current_log_entry_hub: LogEntryHub = field(default_factory=LogEntryHub)

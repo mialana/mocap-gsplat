@@ -1,4 +1,4 @@
-# 2026-02-06 02:08:15.538298
+# 2026-02-07 20:38:18.090281
 # created using 'generate_property_meta_files.py'
 
 
@@ -9,9 +9,9 @@ from infrastructure.schemas import PropertyMeta
 
 class Mosplat_AP_Global_Meta(NamedTuple):
     cache_dir: PropertyMeta
-    json_log_subdir: PropertyMeta
-    vggt_model_subdir: PropertyMeta
-    data_output_path: PropertyMeta
+    cache_subdir_logs: PropertyMeta
+    cache_subdir_model: PropertyMeta
+    media_output_dir_format: PropertyMeta
     preprocess_media_script_file: PropertyMeta
     media_extensions: PropertyMeta
     max_frame_range: PropertyMeta
@@ -20,6 +20,7 @@ class Mosplat_AP_Global_Meta(NamedTuple):
     json_log_format: PropertyMeta
     stdout_date_log_format: PropertyMeta
     stdout_log_format: PropertyMeta
+    blender_max_log_entries: PropertyMeta
     vggt_hf_id: PropertyMeta
 
 
@@ -29,18 +30,20 @@ MOSPLAT_AP_GLOBAL_META = Mosplat_AP_Global_Meta(
         name="Cache Directory",
         description="Cache directory on disk used by the addon",
     ),
-    json_log_subdir=PropertyMeta(
-        id="json_log_subdir",
-        name="JSON Log Cache Subdirectory",
-        description="Subdirectory (relative to cache) for JSON logs",
+    cache_subdir_logs=PropertyMeta(
+        id="cache_subdir_logs",
+        name="Logs Cache Subdirectory",
+        description="Subdirectory in cache directory for JSON logs",
     ),
-    vggt_model_subdir=PropertyMeta(
-        id="vggt_model_subdir",
+    cache_subdir_model=PropertyMeta(
+        id="cache_subdir_model",
         name="Model Cache Subdirectory",
-        description="Subdirectory where the VGGT model data will be stored",
+        description="Subdirectory in cache directory where model data will be stored",
     ),
-    data_output_path=PropertyMeta(
-        id="data_output_path", name="Data Output Path", description=""
+    media_output_dir_format=PropertyMeta(
+        id="media_output_dir_format",
+        name="Media Output Directory Format",
+        description="",
     ),
     preprocess_media_script_file=PropertyMeta(
         id="preprocess_media_script_file",
@@ -57,24 +60,29 @@ MOSPLAT_AP_GLOBAL_META = Mosplat_AP_Global_Meta(
     ),
     json_log_filename_format=PropertyMeta(
         id="json_log_filename_format",
-        name="JSON Log Filename Format",
+        name="JSON Logging Filename Format",
         description="strftime-compatible filename pattern",
     ),
     json_date_log_format=PropertyMeta(
         id="json_date_log_format",
-        name="JSON Date Format",
+        name="JSON Logging Date Format",
         description="strftime format for JSON log timestamps",
     ),
     json_log_format=PropertyMeta(
-        id="json_log_format", name="JSON Log Format", description=""
+        id="json_log_format", name="JSON Logging Format", description=""
     ),
     stdout_date_log_format=PropertyMeta(
         id="stdout_date_log_format",
-        name="STDOUT Date Format",
+        name="STDOUT Logging Date Format",
         description="strftime format for console log timestamps",
     ),
     stdout_log_format=PropertyMeta(
-        id="stdout_log_format", name="STDOUT Log Format", description=""
+        id="stdout_log_format", name="STDOUT Logging Log Format", description=""
+    ),
+    blender_max_log_entries=PropertyMeta(
+        id="blender_max_log_entries",
+        name="BLENDER Logging Max Entries",
+        description="The max amount of log entries that will be stored as Blender data and displayed in UI.",
     ),
     vggt_hf_id=PropertyMeta(
         id="vggt_hf_id",

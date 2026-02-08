@@ -12,16 +12,12 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Set, TypeGuard, cast
 
-from infrastructure.constants import PER_FRAME_DIRNAME
-from infrastructure.macros import try_access_path
 from infrastructure.schemas import (
     AddonMeta,
-    SavedTensorFileName,
-    STNameToPathLookup,
     UnexpectedError,
     UserFacingError,
 )
-from interfaces import MosplatLoggingInterface
+from interfaces import LoggingInterface
 
 if TYPE_CHECKING:
     from bpy.types import Preferences, Scene, WindowManager
@@ -29,7 +25,7 @@ if TYPE_CHECKING:
     from core.preferences import Mosplat_AP_Global
     from core.properties import Mosplat_PG_Global
 
-logger = MosplatLoggingInterface.configure_logger_instance(__name__)
+logger = LoggingInterface.configure_logger_instance(__name__)
 
 _ADDON_META = AddonMeta()
 
@@ -78,21 +74,31 @@ def check_window_manager(wm: Optional[WindowManager]) -> TypeGuard[WindowManager
     return True
 
 
-def check_data_output_dirpath(
-    prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
-) -> Path:
+def check_media_directory(props: Mosplat_PG_Global):
+    dirpath = Path(props.media_directory)
+    if not dirpath.is_dir():
+        raise UserFacingError(
+            f"'{props._meta.media_directory.name}' is not a valid directory."
+        )
+
+    return dirpath
+
+
+def check_media_output_dir(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> Path:
     output: Path
 
-    current_media_dirpath = check_current_media_dirpath(props)
-    media_directory_name = current_media_dirpath.name
+    media_directory = check_media_directory(props)
+    media_directory_name = media_directory.name
 
     formatted_output_path = Path(
-        str(prefs.data_output_path).format(media_directory_name=media_directory_name)
+        str(prefs.media_output_dir_format).format(
+            media_directory_name=media_directory_name
+        )
     )
     if formatted_output_path.is_absolute():
         output = formatted_output_path
     else:
-        output = current_media_dirpath / formatted_output_path
+        output = media_directory / formatted_output_path
 
     try:
         os.makedirs(
@@ -100,32 +106,28 @@ def check_data_output_dirpath(
         )  # see if the directory can be created successfully
     except (FileExistsError, PermissionError, OSError):
         raise UserFacingError(
-            f"'{props._meta.current_media_dir.name}' and '{prefs._meta.data_output_path.name}' create an invalid directory value: '{output}'"
+            f"'{props._meta.media_directory.name}' and '{prefs._meta.media_output_dir_format.name}' create an invalid directory value: '{output}'"
         )
 
     return output
 
 
-def check_data_json_filepath(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global):
-    return (
-        check_data_output_dirpath(prefs, props) / _ADDON_META.media_io_dataset_filename
-    )
+def check_media_io_metadata_filepath(
+    prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
+):
+    return check_media_output_dir(prefs, props) / _ADDON_META.media_io_metadata_filename
 
 
 def check_media_files(prefs: Mosplat_AP_Global, props: Mosplat_PG_Global) -> List[Path]:
     exts = check_media_extensions_set(prefs)
 
     files = sorted(
-        [
-            p
-            for p in check_current_media_dirpath(props).iterdir()
-            if p.suffix.lower() in exts
-        ]
+        [p for p in check_media_directory(props).iterdir() if p.suffix.lower() in exts]
     )
 
     if len(files) == 0:
         raise UserFacingError(
-            f"No files were found in '{props.current_media_dir}' with extensions of '{prefs.media_extensions}'."
+            f"No files were found in '{props.media_directory}' with extensions of '{prefs.media_extensions}'."
         )
     return files
 
@@ -145,30 +147,20 @@ def check_media_extensions_set(prefs: Mosplat_AP_Global) -> Set[str]:
     return exts
 
 
-def check_current_media_dirpath(props: Mosplat_PG_Global):
-    dirpath = Path(props.current_media_dir)
-    if not dirpath.is_dir():
-        raise UserFacingError(
-            f"'{props._meta.current_media_dir.name}' is not a valid directory."
-        )
-
-    return dirpath
-
-
 def check_frame_range_poll_result(
     prefs: Mosplat_AP_Global, props: Mosplat_PG_Global
 ) -> List[str]:
     err_list = []
-    start, end = props.current_frame_range
-    curr_range_name = props._meta.current_frame_range.name
+    start, end = props.frame_range
+    curr_range_name = props._meta.media_directory.name
     if start >= end:
         err_list.append(
             f"Start frame for '{curr_range_name}' must be less than end frame."
         )
 
-    if end >= props.dataset_accessor.median_frame_count:
-        prop_name = props.dataset_accessor._meta.median_frame_count.name
-        count = props.dataset_accessor.median_frame_count
+    if end >= props.metadata_accessor.median_frame_count:
+        prop_name = props.metadata_accessor._meta.median_frame_count.name
+        count = props.metadata_accessor.median_frame_count
         err_list.append(
             f"End frame must be less than '{prop_name}' of '{count}' frames."
         )
@@ -182,39 +174,3 @@ def check_frame_range_poll_result(
         )
 
     return err_list  # return even if list if empty
-
-
-def check_st_filepaths_for_frame_range(
-    prefs: Mosplat_AP_Global,
-    props: Mosplat_PG_Global,
-    names: List[SavedTensorFileName],
-    should_exist: List[bool],
-) -> STNameToPathLookup:
-    """
-    generates safetensor file paths given a list of desired names and for all frames in current
-    frame range. Use `should_exist` if the st files should already exist to raise
-    `UserFacingError` if an st file does not exist where it is expected to.
-    """
-    start, end = props.current_frame_range
-
-    data_dir = check_data_output_dirpath(prefs, props)
-
-    all_st_files: STNameToPathLookup = {name: [] for name in names}
-
-    for frame in range(start, end):
-        frame_dir = data_dir / PER_FRAME_DIRNAME.format(frame)
-
-        for idx, name in enumerate(names):
-            st_filepath = frame_dir / f"{name}.safetensors"
-            if should_exist[idx]:
-                try:
-                    try_access_path(st_filepath)  # raises the below exceptions
-                except (OSError, PermissionError, FileNotFoundError) as e:
-                    raise UserFacingError(
-                        f"Expected to find an extracted safetensor file at '{st_filepath}'."
-                        "Re-extract the frame range if necessary.",
-                        e,
-                    )  # convert now to a `UserFacingError`
-            all_st_files[name].append(st_filepath)
-
-    return all_st_files

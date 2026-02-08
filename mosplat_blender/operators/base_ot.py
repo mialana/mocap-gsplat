@@ -29,7 +29,7 @@ from infrastructure.mixins import ContextAccessorMixin, CtxPackage
 from infrastructure.schemas import (
     DeveloperError,
     EnvVariableEnum,
-    MediaIODataset,
+    MediaIOMetadata,
     UnexpectedError,
     UserFacingError,
 )
@@ -43,14 +43,14 @@ if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
         check_propertygroup,
         check_window_manager,
     )
-    from core.handlers import load_dataset_property_group_from_json
+    from core.handlers import load_metadata_property_group_from_json
 else:
     Operator: TypeAlias = object
     Timer: TypeAlias = object
     check_addonpreferences = lambda c: c
     check_propertygroup = lambda c: c
     check_window_manager = lambda c: c
-    load_dataset_property_group_from_json = lambda c: c
+    load_metadata_property_group_from_json = lambda c: c
 
 
 if TYPE_CHECKING:
@@ -99,7 +99,7 @@ class MosplatOperatorBase(
 ):
     __worker: Optional[MosplatWorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
-    __data: Optional[MediaIODataset] = None
+    __data: Optional[MediaIOMetadata] = None
 
     _poll_error_msg_list: ClassVar[List[str]] = []  # can track all current poll errors
 
@@ -204,7 +204,6 @@ class MosplatOperatorBase(
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
         if not self.worker:
             return "FINISHED"
-
         if (next := self.worker.dequeue()) is not None:
             try:
                 return self._queue_callback(pkg, event, next)
@@ -216,7 +215,7 @@ class MosplatOperatorBase(
 
     def _sync_to_props(self, props: Mosplat_PG_Global):
         """sync global properties with owned copy of data"""
-        props.dataset_accessor.from_dataclass(self.data)
+        props.metadata_accessor.from_dataclass(self.data)
 
     def _queue_callback(self, pkg: CtxPackage, event: Event, next: QT) -> OpResultTuple:
         """
@@ -224,8 +223,12 @@ class MosplatOperatorBase(
         this function is required IF it's a modal operator.
         otherwise, the `NotImplementedError` pathway will never be seen.
         """
-        if len(next) < 2:
-            raise NotImplementedError
+        if (
+            len(next) < 2
+            or not isinstance(next[0], str)
+            or not isinstance(next[1], str)
+        ):
+            raise DeveloperError("Queue type not compatible.")
 
         status = next[0]
         msg = next[1]
@@ -245,8 +248,8 @@ class MosplatOperatorBase(
     def commit_data_to_json(self, pkg: CtxPackage):
         # update JSON with current state of PG as source of truth
         try:
-            json_filepath = pkg.props.data_json_filepath(pkg.prefs)
-            pkg.props.dataset_accessor.to_JSON(json_filepath)
+            json_filepath = pkg.props.media_io_metadata_filepath(pkg.prefs)
+            pkg.props.metadata_accessor.to_JSON(json_filepath)
             self.logger.info(
                 f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
             )
@@ -266,8 +269,8 @@ class MosplatOperatorBase(
             self.logger.debug("Timer cleaned up")
         if self.worker:
             self.worker.cleanup()
-            self.worker = None
             self.logger.debug("Worker cleaned up")
+            self.worker = None
 
         self.__data = None  # data is not guaranteed to be in-sync anymore
         self.logger.info(f"'{self.bl_idname}' cleaned up")
@@ -351,15 +354,15 @@ class MosplatOperatorBase(
         self.__timer = tmr
 
     @property
-    def data(self) -> MediaIODataset:
-        """dataset property group as a dataclass."""
+    def data(self) -> MediaIOMetadata:
+        """metadata property group as a dataclass."""
         if self.__data is None:
-            raise DeveloperError("Dataset as dataclass not available in this scope.")
+            raise DeveloperError("Metadata as dataclass not available in this scope.")
         else:
             return self.__data
 
     @data.setter
-    def data(self, new_data: MediaIODataset) -> None:
+    def data(self, new_data: MediaIOMetadata) -> None:
         self.__data = new_data
 
     def wm(self, context: Context) -> WindowManager:
@@ -371,7 +374,7 @@ class MosplatOperatorBase(
         # try to restore both dataclass and property group from local JSON
         # mangle so that only base class can access
         try:
-            self.__data, load_msg = load_dataset_property_group_from_json(props, prefs)
+            self.__data, load_msg = load_metadata_property_group_from_json(props, prefs)
             self.logger.info(load_msg)  # log the load message
         except UserWarning as e:  # raised if filesystem permission errors
             self.__data = None

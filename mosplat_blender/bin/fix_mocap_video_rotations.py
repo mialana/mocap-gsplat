@@ -58,14 +58,11 @@ def _rotate_180(x: np.ndarray) -> np.ndarray:
     return x[:, ::-1, ::-1, :]
 
 
-def _build_mask(media_file_names: List[Path]) -> npt.NDArray[np.bool_]:
+def _build_mask(media_filenames: List[Path]) -> npt.NDArray[np.bool_]:
     """creates a NumPy boolean array for masking out the images per frame that need to have a
     180 degree transformation applied to them."""
     cam_indices = np.array(
-        [
-            int(file.name.replace("stream", "").split(".")[0])
-            for file in media_file_names
-        ]
+        [int(file.name.replace("stream", "").split(".")[0]) for file in media_filenames]
     )
     # only need to apply rotation to cameras of these specific indices
     return np.isin(cam_indices, [3, 4, 5, 6, 7])

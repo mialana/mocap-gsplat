@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Set
 
@@ -10,7 +11,7 @@ from bpy.types import AddonPreferences, Context
 
 from core.checks import check_media_extensions_set
 from core.meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
-from infrastructure.constants import DEFAULT_PREPROCESS_MEDIA_SCRIPT
+from infrastructure.constants import DEFAULT_MAX_LOG_ENTRIES, DEFAULT_PREPROCESS_SCRIPT
 from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.macros import try_access_path
 from infrastructure.mixins import EnforceAttributesMixin
@@ -19,35 +20,22 @@ from infrastructure.schemas import (
     UnexpectedError,
     UserFacingError,
 )
-from interfaces import MosplatLoggingInterface as LoggingInterface
-from interfaces import MosplatVGGTInterface as VGGTInterface
+from interfaces import LoggingInterface, VGGTInterface
 
 if TYPE_CHECKING:
     from core.preferences import Mosplat_AP_Global
 
+LoggingHandler = LoggingInterface.LoggingHandler
 
-def update_stdout_logging(self: Mosplat_AP_Global, _: Context):
+
+def update_logging(self: Mosplat_AP_Global, _: Context, *, handler: LoggingHandler):
     try:
-        LoggingInterface().init_stdout_handler(
-            log_fmt=self.stdout_log_format,
-            log_date_fmt=self.stdout_date_log_format,
-        )
-        self.logger.info("STDOUT logging updated.")
+        LoggingInterface().init_handler(handler, self)
+        self.logger.info(f"{handler} logging updated.")
     except UserFacingError as e:
-        self.logger.error(UserFacingError.make_msg("STDOUT log settings invalid.", e))
-
-
-def update_json_logging(self: Mosplat_AP_Global, _: Context):
-    try:
-        LoggingInterface().init_json_handler(
-            log_fmt=self.json_log_format,
-            log_date_fmt=self.json_date_log_format,
-            outdir=self.json_log_dir,
-            file_fmt=self.json_log_filename_format,
+        self.logger.error(
+            UserFacingError.make_msg(f"{handler} log settings invalid.", e)
         )
-        self.logger.info("JSON logging updated.")
-    except UserFacingError as e:
-        self.logger.error(UserFacingError.make_msg("JSON log settings invalid.", e))
 
 
 def update_media_extensions(self: Mosplat_AP_Global, context: Context):
@@ -57,7 +45,7 @@ def update_media_extensions(self: Mosplat_AP_Global, context: Context):
 
 def update_model_preferences(self: Mosplat_AP_Global, context: Context):
     if VGGTInterface().model is not None:
-        if VGGTInterface().cache_dir != self.vggt_model_dir:
+        if VGGTInterface().cache_dir != self.cache_dir_vggt_:
             self.logger.warning(
                 "Changed model cache dir, next init will take a while."
                 "Change back to previous directory if this is not desired."
@@ -84,27 +72,27 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         description="Cache directory on disk used by the addon",
         default=str(Path.home() / ".cache" / AddonMeta().base_id),
         subtype="DIR_PATH",
-        update=update_json_logging,
+        update=partial(update_logging, handler=LoggingHandler.JSON),
     )
 
-    json_log_subdir: StringProperty(
-        name="JSON Log Cache Subdirectory",
-        description="Subdirectory (relative to cache) for JSON logs",
+    cache_subdir_logs: StringProperty(
+        name="Logs Cache Subdirectory",
+        description="Subdirectory in cache directory for JSON logs",
         default="log",
-        update=update_json_logging,
+        update=partial(update_logging, handler=LoggingHandler.JSON),
     )
 
-    vggt_model_subdir: StringProperty(
+    cache_subdir_model: StringProperty(
         name="Model Cache Subdirectory",
-        description="Subdirectory where the VGGT model data will be stored",
+        description="Subdirectory in cache directory where model data will be stored",
         default="vggt",
         update=update_model_preferences,
     )
 
-    data_output_path: StringProperty(
-        name="Data Output Path",
-        description="Output directory for processed data generated from the selected media directory.\n"
-        "Relative paths are resolved against the selected media directory.\n"
+    media_output_dir_format: StringProperty(
+        name="Media Output Directory Format",
+        description="Format for resolving the path to a directory where processed data generated for the selected media directory will be outputted.\n"
+        "Relative paths are resolved against the selected media directory path.\n"
         "The token {media_directory_name} will be replaced with the base name of the selected media directory.",
         default=f"{os.curdir}{os.sep}{{media_directory_name}}_OUTPUT",
     )
@@ -112,9 +100,9 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     preprocess_media_script_file: StringProperty(
         name="Preprocess Media Script File",
         description=f"A file containing a Python script that will be applied to the contents of the selected media directory before individual frames are extracted.\n"
-        "See '{DEFAULT_PREPROCESS_MEDIA_SCRIPT_FILE}' for details on the expected format of the file.\n"
+        f"See '{DEFAULT_PREPROCESS_SCRIPT}' for details on the expected format of the file.\n"
         "If an empty path is entered no pre-processing will be performed.",
-        default=DEFAULT_PREPROCESS_MEDIA_SCRIPT,
+        default=DEFAULT_PREPROCESS_SCRIPT,
         subtype="FILE_PATH",
     )
 
@@ -134,38 +122,45 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     )
 
     json_log_filename_format: StringProperty(
-        name="JSON Log Filename Format",
+        name="JSON Logging Filename Format",
         description="strftime-compatible filename pattern",
         default="mosplat_%Y-%m-%d_%H-%M-%S.log",
-        update=update_json_logging,
+        update=partial(update_logging, handler=LoggingHandler.JSON),
     )
 
     json_date_log_format: StringProperty(
-        name="JSON Date Format",
+        name="JSON Logging Date Format",
         description="strftime format for JSON log timestamps",
         default="%Y-%m-%d %H:%M:%S",
-        update=update_json_logging,
+        update=partial(update_logging, handler=LoggingHandler.JSON),
     )
 
     json_log_format: StringProperty(
-        name="JSON Log Format",
+        name="JSON Logging Format",
         description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="%(asctime)s %(levelname)s %(name)s %(pathname)s %(classname)s %(funcName)s %(lineno)s %(thread)d %(message)s",
-        update=update_json_logging,
+        update=partial(update_logging, handler=LoggingHandler.JSON),
     )
 
     stdout_date_log_format: StringProperty(
-        name="STDOUT Date Format",
+        name="STDOUT Logging Date Format",
         description="strftime format for console log timestamps",
         default="%I:%M:%S %p",
-        update=update_stdout_logging,
+        update=partial(update_logging, handler=LoggingHandler.STDOUT),
     )
 
     stdout_log_format: StringProperty(
-        name="STDOUT Log Format",
+        name="STDOUT Logging Log Format",
         description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
         default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
-        update=update_stdout_logging,
+        update=partial(update_logging, handler=LoggingHandler.STDOUT),
+    )
+
+    blender_max_log_entries: IntProperty(
+        name="BLENDER Logging Max Entries",
+        description="The max amount of log entries that will be stored as Blender data and displayed in UI.",
+        default=DEFAULT_MAX_LOG_ENTRIES,
+        update=partial(update_logging, handler=LoggingHandler.BLENDER),
     )
 
     vggt_hf_id: StringProperty(
@@ -176,24 +171,24 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     )
 
     @property
-    def json_log_dir(self) -> Path:
-        return Path(self.cache_dir) / self.json_log_subdir
+    def cache_dir_logs_(self) -> Path:
+        return Path(self.cache_dir) / self.cache_subdir_logs
 
     @property
-    def vggt_model_dir(self) -> Path:
-        return Path(self.cache_dir) / self.vggt_model_subdir
+    def cache_dir_vggt_(self) -> Path:
+        return Path(self.cache_dir) / self.cache_subdir_model
 
     @property
-    def preprocess_media_script_filepath(self) -> Path:
+    def preprocess_media_script_file_(self) -> Path:
         """raises `UserFacingError` if the script is not accessible."""
-        filepath = Path(self.preprocess_media_script_file)
+        file_path = Path(self.preprocess_media_script_file)
 
         try:
-            try_access_path(filepath)
-            return filepath
+            try_access_path(file_path)
+            return file_path
         except (OSError, PermissionError, FileNotFoundError) as e:
             raise UserFacingError(
-                f"Given preprocess script file is not accessible: '{filepath}'", e
+                f"Given preprocess script file is not accessible: '{file_path}'", e
             ) from e  # convert now to a `UserFacingError`
 
     @property
@@ -215,15 +210,15 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         gen_io_box = col.box()
         gen_io_box.label(text="General I/O Configuration", icon="DISK_DRIVE_LARGE")
         gen_io_box.prop(self, meta.cache_dir.id)
-        gen_io_box.prop(self, meta.json_log_subdir.id)
-        gen_io_box.prop(self, meta.vggt_model_subdir.id)
+        gen_io_box.prop(self, meta.cache_subdir_logs.id)
+        gen_io_box.prop(self, meta.cache_subdir_model.id)
         gen_io_box.prop(self, meta.vggt_hf_id.id)
 
         layout.separator()
 
         data_proc_box = col.box()
         data_proc_box.label(text="Data Processing Configuration", icon="MESH_CYLINDER")
-        data_proc_box.prop(self, meta.data_output_path.id)
+        data_proc_box.prop(self, meta.media_output_dir_format.id)
         data_proc_box.prop(self, meta.preprocess_media_script_file.id)
         data_proc_box.prop(self, meta.media_extensions.id)
         data_proc_box.prop(self, meta.max_frame_range.id)
@@ -231,7 +226,7 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         layout.separator()
 
         json_box = col.box()
-        json_box.label(text="JSON Log Configuration", icon="FILE_TEXT")
+        json_box.label(text="JSON Logging Configuration", icon="FILE_TEXT")
         json_box.prop(self, meta.json_log_filename_format.id)
         json_box.prop(self, meta.json_date_log_format.id)
         json_box.prop(self, meta.json_log_format.id)
@@ -239,6 +234,12 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         layout.separator()
 
         stdout_box = col.box()
-        stdout_box.label(text="STDOUT Log Formatting", icon="GREASEPENCIL")
+        stdout_box.label(text="STDOUT Logging Configuration", icon="GREASEPENCIL")
         stdout_box.prop(self, meta.stdout_date_log_format.id)
         stdout_box.prop(self, meta.stdout_log_format.id)
+
+        layout.separator()
+
+        blender_box = col.box()
+        blender_box.label(text="BLENDER Logging Configuration", icon="GREASEPENCIL")
+        blender_box.prop(self, meta.blender_max_log_entries.id)

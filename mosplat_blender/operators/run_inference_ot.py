@@ -1,6 +1,6 @@
 from typing import NamedTuple, Tuple
 
-from interfaces import MosplatVGGTInterface
+from interfaces import VGGTInterface
 from operators.base_ot import MosplatOperatorBase
 
 
@@ -14,7 +14,7 @@ class Mosplat_OT_run_inference(
     @classmethod
     def _contexted_poll(cls, pkg):
 
-        if MosplatVGGTInterface().model is None:
+        if VGGTInterface().model is None:
             cls.poll_message_set("Model must be initialized.")
             return False  # prevent without model initialization
         return True

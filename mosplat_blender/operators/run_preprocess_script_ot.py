@@ -4,7 +4,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, List, NamedTuple, Optional, Tuple, cast
 
-from infrastructure.constants import PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME
+from infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
@@ -12,9 +12,9 @@ from infrastructure.macros import (
 from infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
-    MediaIODataset,
+    MediaIOMetadata,
     SavedTensorFileName,
-    STNameToPathLookup,
+    TensorFileFormatLookup,
     UserFacingError,
 )
 from operators.base_ot import MosplatOperatorBase
@@ -22,13 +22,15 @@ from operators.base_ot import MosplatOperatorBase
 
 class ProcessKwargs(NamedTuple):
     preprocess_fn: Callable
-    st_file_lookup: STNameToPathLookup
+    preprocess_script: Path
     media_files: List[Path]
-    dataset_as_dc: MediaIODataset
+    frame_range: Tuple[int, int]
+    tensor_file_formats: TensorFileFormatLookup
+    data: MediaIOMetadata
 
 
 class Mosplat_OT_run_preprocess_script(
-    MosplatOperatorBase[Tuple[str, str, Optional[MediaIODataset]], ProcessKwargs],
+    MosplatOperatorBase[Tuple[str, str, Optional[MediaIOMetadata]], ProcessKwargs],
 ):
     @classmethod
     def _contexted_poll(cls, pkg) -> bool:
@@ -43,12 +45,11 @@ class Mosplat_OT_run_preprocess_script(
         props = pkg.props
 
         self._media_files: List[Path] = props.media_files(prefs)
-        self._preprocess_script = prefs.preprocess_media_script_filepath
-        self._st_file_lookup: STNameToPathLookup = (
-            props.generate_st_filepaths_for_frame_range(
-                prefs,
-                [SavedTensorFileName.RAW, SavedTensorFileName.PREPROCESSED],
-                [True, False],
+        self._preprocess_script: Path = prefs.preprocess_media_script_file_
+        self._frame_range: Tuple[int, int] = tuple(props.frame_range)
+        self._tensor_file_formats: TensorFileFormatLookup = (
+            props.generate_safetensor_filepath_formats(
+                prefs, [SavedTensorFileName.RAW, SavedTensorFileName.PREPROCESSED]
             )
         )
 
@@ -58,7 +59,7 @@ class Mosplat_OT_run_preprocess_script(
         try:
             self._module = import_module_from_path_dynamic(self._preprocess_script)
             self._preprocess_fn = get_required_function(
-                self._module, PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME
+                self._module, PREPROCESS_SCRIPT_FUNCTION_NAME
             )
             self.logger.info(
                 f"Found and imported function '{self._preprocess_fn.__qualname__}' from module '{self._module.__name__}'."
@@ -72,7 +73,7 @@ class Mosplat_OT_run_preprocess_script(
             return "FINISHED"
         except (AttributeError, TypeError) as e:
             msg = UserFacingError.make_msg(
-                f"Cannot import required `${PREPROCESS_MEDIA_SCRIPT_FUNCTION_NAME}` function from selected preprocess script: '${self._preprocess_script}'",
+                f"Cannot import required `${PREPROCESS_SCRIPT_FUNCTION_NAME}` function from selected preprocess script: '${self._preprocess_script}'",
                 e,
             )
             self.logger.error(msg)
@@ -82,9 +83,11 @@ class Mosplat_OT_run_preprocess_script(
             pkg.context,
             pwargs=ProcessKwargs(
                 preprocess_fn=self._preprocess_fn,
-                st_file_lookup=self._st_file_lookup,
+                preprocess_script=self._preprocess_script,
                 media_files=self._media_files,
-                dataset_as_dc=self.data,
+                frame_range=self._frame_range,
+                tensor_file_formats=self._tensor_file_formats,
+                data=self.data,
             ),
         )
 
@@ -102,57 +105,75 @@ class Mosplat_OT_run_preprocess_script(
 
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
-        import numpy as np
-        from numpy.lib import npyio
+        import torch
+        from safetensors import SafetensorError, safe_open
+        from safetensors.torch import save_file
+        from torchcodec.decoders import VideoDecoder
 
-        fn = pwargs.preprocess_fn
+        fn, script, files, (start, end), tensor_file_formats, data = pwargs
+        in_file_format = tensor_file_formats[SavedTensorFileName.RAW]
+        out_file_format = tensor_file_formats[SavedTensorFileName.PREPROCESSED]
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         # as strings and `Counter` collection type
         media_files_counter = Counter(pwargs.media_files)
 
-        raw_st_files = pwargs.st_file_lookup[SavedTensorFileName.RAW]
-        preprocessed_st_files = pwargs.st_file_lookup[SavedTensorFileName.PREPROCESSED]
-        for idx, files in enumerate(zip(raw_st_files, preprocessed_st_files)):
+        for idx in range(start, end):
             if cancel_event.is_set():
                 return
-
-            raw, preprocessed = files
             try:
-                st_file: npyio.NpzFile = np.load(raw, mmap_mode=None)
-                st_structure = FrameTensorMetadata(**dict(st_file.items()))
+                in_file = in_file_format.format(frame_idx=idx)
+                out_file = out_file_format.format(frame_idx=idx)
+                with safe_open(in_file_format, framework="pt", device=device) as f:
+                    try:
+                        tensor: torch.Tensor = f.get_slice(
+                            SavedTensorFileName._tensor_key_name()
+                        )
+                        metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
+                            f.metadata()
+                        )
+                    except (SafetensorError, OSError) as e:
+                        raise UserFacingError(
+                            f"Saved data in '{in_file_format}' is corrupted. Behavior is unpredictable. Delete the file and re-extract frame data to clean up data state.",
+                            e,
+                        ) from e
+
                 # converts to native int
-                frame_idx: int = st_structure.get("frame")[0]
+                frame_idx = metadata.frame_idx
+                media_files = metadata.media_files
+
                 if frame_idx != idx:
-                    raise DeveloperError(
-                        "Saved frame index should match iteration index.\n"
-                        f"Expected Index: '{idx}'\nExtracted Index: '{frame_idx}'"
+                    raise ValueError(
+                        f"Frame index used to create '{in_file_format}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
+                        f"\nExpected Index: '{idx}'"
+                        f"\nExtracted Index: '{frame_idx}'",
                     )
-                media_files: List[Path] = [
-                    Path(s) for s in st_structure.get("media_files")
-                ]
+
                 if media_files_counter != Counter(media_files):
                     raise ValueError(
-                        f"Media files did not match."
+                        f"Media files in media directory have changed since creating '{in_file_format}'. Delete the file and re-extract frame data to clean up data state.",
                         f"\nExpected Files: '{pwargs.media_files}'"
-                        f"\nExtracted Files: '{media_files}'"
+                        f"\nMetadata Files: '{media_files}'",
                     )
-            except (OSError, ValueError, TypeError) as e:
-                msg = UserFacingError.make_msg(
-                    f"Data used to create safetensor file '{raw}' did not match currrent state of media directory or ST files are corrupted. Behavior is unpredictable. Delete the safetensor files in the frame range and re-extract frame data to clean up data state.",
-                    e,
-                )
-                queue.put(("error", msg, None))
-                break
+            except (OSError, ValueError, TypeError, UserFacingError) as e:
+                queue.put(("error", str(e), None))
+                continue
             try:
-                processed_data = fn(frame_idx, media_files, st_file.get("data"))
-                st_structure["data"] = processed_data
-                np.savez(preprocessed, **cast(dict, st_structure))
+                new_tensor = fn(frame_idx, media_files, tensor)
+                new_metadata = FrameTensorMetadata(frame_idx=idx, media_files=files)
+                save_file(
+                    {SavedTensorFileName._tensor_key_name(): new_tensor},
+                    filename=out_file,
+                    metadata=new_metadata.to_dict(),
+                )
                 queue.put(("update", f"Finished processing frame '{frame_idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(
                     f"Could not run script on frame '{frame_idx}'", e
                 )
                 queue.put(("error", msg, None))
-                break
+                continue
 
 
 def process_entrypoint(*args, **kwargs):

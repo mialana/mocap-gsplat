@@ -1,4 +1,4 @@
-# 2026-02-07 19:22:52.101326
+# 2026-02-07 21:02:58.193429
 # created using 'generate_property_meta_files.py'
 
 
@@ -29,7 +29,7 @@ class Mosplat_PG_MediaFileStatus_Meta(NamedTuple):
     file_size: PropertyMeta
 
 
-class Mosplat_PG_MediaIODataset_Meta(NamedTuple):
+class Mosplat_PG_MediaIOMetadata_Meta(NamedTuple):
     base_directory: PropertyMeta
     is_valid_media_directory: PropertyMeta
     median_frame_count: PropertyMeta
@@ -59,11 +59,11 @@ class Mosplat_PG_LogEntryHub_Meta(NamedTuple):
 
 
 class Mosplat_PG_Global_Meta(NamedTuple):
-    current_media_dir: PropertyMeta
-    current_frame_range: PropertyMeta
-    current_media_io_dataset: PropertyMeta
-    current_operator_progress: PropertyMeta
-    current_log_entry_hub: PropertyMeta
+    media_directory: PropertyMeta
+    frame_range: PropertyMeta
+    operator_progress: PropertyMeta
+    log_entry_hub: PropertyMeta
+    media_io_metadata: PropertyMeta
 
 
 MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META = Mosplat_PG_AppliedPreprocessScript_Meta(
@@ -90,7 +90,7 @@ MOSPLAT_PG_MEDIAFILESTATUS_META = Mosplat_PG_MediaFileStatus_Meta(
     file_size=PropertyMeta(id="file_size", name="File Size", description=""),
 )
 
-MOSPLAT_PG_MEDIAIODATASET_META = Mosplat_PG_MediaIODataset_Meta(
+MOSPLAT_PG_MEDIAIOMETADATA_META = Mosplat_PG_MediaIOMetadata_Meta(
     base_directory=PropertyMeta(
         id="base_directory",
         name="Base Directory",
@@ -166,25 +166,25 @@ MOSPLAT_PG_LOGENTRYHUB_META = Mosplat_PG_LogEntryHub_Meta(
 )
 
 MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
-    current_media_dir=PropertyMeta(
-        id="current_media_dir",
+    media_directory=PropertyMeta(
+        id="media_directory",
         name="Media Directory",
         description="Filepath to directory containing media files to be processed.",
     ),
-    current_frame_range=PropertyMeta(
-        id="current_frame_range",
+    frame_range=PropertyMeta(
+        id="frame_range",
         name="Frame Range",
         description="Start and end frame of data to be processed.",
     ),
-    current_media_io_dataset=PropertyMeta(
-        id="current_media_io_dataset",
-        name="Media IO Dataset",
-        description="Dataset for all media I/O operations",
+    operator_progress=PropertyMeta(
+        id="operator_progress", name="Current Operator Progress", description=""
     ),
-    current_operator_progress=PropertyMeta(
-        id="current_operator_progress", name="Current Operator Progress", description=""
+    log_entry_hub=PropertyMeta(
+        id="log_entry_hub", name="Current Log Entry Hub", description=""
     ),
-    current_log_entry_hub=PropertyMeta(
-        id="current_log_entry_hub", name="Current Log Entry Hub", description=""
+    media_io_metadata=PropertyMeta(
+        id="media_io_metadata",
+        name="Media IO Metadata",
+        description="Metadata for all media I/O operations",
     ),
 )
