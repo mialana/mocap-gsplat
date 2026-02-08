@@ -27,7 +27,9 @@ class Mosplat_OT_initialize_model(
     def _queue_callback(self, pkg, event, next):
         status, msg, current, total = next
         props = pkg.props
+        prefs = pkg.prefs
         wm = self.wm(pkg.context)
+
         progress = props.progress_accessor
         if status == "progress":
             if not progress.in_use and total > 0:
@@ -42,6 +44,16 @@ class Mosplat_OT_initialize_model(
             wm.progress_update(current)
             progress.current = current
             return "RUNNING_MODAL"
+
+        if status == "done":
+            try:
+                VGGTInterface().initialize_model(
+                    prefs.vggt_hf_id, prefs.cache_dir_vggt_
+                )
+            except Exception as e:
+                self.logger.error(str(e))
+                return "CANCELLED"
+
         return super()._queue_callback(pkg, event, next)
 
     def _contexted_execute(self, pkg):
@@ -71,11 +83,9 @@ class Mosplat_OT_initialize_model(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         try:
-            VGGTInterface().initialize_model(
+            VGGTInterface.download_model(
                 pwargs.hf_id, pwargs.model_cache_dir, queue, cancel_event
             )
-
-            queue.put(("done", "Downloaded & initialized VGGT model.", -1, -1))
         except UnexpectedError as e:
             queue.put(("error", str(e), -1, -1))
 

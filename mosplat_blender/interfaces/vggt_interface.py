@@ -10,6 +10,7 @@ import multiprocessing.synchronize as mp_sync
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple, TypeAlias
 
+from infrastructure.decorators import run_once_per_instance
 from infrastructure.mixins import LogClassMixin
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
@@ -32,6 +33,7 @@ class VGGTInterface(LogClassMixin):
 
         return cls.instance
 
+    @run_once_per_instance
     def __init__(self):
         self.model: Optional[VGGT] = None
         self.hf_id: Optional[str] = None
@@ -41,16 +43,11 @@ class VGGTInterface(LogClassMixin):
         self,
         hf_id: str,
         model_cache_dir: Path,
-        queue: mp.Queue[InitQueueTuple],
-        cancel_event: mp_sync.Event,
     ):
         try:
-            self.download_model(hf_id, model_cache_dir, queue, cancel_event)
-
             from vggt.models.vggt import VGGT
 
             if all([self.model, self.hf_id, self.model_cache_dir]):
-                queue.put(("done", "Initialization already occurred.", -1, -1))
                 return  # initialization did not occur
 
             # initialize model from the downloaded local model cache
@@ -60,38 +57,32 @@ class VGGTInterface(LogClassMixin):
             self.hf_id = hf_id
             self.model_cache_dir = model_cache_dir
 
-            if cancel_event.is_set():
-                # if cancel event was set at some point cleanup the resources now
-                self.cleanup()
-                return
-
-            queue.put(("done", "Initialization finished.", -1, -1))
-
         except Exception as e:
             self.cleanup()
-            queue.put(("error", str(e), -1, -1))
+            raise e
 
+    @staticmethod
     def download_model(
-        self,
         hf_id: str,
         model_cache_dir: Path,
         queue: mp.Queue[InitQueueTuple],
         cancel_event: mp_sync.Event,
     ):
-        from huggingface_hub import hf_hub_download
-        from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
+        try:
+            from huggingface_hub import hf_hub_download
+            from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
 
-        hf_hub_download(
-            repo_id=hf_id,
-            filename=SAFETENSORS_SINGLE_FILE,
-            cache_dir=str(model_cache_dir),
-            tqdm_class=make_tqdm_class(queue),
-        )
-        if cancel_event.is_set():
-            # if cancel event was set at some point cleanup the resources now
-            self.cleanup()
-            return
-        queue.put(("update", "Download finished.", -1, -1))
+            hf_hub_download(
+                repo_id=hf_id,
+                filename=SAFETENSORS_SINGLE_FILE,
+                cache_dir=str(model_cache_dir),
+                tqdm_class=make_tqdm_class(queue),
+            )
+            if cancel_event.is_set():
+                return
+            queue.put(("done", "Download finished.", -1, -1))
+        except Exception as e:
+            queue.put(("error", str(e), -1, -1))
 
     def run_inference(self, np_data: np.ndarray):
         from torch import from_numpy, no_grad
