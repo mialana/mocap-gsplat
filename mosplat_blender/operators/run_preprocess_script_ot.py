@@ -128,14 +128,17 @@ class Mosplat_OT_run_preprocess_script(
 
                 new_tensor: ImagesTensorType = preprocess_fn(idx, files, tensor)
 
-                if (
-                    not new_tensor.dtype == tensor.dtype
-                    or new_tensor.shape == tensor.shape
-                ):
+                if not new_tensor.dtype == tensor.dtype:
                     raise UserAssertionError(
-                        tensor.dtype,
-                        new_tensor.dtype,
                         f"Data type of tensor cannot change after preprocess script",
+                        expected=tensor.dtype,
+                        actual=new_tensor.dtype,
+                    )
+                if not new_tensor.shape == tensor.shape:
+                    raise UserAssertionError(
+                        f"Shape of tensor cannot change after preprocess script",
+                        expected=tensor.shape,
+                        actual=new_tensor.shape,
                     )
 
                 new_metadata = FrameTensorMetadata(frame_idx=idx, media_files=files)
@@ -146,12 +149,12 @@ class Mosplat_OT_run_preprocess_script(
                 )
                 queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
-                queue.put(("error", str(e), None))
+                queue.put(("warning", str(e), None))
                 continue
 
         frame_range = data.get_frame_range(start, end - 1)  # inclusive
         if not frame_range:
-            msg = UnexpectedError.msg(f"Poll-guard failed.")
+            msg = UnexpectedError.make_msg(f"Poll-guard failed.")
             queue.put(("error", msg, None))
         else:
             frame_range.applied_preprocess_script = (
@@ -190,16 +193,16 @@ def _load_and_verify_tensor(
 
     if frame_idx != frame_idx:
         raise UserAssertionError(
-            idx,
-            frame_idx,
             f"Frame index used to create '{in_file}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
+            expected=idx,
+            actual=frame_idx,
         )
 
     if media_files_counter != Counter(media_files):
         raise UserAssertionError(
-            files,
-            media_files,
             f"Media files in media directory have changed since creating '{in_file}'. Delete the file and re-extract frame data to clean up data state.",
+            expected=files,
+            actual=media_files,
         )
 
     return tensor
@@ -221,14 +224,14 @@ def _retrieve_preprocess_fn(
             )
         )
     except ImportError as e:
-        msg = UserFacingError.msg(
+        msg = UserFacingError.make_msg(
             f"Cannot import selected preprocess script: '${script}'",
             e,
         )
         queue.put(("error", msg, None))
         return None
     except (AttributeError, TypeError) as e:
-        msg = UserFacingError.msg(
+        msg = UserFacingError.make_msg(
             f"Cannot import required `${PREPROCESS_SCRIPT_FUNCTION_NAME}` function from selected preprocess script: '{script}'",
             e,
         )

@@ -71,7 +71,7 @@ class Mosplat_OT_validate_media_statuses(
                 except RuntimeError as e:
                     status.mark_invalid()
                     # change queue item and give error msg
-                    queue_item = ("error", str(e), data)
+                    queue_item = ("warning", str(e), data)
 
             accumulator(status)  # update metadata from new status
             queue.put(queue_item)  # transmit that metadata has been updated

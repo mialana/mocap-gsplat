@@ -108,24 +108,17 @@ class MosplatOperatorBase(
         cls._poll_error_msg_list.clear()
 
         try:
-            check_addonpreferences(context.preferences)
-        except (UserFacingError, UnexpectedError) as e:
-            cls._poll_error_msg_list.append(str(e))
-        try:
-            check_propertygroup(context.scene)
-        except (UserFacingError, UnexpectedError) as e:
-            cls._poll_error_msg_list.append(str(e))
-        try:
             check_window_manager(context.window_manager)
         except UserFacingError as e:
             cls._poll_error_msg_list.append(str(e))
-
-        wrapped_result = cls._contexted_poll(cls.package(context))
-
-        if len(cls._poll_error_msg_list) > 0:  # set the poll msg based on the list
-            cls.poll_message_set("\n".join(cls._poll_error_msg_list))
-
-        return wrapped_result
+        try:
+            return cls._contexted_poll(cls.package(context))
+        except (UserFacingError, UnexpectedError) as e:
+            cls._poll_error_msg_list.append(str(e))
+            return False
+        finally:
+            if len(cls._poll_error_msg_list) > 0:  # set the poll msg based on the list
+                cls.poll_message_set("\n".join(cls._poll_error_msg_list))
 
     @classmethod
     def _contexted_poll(cls, pkg: CtxPackage) -> bool:
@@ -163,7 +156,7 @@ class MosplatOperatorBase(
             try:
                 wrapped_result: Final = im_to_set(self._contexted_execute(pkg))
             except AttributeError as e:
-                msg = UserFacingError.msg(
+                msg = UserFacingError.make_msg(
                     f"This error occured during execution of '{self.bl_idname}'.\n"
                     "Are you aware this operator requires invocation before execution?",
                     e,
@@ -266,7 +259,9 @@ class MosplatOperatorBase(
         """ensures clean up always runs even with uncaught exceptions"""
 
         def handle():
-            msg = DeveloperError.msg("Uncaught exception during operator lifetime.", e)
+            msg = DeveloperError.make_msg(
+                "Uncaught exception during operator lifetime.", e
+            )
             self.logger.exception(msg)
             self.cleanup(pkg)  # cleanup here
 
@@ -291,7 +286,7 @@ class MosplatOperatorBase(
                 f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
             )
         except UserFacingError as e:
-            msg = DeveloperError.msg(
+            msg = DeveloperError.make_msg(
                 f"Error occurred while committing data from '{self.bl_idname}' back to JSON.",
                 e,
             )

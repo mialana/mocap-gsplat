@@ -6,9 +6,10 @@ from core.panels.base_pt import (
     MosplatUIListBase,
     MosplatUIListMetadata,
 )
-from core.panels.log_entries_pt import Mosplat_PT_LogEntries, Mosplat_UL_log_entries
+from core.panels.data_inference_pt import Mosplat_PT_data_inference
+from core.panels.log_entries_pt import Mosplat_PT_log_entries, Mosplat_UL_log_entries
 from core.panels.main_pt import Mosplat_PT_Main
-from core.panels.preprocess_pt import Mosplat_PT_Preprocess
+from core.panels.preprocess_pt import Mosplat_PT_preprocess
 from infrastructure.identifiers import PanelIDEnum, UIListIDEnum
 from infrastructure.mixins import PreregristrationFn
 from infrastructure.schemas import AddonMeta
@@ -23,12 +24,17 @@ panel_registry: Dict[
         bl_description=f"Main panel holding all '{_ADDON_SHORTNAME}' panels",
         bl_options={"HIDE_HEADER"},
     ),
-    Mosplat_PT_Preprocess: MosplatPanelMetadata(
+    Mosplat_PT_preprocess: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.PREPROCESS,
         bl_description=f"Holds operations for preprocessing '{_ADDON_SHORTNAME}' data",
         bl_parent_id=PanelIDEnum.MAIN,
     ),
-    Mosplat_PT_LogEntries: MosplatPanelMetadata(
+    Mosplat_PT_data_inference: MosplatPanelMetadata(
+        bl_idname=PanelIDEnum.DATA_INFERENCE,
+        bl_description="Holds data inference operations",
+        bl_parent_id=PanelIDEnum.MAIN,
+    ),
+    Mosplat_PT_log_entries: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.LOG_ENTRIES,
         bl_description="Panel to display log entries.",
         bl_parent_id=PanelIDEnum.MAIN,

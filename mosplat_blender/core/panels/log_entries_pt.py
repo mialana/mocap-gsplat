@@ -89,7 +89,7 @@ class Mosplat_UL_log_entries(MosplatUIListBase):
         layout.prop(log_hub, Mosplat_PG_LogEntryHub._meta.logs_level_filter.id)
 
 
-class Mosplat_PT_LogEntries(MosplatPanelBase):
+class Mosplat_PT_log_entries(MosplatPanelBase):
     def draw_with_layout(self, pkg, layout):
         log_hub = pkg.props.log_hub_accessor
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Optional, Set, TypeAlias
+from typing import TYPE_CHECKING, ClassVar, List, Literal, Optional, Set, TypeAlias
 
 from bpy.types import Context, Panel, UILayout, UIList
 
@@ -70,17 +70,18 @@ class MosplatPanelMetadata:
 
 
 class MosplatPanelBase(Panel, ContextAccessorMixin[MosplatPanelMetadata]):
-    bl_options = {"HIDE_HEADER"}
-
     @classmethod
     def poll(cls, context) -> bool:
         try:
-            check_addonpreferences(context.preferences)
-            check_propertygroup(context.scene)
-            return True
+            return cls._contexted_poll(cls.package(context))
         except (UserFacingError, UnexpectedError) as e:
-            cls.class_logger.warning(f"Poll failed for '{cls.__name__}'.")
+            cls.class_logger.error(str(e))
             return False
+
+    @classmethod
+    def _contexted_poll(cls, pkg: CtxPackage) -> bool:
+        """an overrideable entrypoint for `poll` with access to prefs and props"""
+        return True  # if not overriden will return true
 
     def draw(self, context: Context) -> None:
         if not (layout := self.layout):

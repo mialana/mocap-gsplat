@@ -9,17 +9,10 @@ from infrastructure.schemas import EnvVariableEnum, MediaFileStatus
 _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")
 
 
-class Mosplat_PT_Preprocess(MosplatPanelBase):
+class Mosplat_PT_preprocess(MosplatPanelBase):
     def draw_with_layout(self, pkg, layout):
         props = pkg.props
         column = layout.column()
-        init_model_box = column.box()
-        init_model_box.row().operator(OperatorIDEnum.INITIALIZE_MODEL)
-        progress = props.progress_accessor
-        prog_curr: int = progress.current
-        prog_total: int = progress.total
-        if prog_curr > 0 and prog_total > 0:
-            init_model_box.row().progress(factor=(float(prog_curr) / float(prog_total)))
 
         box = column.box()
         box.row().label(text=props._meta.media_directory.name)

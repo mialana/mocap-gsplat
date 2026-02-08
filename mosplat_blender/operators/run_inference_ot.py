@@ -13,11 +13,12 @@ class Mosplat_OT_run_inference(
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
-
         if VGGTInterface().model is None:
-            cls.poll_message_set("Model must be initialized.")
-            return False  # prevent without model initialization
-        return True
+            cls._poll_error_msg_list.append("Model must be initialized.")
+        if not pkg.props.was_frame_range_extracted:
+            cls._poll_error_msg_list.append("Frame range must be extracted.")
+
+        return len(cls._poll_error_msg_list) == 0
 
     def _queue_callback(self, pkg, event, next):
 

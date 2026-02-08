@@ -18,17 +18,17 @@ from typing import (
     Callable,
     ClassVar,
     Dict,
+    Generic,
     List,
     NamedTuple,
     Optional,
     Self,
     Tuple,
     TypeAlias,
+    TypeVar,
     Union,
     cast,
 )
-
-from typing_extensions import override
 
 from infrastructure.macros import (
     append_if_not_equals,
@@ -46,7 +46,7 @@ class CustomError(ABC, RuntimeError):
     base_msg: ClassVar[str]
 
     @classmethod
-    def msg(
+    def make_msg(
         cls,
         custom_msg: str = "",
         orig: Optional[BaseException] = None,
@@ -65,7 +65,7 @@ class CustomError(ABC, RuntimeError):
         orig: Optional[BaseException] = None,
         show_orig_msg: bool = True,
     ):
-        super().__init__(self.msg(custom_msg, orig, show_orig_msg))
+        return super().__init__(self.make_msg(custom_msg, orig, show_orig_msg))
 
 
 class UserFacingError(CustomError):
@@ -74,31 +74,38 @@ class UserFacingError(CustomError):
     base_msg = "USER ERROR"
 
 
-class UserAssertionError(UserFacingError):
-    """a custom `UserFacingError` with expected vs actual values"""
+class UserAssertionError(CustomError):
+    """a custom user-facing `RuntimeError` with expected vs actual values"""
+
+    base_msg = "USER ASSERTION ERROR"
 
     @classmethod
     def make_msg(
         cls,
-        expected: Any,
-        actual: Any,
         custom_msg: str = "",
         orig: Optional[BaseException] = None,
         show_orig_msg: bool = True,
+        *,
+        expected: Any = None,
+        actual: Any = None,
     ) -> str:
         custom_msg += f"\nExpected: {expected}\nActual: {actual}"
-        return super().msg(custom_msg, orig, show_orig_msg)
+        return super().make_msg(custom_msg, orig, show_orig_msg)
 
     def __init__(
         self,
-        expected: Any,
-        actual: Any,
         custom_msg: str = "",
         orig: Optional[BaseException] = None,
         show_orig_msg: bool = True,
+        *,
+        expected: Any = None,
+        actual: Any = None,
     ):
-        super().__init__(
-            self.make_msg(expected, actual, custom_msg, orig, show_orig_msg)
+        RuntimeError.__init__(
+            self,
+            self.make_msg(
+                custom_msg, orig, show_orig_msg, expected=expected, actual=actual
+            ),
         )
 
 

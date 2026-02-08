@@ -341,8 +341,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         result = []
         if not data.is_valid_media_directory:
             result.append(
-                f"Ensure matching frame count, width, & height"
-                f"of media in '{data.base_directory}'."
+                f"Ensure matching frame count, width, & height of media in '{data.base_directory}'."
             )
         return result
 

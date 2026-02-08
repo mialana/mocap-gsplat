@@ -38,7 +38,9 @@ def test_deps_imports():
         try:
             importlib.import_module(req)
         except Exception as e:
-            msg = DeveloperError.msg(f"Could not import required module: '{req}'", e)
+            msg = DeveloperError.make_msg(
+                f"Could not import required module: '{req}'", e
+            )
             logger.error(msg)
 
     logger.info("Success! All dependencies could be imported.")

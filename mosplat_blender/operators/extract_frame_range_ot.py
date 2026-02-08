@@ -86,13 +86,13 @@ class Mosplat_OT_extract_frame_range(
             for media_file in files:
                 dec = VideoDecoder(media_file, device=device)
                 decoders.append(dec)
-        except (UserFacingError, OSError) as e:
+        except ValueError as e:
             # exit early wherever error occurs and put error on queue
             queue.put(("error", str(e), None))
+            return
 
         # create a new frame range with both limits at start
         new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
-        data.add_frame_range(new_frame_range)
 
         for idx in range(start, end):
             if cancel_event.is_set():
@@ -123,6 +123,8 @@ class Mosplat_OT_extract_frame_range(
 
         for dec in decoders:
             del dec  # release resources
+
+        data.add_frame_range(new_frame_range)
 
         queue.put(("done", f"Frames '{start}-{end}' extracted.", None))
 

@@ -74,6 +74,7 @@ class PanelIDEnum(StrEnum):
 
     MAIN = auto()
     PREPROCESS = auto()
+    DATA_INFERENCE = auto()
     LOG_ENTRIES = auto()
 
 
