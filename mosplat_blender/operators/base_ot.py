@@ -163,7 +163,7 @@ class MosplatOperatorBase(
             try:
                 wrapped_result: Final = im_to_set(self._contexted_execute(pkg))
             except AttributeError as e:
-                msg = UserFacingError.make_msg(
+                msg = UserFacingError.msg(
                     f"This error occured during execution of '{self.bl_idname}'.\n"
                     "Are you aware this operator requires invocation before execution?",
                     e,
@@ -266,9 +266,7 @@ class MosplatOperatorBase(
         """ensures clean up always runs even with uncaught exceptions"""
 
         def handle():
-            msg = DeveloperError.make_msg(
-                "Uncaught exception during operator lifetime.", e
-            )
+            msg = DeveloperError.msg("Uncaught exception during operator lifetime.", e)
             self.logger.exception(msg)
             self.cleanup(pkg)  # cleanup here
 
@@ -293,7 +291,7 @@ class MosplatOperatorBase(
                 f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
             )
         except UserFacingError as e:
-            msg = DeveloperError.make_msg(
+            msg = DeveloperError.msg(
                 f"Error occurred while committing data from '{self.bl_idname}' back to JSON.",
                 e,
             )

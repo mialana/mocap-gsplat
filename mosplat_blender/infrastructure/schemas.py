@@ -14,6 +14,7 @@ from pathlib import Path
 from string import capwords
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     ClassVar,
     Dict,
@@ -26,6 +27,8 @@ from typing import (
     Union,
     cast,
 )
+
+from typing_extensions import override
 
 from infrastructure.macros import (
     append_if_not_equals,
@@ -43,7 +46,7 @@ class CustomError(ABC, RuntimeError):
     base_msg: ClassVar[str]
 
     @classmethod
-    def make_msg(
+    def msg(
         cls,
         custom_msg: str = "",
         orig: Optional[BaseException] = None,
@@ -62,13 +65,41 @@ class CustomError(ABC, RuntimeError):
         orig: Optional[BaseException] = None,
         show_orig_msg: bool = True,
     ):
-        super().__init__(self.make_msg(custom_msg, orig, show_orig_msg))
+        super().__init__(self.msg(custom_msg, orig, show_orig_msg))
 
 
 class UserFacingError(CustomError):
     """a custom `RuntimeError` for errors that are user-caused and user-facing (i.e. should be visible to user)."""
 
     base_msg = "USER ERROR"
+
+
+class UserAssertionError(UserFacingError):
+    """a custom `UserFacingError` with expected vs actual values"""
+
+    @classmethod
+    def make_msg(
+        cls,
+        expected: Any,
+        actual: Any,
+        custom_msg: str = "",
+        orig: Optional[BaseException] = None,
+        show_orig_msg: bool = True,
+    ) -> str:
+        custom_msg += f"\nExpected: {expected}\nActual: {actual}"
+        return super().msg(custom_msg, orig, show_orig_msg)
+
+    def __init__(
+        self,
+        expected: Any,
+        actual: Any,
+        custom_msg: str = "",
+        orig: Optional[BaseException] = None,
+        show_orig_msg: bool = True,
+    ):
+        super().__init__(
+            self.make_msg(expected, actual, custom_msg, orig, show_orig_msg)
+        )
 
 
 class DeveloperError(CustomError):

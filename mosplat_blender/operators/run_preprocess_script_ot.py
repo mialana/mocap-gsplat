@@ -18,12 +18,17 @@ from infrastructure.schemas import (
     SavedTensorFileName,
     TensorFileFormatLookup,
     UnexpectedError,
+    UserAssertionError,
     UserFacingError,
 )
 from operators.base_ot import MosplatOperatorBase
 
 if TYPE_CHECKING:
     import torch
+    from jaxtyping import UInt8
+
+    ImagesTensorType: TypeAlias = UInt8[torch.Tensor, "B 3 H W"]
+
 
 QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 
@@ -117,11 +122,22 @@ class Mosplat_OT_run_preprocess_script(
             try:
                 in_file = in_file_formatter.format(frame_idx=idx)
                 out_file = out_file_formatter.format(frame_idx=idx)
-                tensor = load_and_verify_tensor(
+                tensor = _load_and_verify_tensor(
                     idx, in_file, files, media_files_counter, device_str
                 )
 
-                new_tensor = preprocess_fn(idx, files, tensor)
+                new_tensor: ImagesTensorType = preprocess_fn(idx, files, tensor)
+
+                if (
+                    not new_tensor.dtype == tensor.dtype
+                    or new_tensor.shape == tensor.shape
+                ):
+                    raise UserAssertionError(
+                        tensor.dtype,
+                        new_tensor.dtype,
+                        f"Data type of tensor cannot change after preprocess script",
+                    )
+
                 new_metadata = FrameTensorMetadata(frame_idx=idx, media_files=files)
                 save_file(
                     {SavedTensorFileName._tensor_key_name(): new_tensor},
@@ -135,7 +151,7 @@ class Mosplat_OT_run_preprocess_script(
 
         frame_range = data.get_frame_range(start, end - 1)  # inclusive
         if not frame_range:
-            msg = UnexpectedError.make_msg(f"Poll-guard failed.")
+            msg = UnexpectedError.msg(f"Poll-guard failed.")
             queue.put(("error", msg, None))
         else:
             frame_range.applied_preprocess_script = (
@@ -144,19 +160,19 @@ class Mosplat_OT_run_preprocess_script(
             queue.put(("done", f"Ran '{script}' on frames '{start}-{end}'", data))
 
 
-def load_and_verify_tensor(
+def _load_and_verify_tensor(
     idx: int,
     in_file: str,
     files: List[Path],
     media_files_counter: Counter[Path],
     device_str: str,
-) -> torch.Tensor:
+) -> ImagesTensorType:
     from safetensors import SafetensorError, safe_open
 
     try:
         with safe_open(in_file, framework="pt", device=device_str) as f:
             file: safe_open = f
-            tensor: torch.Tensor = file.get_tensor(
+            tensor: ImagesTensorType = file.get_tensor(
                 SavedTensorFileName._tensor_key_name()
             )
             metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
@@ -173,15 +189,17 @@ def load_and_verify_tensor(
     media_files = metadata.media_files
 
     if frame_idx != frame_idx:
-        raise ValueError(
+        raise UserAssertionError(
+            idx,
+            frame_idx,
             f"Frame index used to create '{in_file}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
-            f"\nExpected Index: '{idx}'" f"\nExtracted Index: '{frame_idx}'",
         )
 
     if media_files_counter != Counter(media_files):
-        raise ValueError(
+        raise UserAssertionError(
+            files,
+            media_files,
             f"Media files in media directory have changed since creating '{in_file}'. Delete the file and re-extract frame data to clean up data state.",
-            f"\nExpected Files: '{files}'" f"\nMetadata Files: '{media_files}'",
         )
 
     return tensor
@@ -203,14 +221,14 @@ def _retrieve_preprocess_fn(
             )
         )
     except ImportError as e:
-        msg = UserFacingError.make_msg(
+        msg = UserFacingError.msg(
             f"Cannot import selected preprocess script: '${script}'",
             e,
         )
         queue.put(("error", msg, None))
         return None
     except (AttributeError, TypeError) as e:
-        msg = UserFacingError.make_msg(
+        msg = UserFacingError.msg(
             f"Cannot import required `${PREPROCESS_SCRIPT_FUNCTION_NAME}` function from selected preprocess script: '{script}'",
             e,
         )

@@ -156,7 +156,7 @@ class LoggingInterface:
                 self.init_handler(handler, prefs)
                 logger.info(ok_fmt.format(handler_type=handler.upper()))
             except UserFacingError as e:
-                msg = UserFacingError.make_msg(
+                msg = UserFacingError.msg(
                     error_fmt.format(handler_type=handler.upper()), e
                 )
                 logger.warning(msg)

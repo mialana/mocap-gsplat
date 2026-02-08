@@ -34,7 +34,7 @@ def make_update_logging_fn(handler: LoggingHandler):
             self.logger.info(f"{handler} logging updated.")
         except UserFacingError as e:
             self.logger.error(
-                UserFacingError.make_msg(f"{handler} log settings invalid.", e)
+                UserFacingError.msg(f"{handler} log settings invalid.", e)
             )
 
     return update_logging
