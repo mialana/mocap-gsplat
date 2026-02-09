@@ -4,13 +4,13 @@ from numbers import Integral
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
-from infrastructure.macros import is_path_accessible
+from infrastructure.macros import is_path_accessible, save_tensor_stack_png_preview
 from infrastructure.schemas import (
     FrameTensorMetadata,
+    ImagesTensorType,
     MediaIOMetadata,
     ProcessedFrameRange,
     SavedTensorFileName,
-    UserFacingError,
 )
 from operators.base_ot import MosplatOperatorBase
 
@@ -73,6 +73,7 @@ class Mosplat_OT_extract_frame_range(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
+        from jaxtyping import Float
         from safetensors.torch import save_file
         from torchcodec.decoders import VideoDecoder
 
@@ -106,7 +107,10 @@ class Mosplat_OT_extract_frame_range(
                 out_file.parent.mkdir(parents=True, exist_ok=True)
 
                 tensor_list = [dec[cast(Integral, idx)] for dec in decoders]
-                tensor = torch.stack(tensor_list, dim=0)
+                # convert to 0.0-1.0 range
+                tensor: ImagesTensorType = (
+                    torch.stack(tensor_list, dim=0).float() / 255.0
+                )
 
                 save_file(
                     {SavedTensorFileName._tensor_key_name(): tensor},
@@ -115,6 +119,7 @@ class Mosplat_OT_extract_frame_range(
                         frame_idx=idx, media_files=files
                     ).to_dict(),
                 )
+                save_tensor_stack_png_preview(tensor, out_file)
 
                 note = f"Saved safetensor '{out_file}' to disk."
 

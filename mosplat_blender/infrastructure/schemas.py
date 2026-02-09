@@ -18,14 +18,12 @@ from typing import (
     Callable,
     ClassVar,
     Dict,
-    Generic,
     List,
     NamedTuple,
     Optional,
     Self,
     Tuple,
     TypeAlias,
-    TypeVar,
     Union,
     cast,
 )
@@ -37,9 +35,15 @@ from infrastructure.macros import (
 )
 
 if TYPE_CHECKING:
+    import torch
     import torchcodec.decoders
+    from jaxtyping import Float
 
     from core.properties import Mosplat_PG_MediaIOMetadata
+
+    ImagesTensorType: TypeAlias = Float[torch.Tensor, "B 3 H W"]
+else:
+    ImagesTensorType: TypeAlias = Any
 
 
 class CustomError(ABC, RuntimeError):

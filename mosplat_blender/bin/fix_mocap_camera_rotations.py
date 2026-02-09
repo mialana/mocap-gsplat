@@ -26,9 +26,9 @@ from pathlib import Path
 from typing import List, Optional, TypeAlias
 
 import torch
-from jaxtyping import Bool, UInt8
+from jaxtyping import Bool, Float
 
-ImagesTensorType: TypeAlias = UInt8[torch.Tensor, "B 3 H W"]
+ImagesTensorType: TypeAlias = Float[torch.Tensor, "B 3 H W"]
 MaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
 
 _IMAGES_MASK: Optional[MaskTensorType] = None
@@ -47,7 +47,7 @@ def preprocess(
             Will have length of B (batch) dimension of `images` tensor.
         images: Raw image data as a torch tensor of shape (B, 3, H, W),
             where B (batch) is the number of media streams / cameras,
-            and the 2nd dimension are color channels.
+            and the 2nd dimension are color channels. RGB values are normalized to the range 0.0-1.0 and are the data-type `float`. Lastly, H and W are directly the pixel size of the media files in the media directory.
 
     Returns:
         A Torch tensor array with the same shape and dtype as `images`,

@@ -4,16 +4,18 @@ import multiprocessing as mp
 from collections import Counter
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Callable, List, NamedTuple, Optional, Tuple, TypeAlias
+from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
 from infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
+    save_tensor_stack_png_preview,
 )
 from infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
+    ImagesTensorType,
     MediaIOMetadata,
     SavedTensorFileName,
     TensorFileFormatLookup,
@@ -22,13 +24,6 @@ from infrastructure.schemas import (
     UserFacingError,
 )
 from operators.base_ot import MosplatOperatorBase
-
-if TYPE_CHECKING:
-    import torch
-    from jaxtyping import UInt8
-
-    ImagesTensorType: TypeAlias = UInt8[torch.Tensor, "B 3 H W"]
-
 
 QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 
@@ -116,12 +111,15 @@ class Mosplat_OT_run_preprocess_script(
         # as strings and `Counter` collection type
         media_files_counter: Counter[Path] = Counter(files)
 
+        from torchvision.utils import save_image
+
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
             try:
-                in_file = in_file_formatter.format(frame_idx=idx)
-                out_file = out_file_formatter.format(frame_idx=idx)
+                in_file = Path(in_file_formatter.format(frame_idx=idx))
+                out_file = Path(out_file_formatter.format(frame_idx=idx))
+
                 tensor = _load_and_verify_tensor(
                     idx, in_file, files, media_files_counter, device_str
                 )
@@ -147,6 +145,8 @@ class Mosplat_OT_run_preprocess_script(
                     filename=out_file,
                     metadata=new_metadata.to_dict(),
                 )
+
+                save_tensor_stack_png_preview(new_tensor, out_file)
                 queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
                 queue.put(("warning", str(e), None))
@@ -165,7 +165,7 @@ class Mosplat_OT_run_preprocess_script(
 
 def _load_and_verify_tensor(
     idx: int,
-    in_file: str,
+    in_file: Path,
     files: List[Path],
     media_files_counter: Counter[Path],
     device_str: str,

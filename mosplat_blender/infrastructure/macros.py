@@ -22,15 +22,10 @@ from typing import (
     TypeGuard,
     TypeVar,
     Union,
-    Unpack,
-    cast,
 )
 
 if TYPE_CHECKING:
-    from torch import Tensor
-    from torchcodec.decoders import VideoDecoder
-
-    from infrastructure.schemas import FrameTensorMetadata
+    from infrastructure.schemas import ImagesTensorType
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
@@ -134,3 +129,11 @@ def get_required_function(module: ModuleType, name: str) -> Callable:
         raise TypeError(f"'{name}' exists but is not callable")
 
     return fn
+
+
+def save_tensor_stack_png_preview(tensor: ImagesTensorType, tensor_out_file: Path):
+    from torchvision.utils import save_image
+
+    preview_png_file: Path = tensor_out_file.parent / f"{tensor_out_file.stem}.png"
+
+    save_image(tensor, preview_png_file)
