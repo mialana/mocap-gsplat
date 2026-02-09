@@ -3,20 +3,28 @@ from typing import List, Optional, TypeAlias
 
 import torch
 from jaxtyping import Bool, Float
-from torchvision.models.segmentation import fcn_resnet50
-
-model = fcn_resnet50(pretrained=True, progress=True)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.eval().to(device)
-
-
-COCO_DATASET_MEAN = [0.485, 0.456, 0.406]
-COCO_DATASET_STD = [0.229, 0.224, 0.225]
+from torchvision.models.segmentation import FCN_ResNet50_Weights, fcn_resnet50
 
 ImagesTensorType: TypeAlias = Float[torch.Tensor, "B 3 H W"]
+SingleImageTensorType: TypeAlias = Float[torch.Tensor, "3 H W"]
+SegMaskTensorType: TypeAlias = Bool[torch.Tensor, "B H W"]
 MaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
 
 _IMAGES_MASK: Optional[MaskTensorType] = None
+_PERSON_CLASS = 15
+
+weights = FCN_ResNet50_Weights.DEFAULT
+model = fcn_resnet50(pretrained=True, progress=False, weights=weights)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.eval().to(device)  # set to evaluate
+
+COCO_DATASET_MEAN = torch.tensor(
+    [0.485, 0.456, 0.406], dtype=torch.float, device=device
+)[None, :, None, None]
+
+COCO_DATASET_STD = torch.tensor(
+    [0.229, 0.224, 0.225], dtype=torch.float, device=device
+)[None, :, None, None]
 
 
 def preprocess(
@@ -29,7 +37,31 @@ def preprocess(
 
     images[_IMAGES_MASK] = _rotate_180(images[_IMAGES_MASK])  # rotate by 180 degrees
 
-    return images
+    masked_images = _mask_person_class(images)
+
+    return masked_images
+
+
+@torch.no_grad()
+def _mask_person_class(
+    images: ImagesTensorType,
+) -> ImagesTensorType:
+    normalized = normalize_to_coco_dataset(images)
+    outputs: Float[torch.Tensor, "B 21 H W"] = model(normalized)["out"]
+
+    # per-pixel, get the class which has the highest prediction likeliness
+    class_map: SegMaskTensorType = outputs.argmax(dim=1)
+
+    # expand to create a boolean mask of the pixel dimension
+    person_mask: SegMaskTensorType = class_map == _PERSON_CLASS
+    unsqueezed: Float[torch.Tensor, "B 1 H W"] = person_mask.unsqueeze(dim=1)
+
+    # apply mask
+    return images * unsqueezed
+
+
+def normalize_to_coco_dataset(images: ImagesTensorType) -> ImagesTensorType:
+    return (images - COCO_DATASET_MEAN) / COCO_DATASET_STD
 
 
 def _rotate_180(x: ImagesTensorType) -> ImagesTensorType:

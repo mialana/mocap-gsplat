@@ -10,7 +10,11 @@ from bpy.types import AddonPreferences, Context
 
 from core.checks import check_media_extensions_set
 from core.meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
-from infrastructure.constants import DEFAULT_MAX_LOG_ENTRIES, DEFAULT_PREPROCESS_SCRIPT
+from infrastructure.constants import (
+    DEFAULT_MAX_LOG_ENTRIES,
+    DEFAULT_PREPROCESS_SCRIPT,
+    PENN_DEFAULT_PREPROCESS_SCRIPT,
+)
 from infrastructure.identifiers import OperatorIDEnum
 from infrastructure.macros import try_access_path
 from infrastructure.mixins import EnforceAttributesMixin
@@ -104,7 +108,7 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         description=f"A file containing a Python script that will be applied to the contents of the selected media directory before individual frames are extracted.\n"
         f"See '{DEFAULT_PREPROCESS_SCRIPT}' for details on the expected format of the file.\n"
         "If an empty path is entered no pre-processing will be performed.",
-        default=DEFAULT_PREPROCESS_SCRIPT,
+        default=PENN_DEFAULT_PREPROCESS_SCRIPT,
         subtype="FILE_PATH",
     )
 
