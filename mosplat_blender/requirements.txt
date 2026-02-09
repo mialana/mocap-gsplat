@@ -4,14 +4,11 @@
 
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-numpy
 Pillow
 huggingface_hub
 einops
 safetensors
 plyfile
-
-opencv-python
 
 # for vggt build deps
 setuptools

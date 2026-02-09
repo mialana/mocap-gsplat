@@ -14,7 +14,6 @@ from infrastructure.decorators import run_once_per_instance
 from infrastructure.mixins import LogClassMixin
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
-    import numpy as np
     from vggt.models.vggt import VGGT
 
 
@@ -84,17 +83,7 @@ class VGGTInterface(LogClassMixin):
         except Exception as e:
             queue.put(("error", str(e), -1, -1))
 
-    def run_inference(self, np_data: np.ndarray):
-        from torch import from_numpy, no_grad
-
-        if not self.model:
-            return
-
-        tensors = from_numpy(np_data)
-
-        with no_grad():
-            predictions = self.model(tensors)
-
+    def run_inference(self):
         pass
 
     def cleanup(self):
