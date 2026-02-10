@@ -106,6 +106,8 @@ class Mosplat_OT_run_preprocess_script(
 
         device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
 
+        applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
+
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
@@ -114,7 +116,10 @@ class Mosplat_OT_run_preprocess_script(
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
 
                 new_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx, files, preprocess_script=script, model_options=None
+                    idx,
+                    files,
+                    preprocess_script=applied_preprocess_script,
+                    model_options=None,
                 )
 
                 try:
@@ -177,9 +182,7 @@ class Mosplat_OT_run_preprocess_script(
             queue.put(("error", msg, None))
             return
         else:
-            frame_range[0].applied_preprocess_script = (
-                AppliedPreprocessScript.from_file_path(script)
-            )
+            frame_range[0].applied_preprocess_script = applied_preprocess_script
             queue.put(("done", f"Ran '{script}' on frames '{start}-{end}'", data))
 
 

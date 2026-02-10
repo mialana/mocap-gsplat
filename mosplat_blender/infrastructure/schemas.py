@@ -285,7 +285,7 @@ class VGGTModelOptions:
 class FrameTensorMetadata(NamedTuple):
     frame_idx: int
     media_files: List[Path]
-    preprocess_script: Optional[Path]
+    preprocess_script: Optional[AppliedPreprocessScript]
     model_options: Optional[VGGTModelOptions]
 
     def to_dict(self) -> Dict[str, str]:
@@ -297,7 +297,7 @@ class FrameTensorMetadata(NamedTuple):
             ),
         }
         if self.preprocess_script:
-            d |= {"preprocess_script": str(self.preprocess_script)}
+            d |= {"preprocess_script": json.dumps(self.preprocess_script.to_dict())}
         if self.model_options:
             d |= {"model_options": json.dumps(self.model_options.to_dict())}
         return d
@@ -307,12 +307,14 @@ class FrameTensorMetadata(NamedTuple):
         try:
             files = [Path(file_str) for file_str in json.loads(d["media_files"])]
 
-            preprocess_script: Optional[Path] = None
+            preprocess_script: Optional[AppliedPreprocessScript] = None
             model_options: Optional[VGGTModelOptions] = None
             script: str = d.get("preprocess_script", "")
             options: str = d.get("model_options", "")
             if script:
-                preprocess_script = Path(script)
+                preprocess_script = AppliedPreprocessScript.from_dict(
+                    json.loads(script)
+                )
             if options:
                 model_options = VGGTModelOptions.from_dict(json.loads(options))
             return cls(
@@ -361,6 +363,9 @@ class AppliedPreprocessScript:
     @classmethod
     def from_dict(cls, d: Dict) -> AppliedPreprocessScript:
         return cls(**d)
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
 
     @classmethod
     def from_file_path(cls, file_path: Path) -> AppliedPreprocessScript:

@@ -3,6 +3,7 @@ from typing import Counter, List, NamedTuple, Tuple
 
 from infrastructure.macros import load_and_verify_default_tensor, load_and_verify_tensor
 from infrastructure.schemas import (
+    AppliedPreprocessScript,
     FrameTensorMetadata,
     PointCloudTensors,
     SavedTensorFileName,
@@ -78,8 +79,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
         device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # as strings and `Counter` collection type
-        media_files_counter: Counter[Path] = Counter(files)
+        applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
 
         for idx in range(start, end):
             if cancel_event.is_set():
@@ -88,7 +88,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 in_file = Path(in_file_formatter.format(frame_idx=idx))
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
                 new_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx, files, script, options
+                    idx, files, applied_preprocess_script, options
                 )
 
                 try:
@@ -104,7 +104,10 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     pass
 
                 validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx, files, preprocess_script=None, model_options=None
+                    idx,
+                    files,
+                    preprocess_script=applied_preprocess_script,
+                    model_options=None,
                 )  # options did not exist in 'run preprocess script' step
                 images_tensor = load_and_verify_default_tensor(
                     in_file, device_str, validation_metadata
