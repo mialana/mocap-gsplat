@@ -16,6 +16,7 @@ from operators.base_ot import MosplatOperatorBase
 
 
 class ThreadKwargs(NamedTuple):
+    preprocess_script: Path
     media_files: List[Path]
     frame_range: Tuple[int, int]
     tensor_file_formatters: TensorFileFormatLookup
@@ -42,6 +43,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
         self._media_files: List[Path] = props.media_files(prefs)
         self._frame_range: Tuple[int, int] = props.frame_range_
+        self._preprocess_script: Path = prefs.preprocess_media_script_file_
 
         self._tensor_file_formats: TensorFileFormatLookup = (
             props.generate_safetensor_filepath_formatters(
@@ -55,6 +57,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         self.launch_thread(
             pkg.context,
             twargs=ThreadKwargs(
+                preprocess_script=self._preprocess_script,
                 media_files=self._media_files,
                 frame_range=self._frame_range,
                 tensor_file_formatters=self._tensor_file_formats,
@@ -69,7 +72,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         import torch
         from safetensors.torch import save_file
 
-        files, (start, end), tensor_file_formats, options = twargs
+        script, files, (start, end), tensor_file_formats, options = twargs
         in_file_formatter = tensor_file_formats[SavedTensorFileName.PREPROCESSED]
         out_file_formatter = tensor_file_formats[SavedTensorFileName.MODEL_INFERENCE]
 
@@ -84,11 +87,12 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             try:
                 in_file = Path(in_file_formatter.format(frame_idx=idx))
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
+                new_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                    idx, files, script, options
+                )
 
                 try:
-                    _ = load_and_verify_tensor(
-                        idx, out_file, device_str, media_files_counter, options
-                    )
+                    _ = load_and_verify_tensor(out_file, device_str, new_metadata)
                     queue.put(
                         (
                             "update",
@@ -99,15 +103,14 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 except (OSError, UserAssertionError):
                     pass
 
+                validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                    idx, files, preprocess_script=None, model_options=None
+                )  # options did not exist in 'run preprocess script' step
                 images_tensor = load_and_verify_default_tensor(
-                    idx, in_file, device_str, media_files_counter, options=None
+                    in_file, device_str, validation_metadata
                 )
                 if images_tensor is None:
                     raise RuntimeError("Poll-guard failed.")
-
-                new_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx, files, options
-                )
 
                 pc_tensors: PointCloudTensors = VGGTInterface().run_inference(
                     images_tensor, new_metadata, options

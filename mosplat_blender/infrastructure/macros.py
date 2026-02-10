@@ -30,7 +30,11 @@ if TYPE_CHECKING:
     import torch
     from safetensors import safe_open
 
-    from infrastructure.schemas import ImagesTensorType, VGGTModelOptions
+    from infrastructure.schemas import (
+        FrameTensorMetadata,
+        ImagesTensorType,
+        VGGTModelOptions,
+    )
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
@@ -145,11 +149,7 @@ def save_tensor_stack_png_preview(tensor: ImagesTensorType, tensor_out_file: Pat
 
 
 def load_and_verify_tensor(
-    idx: int,
-    in_file: Path,
-    device_str: str,
-    media_files_counter: Counter[Path],
-    options: Optional[VGGTModelOptions] = None,
+    in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
 ) -> Dict[str, torch.Tensor]:
     from safetensors import SafetensorError, safe_open
 
@@ -162,6 +162,7 @@ def load_and_verify_tensor(
     try:
         try_access_path(in_file)
     except (FileNotFoundError, OSError, PermissionError) as e:
+        e.add_note("Restart from extraction process if necessary.")
         raise OSError from e
 
     try:
@@ -171,7 +172,7 @@ def load_and_verify_tensor(
             for key in file.keys():
                 tensors |= {key: file.get_tensor(key)}
 
-            metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
+            saved_metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
                 file.metadata()
             )
     except (SafetensorError, OSError) as e:
@@ -180,41 +181,24 @@ def load_and_verify_tensor(
             e,
         ) from e
 
-    if metadata.frame_idx != idx:
-        raise UserAssertionError(
-            f"Frame index used to create '{in_file}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
-            expected=idx,
-            actual=metadata.frame_idx,
-        )
-
-    if Counter(metadata.media_files) != media_files_counter:
-        raise UserAssertionError(
-            f"Media files in media directory have changed since creating '{in_file}'. Delete the file and re-extract frame data to clean up data state.",
-            expected=media_files_counter,
-            actual=Counter(metadata.media_files),
-        )
-    if metadata.model_options != options:
-        raise UserAssertionError(
-            f"Model options have changed since creating '{in_file}'.",
-            expected=options,
-            actual=metadata.model_options,
-        )
+    for idx, item in enumerate(new_metadata):
+        saved_item = saved_metadata[idx]
+        if item != saved_item:
+            raise UserAssertionError(
+                f"Metadata used to create '{in_file}' does not match the new desired metadata. To clean up data state, delete the file and re-extract frame data",
+                expected=idx,
+                actual=saved_metadata.frame_idx,
+            )
 
     return tensors
 
 
 def load_and_verify_default_tensor(
-    idx: int,
-    in_file: Path,
-    device_str: str,
-    media_files_counter: Counter[Path],
-    options: Optional[VGGTModelOptions] = None,
+    in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
 ) -> Optional[ImagesTensorType]:
     from infrastructure.schemas import SavedTensorFileName
 
-    tensors = load_and_verify_tensor(
-        idx, in_file, device_str, media_files_counter, options
-    )
+    tensors = load_and_verify_tensor(in_file, device_str, new_metadata)
     return tensors.get(SavedTensorFileName._default_tensor_key())
 
 

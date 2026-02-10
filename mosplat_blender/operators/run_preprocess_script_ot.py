@@ -11,6 +11,7 @@ from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
     load_and_verify_default_tensor,
+    load_and_verify_tensor,
     save_tensor_stack_png_preview,
 )
 from infrastructure.schemas import (
@@ -105,9 +106,6 @@ class Mosplat_OT_run_preprocess_script(
 
         device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # as strings and `Counter` collection type
-        media_files_counter: Counter[Path] = Counter(files)
-
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
@@ -115,8 +113,29 @@ class Mosplat_OT_run_preprocess_script(
                 in_file = Path(in_file_formatter.format(frame_idx=idx))
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
 
+                new_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                    idx, files, preprocess_script=script, model_options=None
+                )
+
+                try:
+                    _ = load_and_verify_tensor(out_file, device_str, new_metadata)
+                    queue.put(
+                        (
+                            "update",
+                            f"Previous preprocessed data found on disk for frame '{idx}'",
+                            None,
+                        )
+                    )
+                    continue
+                except (OSError, UserAssertionError):
+                    pass
+
+                validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                    idx, files, preprocess_script=None, model_options=None
+                )  # preprocess script did not exist in extraction step
+
                 tensor = load_and_verify_default_tensor(
-                    idx, in_file, device_str, media_files_counter
+                    in_file, device_str, validation_metadata
                 )
                 if tensor is None:
                     raise RuntimeError("Poll-guard failed.")
@@ -136,7 +155,6 @@ class Mosplat_OT_run_preprocess_script(
                         actual=new_tensor.shape,
                     )
 
-                new_metadata = FrameTensorMetadata(frame_idx=idx, media_files=files)
                 save_file(
                     {SavedTensorFileName._default_tensor_key(): new_tensor},
                     filename=out_file,
