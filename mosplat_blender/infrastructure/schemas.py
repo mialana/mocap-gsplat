@@ -173,6 +173,7 @@ class SavedTensorFileName(StrEnum):
 
     RAW = auto()
     PREPROCESSED = auto()
+    MODEL_INFERENCE = auto()
 
 
 TensorFileFormatLookup: TypeAlias = Dict[SavedTensorFileName, str]
@@ -268,15 +269,24 @@ class FrameTensorMetadata(NamedTuple):
             raise OSError(str(e)) from e
 
 
-PredictionMode: TypeAlias = Literal["depth_cam", "pointmap"]
+class ModelInferenceMode(StrEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name.upper()
+
+    def to_blender_enum_item(self) -> BlenderEnumItem:
+        return (self.value, self.value.capitalize(), "")
+
+    POINT_MAP = auto()
+    DEPTH_CAM = auto()
 
 
 @dataclass(frozen=True)
 class VGGTModelOptions:
-    mode: PredictionMode = "depth_cam"
+    inference_mode: ModelInferenceMode = ModelInferenceMode.POINT_MAP
     confidence_percentile: float = 95.0
-    mask_black: bool = True
-    mask_white: bool = False
+    enable_black_mask: bool = True
+    enable_white_mask: bool = False
 
 
 @dataclass(frozen=True)

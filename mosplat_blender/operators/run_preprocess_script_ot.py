@@ -10,6 +10,7 @@ from infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
+    load_and_verify_tensor,
     save_tensor_stack_png_preview,
 )
 from infrastructure.schemas import (
@@ -56,10 +57,6 @@ class Mosplat_OT_run_preprocess_script(
         self._media_files: List[Path] = props.media_files(prefs)
         self._preprocess_script: Path = prefs.preprocess_media_script_file_
         self._frame_range: Tuple[int, int] = props.frame_range_
-        start, end = self._frame_range
-
-        if not self.data.get_frame_range(start, end - 1):
-            raise UserFacingError("Cannot run preprocess script on a function")
 
         self._tensor_file_formats: TensorFileFormatLookup = (
             props.generate_safetensor_filepath_formatters(
@@ -111,8 +108,6 @@ class Mosplat_OT_run_preprocess_script(
         # as strings and `Counter` collection type
         media_files_counter: Counter[Path] = Counter(files)
 
-        from torchvision.utils import save_image
-
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
@@ -120,7 +115,7 @@ class Mosplat_OT_run_preprocess_script(
                 in_file = Path(in_file_formatter.format(frame_idx=idx))
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
 
-                tensor = _load_and_verify_tensor(
+                tensor = load_and_verify_tensor(
                     idx, in_file, files, media_files_counter, device_str
                 )
 
@@ -161,51 +156,6 @@ class Mosplat_OT_run_preprocess_script(
                 AppliedPreprocessScript.from_file_path(script)
             )
             queue.put(("done", f"Ran '{script}' on frames '{start}-{end}'", data))
-
-
-def _load_and_verify_tensor(
-    idx: int,
-    in_file: Path,
-    files: List[Path],
-    media_files_counter: Counter[Path],
-    device_str: str,
-) -> ImagesTensorType:
-    from safetensors import SafetensorError, safe_open
-
-    try:
-        with safe_open(in_file, framework="pt", device=device_str) as f:
-            file: safe_open = f
-            tensor: ImagesTensorType = file.get_tensor(
-                SavedTensorFileName._tensor_key_name()
-            )
-            metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
-                file.metadata()
-            )
-    except (SafetensorError, OSError) as e:
-        raise UserFacingError(
-            f"Saved data in '{in_file}' is corrupted. Behavior is unpredictable. Delete the file and re-extract frame data to clean up data state.",
-            e,
-        ) from e
-
-    # converts to native int
-    frame_idx = metadata.frame_idx
-    media_files = metadata.media_files
-
-    if frame_idx != frame_idx:
-        raise UserAssertionError(
-            f"Frame index used to create '{in_file}' does not match the directory it is in.  Delete the file and re-extract frame data to clean up data state.",
-            expected=idx,
-            actual=frame_idx,
-        )
-
-    if media_files_counter != Counter(media_files):
-        raise UserAssertionError(
-            f"Media files in media directory have changed since creating '{in_file}'. Delete the file and re-extract frame data to clean up data state.",
-            expected=files,
-            actual=media_files,
-        )
-
-    return tensor
 
 
 def _retrieve_preprocess_fn(

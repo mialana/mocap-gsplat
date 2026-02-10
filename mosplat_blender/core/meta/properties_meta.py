@@ -1,4 +1,4 @@
-# 2026-02-08 12:25:54.341978
+# 2026-02-10 01:00:36.361342
 # created using 'generate_property_meta_files.py'
 
 
@@ -58,12 +58,20 @@ class Mosplat_PG_LogEntryHub_Meta(NamedTuple):
     logs_level_filter: PropertyMeta
 
 
+class Mosplat_PG_VGGTModelOptions_Meta(NamedTuple):
+    inference_mode: PropertyMeta
+    confidence_percentile: PropertyMeta
+    enable_black_mask: PropertyMeta
+    enable_white_mask: PropertyMeta
+
+
 class Mosplat_PG_Global_Meta(NamedTuple):
     media_directory: PropertyMeta
     frame_range: PropertyMeta
     was_frame_range_extracted: PropertyMeta
     operator_progress: PropertyMeta
     log_entry_hub: PropertyMeta
+    vggt_model_options: PropertyMeta
     media_io_metadata: PropertyMeta
 
 
@@ -166,6 +174,21 @@ MOSPLAT_PG_LOGENTRYHUB_META = Mosplat_PG_LogEntryHub_Meta(
     ),
 )
 
+MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
+    inference_mode=PropertyMeta(
+        id="inference_mode", name="Inference Mode", description=""
+    ),
+    confidence_percentile=PropertyMeta(
+        id="confidence_percentile", name="Confidence Percentile", description=""
+    ),
+    enable_black_mask=PropertyMeta(
+        id="enable_black_mask", name="Enable Black Mask", description=""
+    ),
+    enable_white_mask=PropertyMeta(
+        id="enable_white_mask", name="Enable White Mask", description=""
+    ),
+)
+
 MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
     media_directory=PropertyMeta(
         id="media_directory",
@@ -183,10 +206,13 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
         description="Tracks whether the currently selected frame range extracted already.",
     ),
     operator_progress=PropertyMeta(
-        id="operator_progress", name="Current Operator Progress", description=""
+        id="operator_progress", name="Operator Progress", description=""
     ),
     log_entry_hub=PropertyMeta(
-        id="log_entry_hub", name="Current Log Entry Hub", description=""
+        id="log_entry_hub", name="Log Entry Hub", description=""
+    ),
+    vggt_model_options=PropertyMeta(
+        id="vggt_model_options", name="VGGT Model Options", description=""
     ),
     media_io_metadata=PropertyMeta(
         id="media_io_metadata",

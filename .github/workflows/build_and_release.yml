@@ -48,7 +48,7 @@ jobs:
                   python-version: ${{matrix.blender_python_version}}
             - name: build
               run: |
-                  python scripts/build.py --clean --blender_python_version ${{ matrix.blender_python_version }}
+                  python scripts/build.py --clean --cpu --blender_python_version ${{ matrix.blender_python_version }}
 
             - name: validate zip size
               run: |

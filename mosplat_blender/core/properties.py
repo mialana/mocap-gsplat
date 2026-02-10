@@ -32,6 +32,7 @@ from core.meta.properties_meta import (
     MOSPLAT_PG_MEDIAIOMETADATA_META,
     MOSPLAT_PG_OPERATORPROGRESS_META,
     MOSPLAT_PG_PROCESSEDFRAMERANGE_META,
+    MOSPLAT_PG_VGGTMODELOPTIONS_META,
     Mosplat_PG_AppliedPreprocessScript_Meta,
     Mosplat_PG_Global_Meta,
     Mosplat_PG_LogEntry_Meta,
@@ -40,6 +41,7 @@ from core.meta.properties_meta import (
     Mosplat_PG_MediaIOMetadata_Meta,
     Mosplat_PG_OperatorProgress_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
+    Mosplat_PG_VGGTModelOptions_Meta,
 )
 from infrastructure.constants import PER_FRAME_DIRNAME
 from infrastructure.identifiers import OperatorIDEnum
@@ -51,9 +53,11 @@ from infrastructure.schemas import (
     LogEntryLevelEnum,
     MediaFileStatus,
     MediaIOMetadata,
+    ModelInferenceMode,
     ProcessedFrameRange,
     SavedTensorFileName,
     TensorFileFormatLookup,
+    VGGTModelOptions,
 )
 
 if TYPE_CHECKING:
@@ -63,6 +67,9 @@ LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
     member.to_blender_enum_item() for member in LogEntryLevelEnum
 ]
 
+ModelInferenceModeEnumItems: Final[List[BlenderEnumItem]] = [
+    member.to_blender_enum_item() for member in ModelInferenceMode
+]
 
 FrameRangeTuple: TypeAlias = Tuple[int, int]
 
@@ -255,6 +262,20 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase):
         return self.logs
 
 
+class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
+    _meta: Mosplat_PG_VGGTModelOptions_Meta = MOSPLAT_PG_VGGTMODELOPTIONS_META
+    __dataclass_type__ = VGGTModelOptions
+
+    inference_mode: EnumProperty(
+        name="Inference Mode",
+        items=ModelInferenceModeEnumItems,
+        default=ModelInferenceMode.POINT_MAP.value,
+    )
+    confidence_percentile: FloatProperty(name="Confidence Percentile", default=95.0)
+    enable_black_mask: BoolProperty(name="Enable Black Mask", default=True)
+    enable_white_mask: BoolProperty(name="Enable White Mask", default=False)
+
+
 class Mosplat_PG_Global(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
     __dataclass_type__ = None
@@ -286,13 +307,19 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
     )
 
     operator_progress: PointerProperty(
-        name="Current Operator Progress",
+        name="Operator Progress",
         type=Mosplat_PG_OperatorProgress,
         options={"SKIP_SAVE"},
     )
 
     log_entry_hub: PointerProperty(
-        name="Current Log Entry Hub", type=Mosplat_PG_LogEntryHub, options={"SKIP_SAVE"}
+        name="Log Entry Hub", type=Mosplat_PG_LogEntryHub, options={"SKIP_SAVE"}
+    )
+
+    vggt_model_options: PointerProperty(
+        name="VGGT Model Options",
+        type=Mosplat_PG_VGGTModelOptions,
+        options={"SKIP_SAVE"},
     )
 
     media_io_metadata: PointerProperty(
@@ -309,6 +336,10 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
     @property
     def progress_accessor(self) -> Mosplat_PG_OperatorProgress:
         return self.operator_progress
+
+    @property
+    def options_accessor(self) -> Mosplat_PG_VGGTModelOptions:
+        return self.vggt_model_options
 
     @property
     def log_hub_accessor(self) -> Mosplat_PG_LogEntryHub:

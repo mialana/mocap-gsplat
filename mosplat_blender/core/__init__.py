@@ -26,6 +26,7 @@ from core.properties import (
     Mosplat_PG_MediaIOMetadata,
     Mosplat_PG_OperatorProgress,
     Mosplat_PG_ProcessedFrameRange,
+    Mosplat_PG_VGGTModelOptions,
     MosplatPropertyGroupBase,
 )
 from infrastructure.mixins import PreregristrationFn
@@ -44,6 +45,7 @@ properties_registry: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_OperatorProgress,
     Mosplat_PG_LogEntry,
     Mosplat_PG_LogEntryHub,
+    Mosplat_PG_VGGTModelOptions,
     Mosplat_PG_Global,
 ]
 

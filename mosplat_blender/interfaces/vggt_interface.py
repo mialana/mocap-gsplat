@@ -11,11 +11,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Self, Tuple, TypeAlias
 
 from infrastructure.decorators import run_once_per_instance
+from infrastructure.macros import crop_tensor
 from infrastructure.mixins import LogClassMixin
 from infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
     ImagesTensorType,
+    ModelInferenceMode,
     PointCloudTensors,
     UnexpectedError,
     VGGTModelOptions,
@@ -69,6 +71,7 @@ class VGGTInterface(LogClassMixin):
                 VGGT.from_pretrained(hf_id, cache_dir=model_cache_dir)
                 .to(device=self.device)
                 .to(dtype=self.dtype)
+                .eval()
             )
 
             # store the values used for initialization upon success
@@ -113,17 +116,20 @@ class VGGTInterface(LogClassMixin):
 
         import torch
         from vggt.utils.geometry import unproject_depth_map_to_point_map
+        from vggt.utils.load_fn import load_and_preprocess_images
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
-        images = images.to(device=self.device, dtype=self.dtype)
+        images = crop_tensor(
+            images.to(device=self.device, dtype=self.dtype), max_size=518, multiple=14
+        )
 
-        with torch.no_grad():
+        with torch.inference_mode():
             predictions: Dict[str, torch.Tensor] = self.model(images)
 
         extrinsic, intrinsic = pose_encoding_to_extri_intri(
             predictions["pose_enc"], images.shape[-2:], build_intrinsics=True
         )
-        if not intrinsic:
+        if intrinsic is None:
             raise UnexpectedError("`build_intrinsics` argument ineffective.")
 
         predictions["extrinsic"] = extrinsic
@@ -134,61 +140,58 @@ class VGGTInterface(LogClassMixin):
         pointmap = predictions["world_points"]
         pointmap_conf = predictions["world_points_conf"]
 
-        if options.mode == "pointmap":
+        if options.inference_mode == ModelInferenceMode.POINT_MAP:
             world_points = pointmap
             conf_map = pointmap_conf
         else:
-            world_points = unproject_depth_map_to_point_map(
-                depth.cpu().numpy(),
-                predictions["extrinsic"].cpu().numpy(),
-                predictions["intrinsic"].cpu().numpy(),
-            )
+            world_points = predictions["world_points"]
             conf_map = depth_conf
 
-        B, H, W, _ = world_points.shape
+        S, B, H, W, _ = world_points.shape
+        B = S * B
+
+        world_points = world_points.reshape(B, H, W, 3)
+        conf_map = conf_map.reshape(B, H, W)
 
         xyz = world_points.reshape(-1, 3)
         conf = conf_map.reshape(-1)
 
-        rgb = (images.permute(0, 2, 3, 1).reshape(-1, 3).clamp(0, 1) * 255).to(
-            torch.uint8
+        rgb = (
+            images.permute(0, 2, 3, 1)
+            .reshape(-1, 3)
+            .clamp(0, 1)
+            .mul(255)
+            .to(torch.uint8)
         )
 
         cam_idx = torch.repeat_interleave(
-            torch.arange(B, device=self.device, dtype=torch.int32),
+            torch.arange(B, device=conf.device, dtype=torch.int32),
             H * W,
         )
 
-        if conf.numel() > 0:
+        if conf.numel():
             conf_threshold = torch.quantile(conf, options.confidence_percentile / 100.0)
         else:
-            conf_threshold = torch.tensor(0.0, device=conf.device)
+            conf_threshold = conf.new_tensor(0.0)
 
         mask = (conf >= conf_threshold) & (conf > 1e-5)
 
-        if options.mask_black:
-            black_bg_mask = rgb.sum(dim=1) >= 16
-            mask &= black_bg_mask
+        if options.enable_black_mask:
+            mask &= rgb.sum(dim=1) >= 16
 
-        if options.mask_white:
-            white_bg_mask = ~((rgb[:, 0] > 240) & (rgb[:, 1] > 240) & (rgb[:, 2] > 240))
-            mask &= white_bg_mask
+        if options.enable_white_mask:
+            mask &= ~((rgb[:, 0] > 240) & (rgb[:, 1] > 240) & (rgb[:, 2] > 240))
 
-        xyz = xyz[mask]
-        rgb = rgb[mask]
-        conf = conf[mask]
-        cam_idx = cam_idx[mask]
+        xyz = xyz[mask].cpu()
+        rgb = rgb[mask].cpu()
+        conf = conf[mask].cpu()
+        cam_idx = cam_idx[mask].cpu()
 
-        xyz = xyz.cpu()
-        rgb = rgb.cpu()
-        conf = conf.cpu()
-        cam_idx = cam_idx.cpu()
-
-        extrinsic = extrinsic.cpu()
-        if intrinsic:
-            intrinsic = intrinsic.cpu()
-        depth = depth.cpu()
-        depth_conf = depth_conf.cpu()
+        extrinsic = extrinsic.reshape(B, 3, 4).cpu()
+        intrinsic = intrinsic.reshape(B, 3, 3).cpu()
+        depth = depth.reshape(B, H, W, 1).cpu()
+        depth_conf = depth_conf.reshape(B, H, W).cpu()
+        pointmap = pointmap.reshape(B, H, W, 3).cpu()
 
         return PointCloudTensors(
             xyz=xyz,

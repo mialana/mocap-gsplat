@@ -59,6 +59,7 @@ class BuildContext:
     wheels_dir: Path
     ADDON_SRC_DIR: Path
     ADDON_REQUIREMENTS_TXT_FILE: Path
+    ADDON_REQUIREMENTS_CPU_TXT_FILE: Path
     ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path
     DEV_REQUIREMENTS_TXT_FILE: Path
     MANIFEST_TOML_TXT_FILE: Path
@@ -112,6 +113,13 @@ def get_args(defaults: ArgparseDefaults):
         action="store_true",
     )
 
+    parser.add_argument(
+        "-p",
+        "--cpu",
+        help="Build CPU version of PyTorch ecosystem wheels.",
+        action="store_true",
+    )
+
     args = parser.parse_args()
 
     if args.dev:
@@ -143,8 +151,12 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     print(f"Wheels Directory Path: {wheels_dir}")
 
     ADDON_REQUIREMENTS_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.txt"
-
     print(f"Addon's `requirements.txt` File Path: {ADDON_REQUIREMENTS_TXT_FILE}")
+
+    ADDON_REQUIREMENTS_CPU_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.cpu.txt"
+    print(
+        f"Addon's `requirements.cpu.txt` File Path: {ADDON_REQUIREMENTS_CPU_TXT_FILE}"
+    )
 
     ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path = (
         ADDON_SRC_DIR / "requirements.nobinary.txt"
@@ -186,7 +198,7 @@ def get_version_tag_from_git() -> str:
         return "0.0.0"
 
 
-def install_dev_pypi_packages(ctx: BuildContext):
+def install_dev_pypi_packages(ctx: BuildContext, cpu: bool):
     """install wheels for development"""
     print("Beginning install...")
 
@@ -205,7 +217,11 @@ def install_dev_pypi_packages(ctx: BuildContext):
         subprocess.check_call(
             [
                 *pip_install_from_wheels_args_sublist,
-                str(ctx.ADDON_REQUIREMENTS_TXT_FILE),
+                str(
+                    ctx.ADDON_REQUIREMENTS_CPU_TXT_FILE
+                    if cpu
+                    else ctx.ADDON_REQUIREMENTS_TXT_FILE
+                ),
             ]
         )
         subprocess.check_call(
@@ -232,7 +248,12 @@ def install_dev_pypi_packages(ctx: BuildContext):
     print("Install complete")
 
 
-def download_pypi_wheels(ctx: BuildContext, blender_python_version, should_install):
+def download_pypi_wheels(
+    ctx: BuildContext,
+    blender_python_version: float,
+    cpu: bool,
+    should_install: bool,
+):
     """use `subprocess` to invoke `pip download ...` on the addon's PyPI requirements"""
     try:
         subprocess.check_call(
@@ -242,7 +263,11 @@ def download_pypi_wheels(ctx: BuildContext, blender_python_version, should_insta
                 "pip",
                 "download",
                 "-r",
-                str(ctx.ADDON_REQUIREMENTS_TXT_FILE),
+                str(
+                    ctx.ADDON_REQUIREMENTS_CPU_TXT_FILE
+                    if cpu
+                    else ctx.ADDON_REQUIREMENTS_TXT_FILE
+                ),
                 "--dest",
                 str(ctx.wheels_dir),
                 "--only-binary=:all:",
@@ -271,7 +296,7 @@ def download_pypi_wheels(ctx: BuildContext, blender_python_version, should_insta
 
     if should_install:
         _()  # skip a line
-        install_dev_pypi_packages(ctx)
+        install_dev_pypi_packages(ctx, cpu)
 
 
 def generate_blender_manifest_toml(ctx: BuildContext):
@@ -356,6 +381,7 @@ def main():
         ctx.MANIFEST_TOML_TXT_FILE,
         ctx.wheels_dir,
         *([ctx.DEV_REQUIREMENTS_TXT_FILE] if args.dev else []),
+        *([ctx.ADDON_REQUIREMENTS_CPU_TXT_FILE] if args.cpu else []),
     ]:  # check that all required input resources are where they are supposed to be
         if not p.exists():
             raise RuntimeError(f"Expected {p!r} in file system, but was not found.")
@@ -366,7 +392,12 @@ def main():
         clean(ctx.wheels_dir)
         _()  # skip a line
 
-    download_pypi_wheels(ctx, args.blender_python_version, should_install=args.dev)
+    download_pypi_wheels(
+        ctx,
+        blender_python_version=args.blender_python_version,
+        cpu=args.cpu,
+        should_install=args.dev,
+    )
     _()  # skip a line
 
     generate_blender_manifest_toml(ctx)
