@@ -51,7 +51,7 @@ def update_media_extensions(self: Mosplat_AP_Global, context: Context):
 
 def update_model_preferences(self: Mosplat_AP_Global, context: Context):
     if VGGTInterface().model is not None:
-        if VGGTInterface().cache_dir != self.cache_dir_vggt_:
+        if VGGTInterface().model_cache_dir != self.cache_dir_vggt_:
             self.logger.warning(
                 "Changed model cache dir, next init will take a while."
                 "Change back to previous directory if this is not desired."

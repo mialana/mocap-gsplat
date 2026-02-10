@@ -19,6 +19,7 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Literal,
     NamedTuple,
     Optional,
     Self,
@@ -37,11 +38,11 @@ from infrastructure.macros import (
 if TYPE_CHECKING:
     import torch
     import torchcodec.decoders
-    from jaxtyping import Float
+    from jaxtyping import Float32
 
     from core.properties import Mosplat_PG_MediaIOMetadata
 
-    ImagesTensorType: TypeAlias = Float[torch.Tensor, "B 3 H W"]
+    ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
 else:
     ImagesTensorType: TypeAlias = Any
 
@@ -265,6 +266,39 @@ class FrameTensorMetadata(NamedTuple):
             return cls(frame_idx=int(d["frame_idx"]), media_files=files)
         except (KeyError, json.JSONDecodeError) as e:
             raise OSError(str(e)) from e
+
+
+PredictionMode: TypeAlias = Literal["depth_cam", "pointmap"]
+
+
+@dataclass(frozen=True)
+class VGGTModelOptions:
+    mode: PredictionMode = "depth_cam"
+    confidence_percentile: float = 95.0
+    mask_black: bool = True
+    mask_white: bool = False
+
+
+@dataclass(frozen=True)
+class PointCloudTensors:
+    if TYPE_CHECKING:
+        from jaxtyping import Float32, Int32, UInt8
+
+    xyz: Float32[torch.Tensor, "N 3"]
+    rgb: UInt8[torch.Tensor, "N 3"]
+    # confidence level of each point
+    conf: Float32[torch.Tensor, "N"]
+
+    # which camera each point came from
+    cam_idx: Int32[torch.Tensor, "N"]
+
+    extrinsic: Float32[torch.Tensor, "B 3 4"]
+    intrinsic: Float32[torch.Tensor, "B 3 3"]
+    depth: Float32[torch.Tensor, "B H W 1"]
+    depth_conf: Float32[torch.Tensor, "B H W"]
+    point_map: Optional[Float32[torch.Tensor, "B H W 3"]]
+
+    _metadata: FrameTensorMetadata = field(metadata={"skip_to_dict": True})
 
 
 @dataclass(frozen=True)

@@ -2,11 +2,11 @@ from pathlib import Path
 from typing import List, Optional, TypeAlias
 
 import torch
-from jaxtyping import Bool, Float
+from jaxtyping import Bool, Float32
 from torchvision.models.segmentation import FCN_ResNet50_Weights, fcn_resnet50
 
-ImagesTensorType: TypeAlias = Float[torch.Tensor, "B 3 H W"]
-SingleImageTensorType: TypeAlias = Float[torch.Tensor, "3 H W"]
+ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
+SingleImageTensorType: TypeAlias = Float32[torch.Tensor, "3 H W"]
 SegMaskTensorType: TypeAlias = Bool[torch.Tensor, "B H W"]
 MaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
 
@@ -47,14 +47,14 @@ def _mask_person_class(
     images: ImagesTensorType,
 ) -> ImagesTensorType:
     normalized = normalize_to_coco_dataset(images)
-    outputs: Float[torch.Tensor, "B 21 H W"] = model(normalized)["out"]
+    outputs: Float32[torch.Tensor, "B 21 H W"] = model(normalized)["out"]
 
     # per-pixel, get the class which has the highest prediction likeliness
     class_map: SegMaskTensorType = outputs.argmax(dim=1)
 
     # expand to create a boolean mask of the pixel dimension
     person_mask: SegMaskTensorType = class_map == _PERSON_CLASS
-    unsqueezed: Float[torch.Tensor, "B 1 H W"] = person_mask.unsqueeze(dim=1)
+    unsqueezed: Float32[torch.Tensor, "B 1 H W"] = person_mask.unsqueeze(dim=1)
 
     # apply mask
     return images * unsqueezed

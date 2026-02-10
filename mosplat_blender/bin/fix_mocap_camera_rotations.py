@@ -26,9 +26,9 @@ from pathlib import Path
 from typing import List, Optional, TypeAlias
 
 import torch
-from jaxtyping import Bool, Float
+from jaxtyping import Bool, Float32
 
-ImagesTensorType: TypeAlias = Float[torch.Tensor, "B 3 H W"]
+ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
 MaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
 
 _IMAGES_MASK: Optional[MaskTensorType] = None
