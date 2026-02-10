@@ -98,7 +98,7 @@ class VGGTInterface(LogClassMixin):
             )
             if cancel_event.is_set():
                 return
-            queue.put(("done", "Download finished.", -1, -1))
+            queue.put(("downloaded", "Download finished.", -1, -1))
         except Exception as e:
             queue.put(("error", str(e), -1, -1))
 

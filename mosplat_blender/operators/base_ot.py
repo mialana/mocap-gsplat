@@ -4,6 +4,8 @@ import contextlib
 import multiprocessing as mp
 import multiprocessing.synchronize as mp_sync
 import os
+import queue
+import threading
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -33,7 +35,11 @@ from infrastructure.schemas import (
     UnexpectedError,
     UserFacingError,
 )
-from interfaces.worker_interface import QT, WorkerInterface
+from interfaces.worker_interface import (
+    QT,
+    SubprocessWorkerInterface,
+    ThreadWorkerInterface,
+)
 
 if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
     from bpy.types import Operator, Timer  # pyright: ignore[reportRedeclaration]
@@ -97,7 +103,8 @@ class MosplatOperatorMetadata:
 class MosplatOperatorBase(
     Generic[QT, K], ContextAccessorMixin[MosplatOperatorMetadata], Operator
 ):
-    __worker: Optional[WorkerInterface[QT]] = None
+    __subprocess_worker: Optional[SubprocessWorkerInterface[QT]] = None
+    __thread_worker: Optional[ThreadWorkerInterface[QT]] = None
     __timer: Optional[Timer] = None
     __data: Optional[MediaIOMetadata] = None
 
@@ -188,7 +195,9 @@ class MosplatOperatorBase(
             return {"PASS_THROUGH"}  # the event is not a timer callback
         with self.CLEANUP_MANAGER(pkg):
             wrapped_result: Final = im_to_set(self._contexted_modal(pkg, event))
-            if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result) and self.worker:
+            if not ({"RUNNING_MODAL", "PASS_THROUGH"} & wrapped_result) and (
+                self.subprocess_worker or self.thread_worker
+            ):
                 self.logger.debug(f"Modal callbacks stopped for '{self.bl_idname}'.")
                 # cleanup if a non-looping result was returned and worker is not None
                 self.cleanup(pkg)
@@ -196,9 +205,16 @@ class MosplatOperatorBase(
 
     def _contexted_modal(self, pkg: CtxPackage, event: Event) -> OpResultTuple:
         """an overrideable entrypoint that abstracts away shared return paths in `modal` (see above)"""
-        if not self.worker:
+        if not self.subprocess_worker and not self.thread_worker:
             return "FINISHED"
-        if (next := self.worker.dequeue()) is not None:
+
+        next = (
+            self.subprocess_worker.dequeue()
+            if self.subprocess_worker
+            else (self.thread_worker.dequeue() if self.thread_worker else None)
+        )
+
+        if next is not None:
             try:
                 return self._queue_callback(pkg, event, next)
             finally:
@@ -242,13 +258,23 @@ class MosplatOperatorBase(
             self.wm(pkg.context).event_timer_remove(self.timer)
             self.timer = None
             self.logger.debug("Timer cleaned up")
-        if self.worker:
-            self.worker.cleanup()
-            self.logger.debug("Worker cleaned up")
-            self.worker = None
+        self.cleanup_subprocess()
+        self.cleanup_thread()
 
         self.__data = None  # data is not guaranteed to be in-sync anymore
         self.logger.info(f"'{self.bl_idname}' cleaned up")
+
+    def cleanup_subprocess(self):
+        if self.subprocess_worker:
+            self.subprocess_worker.cleanup()
+            self.logger.debug("Subprocess worker cleaned up")
+            self.subprocess_worker = None
+
+    def cleanup_thread(self):
+        if self.thread_worker:
+            self.thread_worker.cleanup()
+            self.logger.debug("Thread worker cleaned up")
+            self.thread_worker = None
 
     def cancel(self, context):
         # no manager needed here as cleanup is non-blocking
@@ -309,35 +335,70 @@ class MosplatOperatorBase(
 
         worker_fn = partial(process_entrypoint, pwargs=pwargs)
 
-        self.worker = WorkerInterface(self.bl_idname, worker_fn)
-        self.worker.start()
+        self.subprocess_worker = SubprocessWorkerInterface(self.bl_idname, worker_fn)
+        self.subprocess_worker.start()
 
-        wm = self.wm(context)
-        self.timer = wm.event_timer_add(
-            time_step=_TIMER_INTERVAL_, window=context.window
-        )
-        wm.modal_handler_add(self)
+        if not self.timer:
+            wm = self.wm(context)
+            self.timer = wm.event_timer_add(
+                time_step=_TIMER_INTERVAL_, window=context.window
+            )
+            wm.modal_handler_add(self)
 
     @staticmethod
     def _operator_subprocess(
         queue: mp.Queue[QT], cancel_event: mp_sync.Event, *, pwargs: K
     ):
         """
-        this function is required IF it's a modal operator.
-        otherwise, this error is safe & correct as the pathway will never be seen.
-        `pwargs` stands for both 'process kwargs'
+        `pwargs` stands for 'process kwargs'
+        """
+        raise NotImplementedError
+
+    def launch_thread(self, context: Context, *, twargs: K):
+        """`twargs` as in keyword args made of a immutable tuple for a thread"""
+
+        worker_fn = partial(self._operator_thread, twargs=twargs)
+
+        self.thread_worker = ThreadWorkerInterface(self.bl_idname, worker_fn)
+        self.thread_worker.start()
+
+        if not self.timer:
+            wm = self.wm(context)
+            self.timer = wm.event_timer_add(
+                time_step=_TIMER_INTERVAL_, window=context.window
+            )
+            wm.modal_handler_add(self)
+
+    @staticmethod
+    def _operator_thread(
+        queue: queue.Queue[QT], cancel_event: threading.Event, *, twargs: K
+    ):
+        """
+        `twargs` stands for both 'thread kwargs' and 'tuple kwargs'
         """
         raise NotImplementedError
 
     """instance properties backed by mangled class attributes"""
 
     @property
-    def worker(self) -> Optional[WorkerInterface[QT]]:
-        return self.__worker
+    def subprocess_worker(self) -> Optional[SubprocessWorkerInterface[QT]]:
+        return self.__subprocess_worker
 
-    @worker.setter
-    def worker(self, wkr: Optional[WorkerInterface[QT]]):
-        self.__worker = wkr
+    @subprocess_worker.setter
+    def subprocess_worker(self, wkr: Optional[SubprocessWorkerInterface[QT]]):
+        if wkr is not None and self.__thread_worker is not None:
+            raise DeveloperError("Cannot launch subprocess and thread simultaneously.")
+        self.__subprocess_worker = wkr
+
+    @property
+    def thread_worker(self) -> Optional[ThreadWorkerInterface[QT]]:
+        return self.__thread_worker
+
+    @thread_worker.setter
+    def thread_worker(self, wkr: Optional[ThreadWorkerInterface[QT]]):
+        if wkr is not None and self.__subprocess_worker is not None:
+            raise DeveloperError("Cannot launch subprocess and thread simultaneously.")
+        self.__thread_worker = wkr
 
     @property
     def timer(self) -> Optional[Timer]:

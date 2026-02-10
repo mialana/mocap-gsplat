@@ -6,13 +6,13 @@ from interfaces import VGGTInterface
 from operators.base_ot import MosplatOperatorBase
 
 
-class ProcessKwargs(NamedTuple):
+class Kwargs(NamedTuple):
     hf_id: str
     model_cache_dir: Path
 
 
 class Mosplat_OT_initialize_model(
-    MosplatOperatorBase[VGGTInterface.InitQueueTuple, ProcessKwargs]
+    MosplatOperatorBase[VGGTInterface.InitQueueTuple, Kwargs]
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
@@ -45,14 +45,15 @@ class Mosplat_OT_initialize_model(
             progress.current = current
             return "RUNNING_MODAL"
 
-        if status == "done":
-            try:
-                VGGTInterface().initialize_model(
-                    prefs.vggt_hf_id, prefs.cache_dir_vggt_
-                )
-            except Exception as e:
-                self.logger.error(str(e))
-                return "CANCELLED"
+        if status == "downloaded":
+            self.cleanup_subprocess()
+            self.launch_thread(
+                pkg.context,
+                twargs=Kwargs(
+                    hf_id=prefs.vggt_hf_id,
+                    model_cache_dir=prefs.cache_dir_vggt_,
+                ),
+            )
 
         return super()._queue_callback(pkg, event, next)
 
@@ -63,7 +64,7 @@ class Mosplat_OT_initialize_model(
 
         self.launch_subprocess(
             pkg.context,
-            pwargs=ProcessKwargs(
+            pwargs=Kwargs(
                 hf_id=prefs.vggt_hf_id,
                 model_cache_dir=prefs.cache_dir_vggt_,
             ),
@@ -87,6 +88,17 @@ class Mosplat_OT_initialize_model(
                 pwargs.hf_id, pwargs.model_cache_dir, queue, cancel_event
             )
         except UnexpectedError as e:
+            queue.put(("error", str(e), -1, -1))
+
+    @staticmethod
+    def _operator_thread(queue, cancel_event, *, twargs):
+        try:
+            VGGTInterface().initialize_model(
+                twargs.hf_id,
+                twargs.model_cache_dir,
+            )
+            queue.put(("done", "Model initialized.", -1, -1))
+        except Exception as e:
             queue.put(("error", str(e), -1, -1))
 
 

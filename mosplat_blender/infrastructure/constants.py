@@ -15,7 +15,7 @@ from typing import Any, Final
 
 _MISSING_: Any = object()  # sentinel variable
 
-_TIMER_INTERVAL_: Final[float] = 0.1
+_TIMER_INTERVAL_: Final[float] = 0.5
 _TIMEOUT_LAZY_: Final[float] = 10.0  # timeout can occur lazily
 _TIMEOUT_IMMEDIATE_: Final[float] = 1.0  # timeout should occur more or less immediately
 

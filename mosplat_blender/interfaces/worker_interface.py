@@ -4,15 +4,17 @@ import multiprocessing as mp
 import multiprocessing.context as mp_ctx
 import multiprocessing.synchronize as mp_sync
 import os
+import queue
 import threading
 import time
 from datetime import datetime
-from queue import Empty
 from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
 QT = TypeVar("QT", bound=tuple)  # types elements of worker queue
 
+
 from infrastructure.constants import _TIMEOUT_LAZY_
+from infrastructure.decorators import record_work_time
 from infrastructure.macros import kill_subprocess_cross_platform
 from infrastructure.mixins import LogClassMixin
 from infrastructure.schemas import EnvVariableEnum
@@ -21,7 +23,7 @@ StartWorkCallback: TypeAlias = Optional[Callable[[float], None]]
 EndWorkCallback: TypeAlias = Optional[Callable[[float, float], None]]
 
 
-class WorkerInterface(Generic[QT], LogClassMixin):
+class SubprocessWorkerInterface(Generic[QT], LogClassMixin):
     """
     this is a clean abstraction for blender operators that require similar "worker" behavior in a subprocess
 
@@ -91,14 +93,14 @@ class WorkerInterface(Generic[QT], LogClassMixin):
         while True:
             try:
                 self._queue.get_nowait()
-            except Empty:
+            except queue.Empty:
                 break
         self.logger.debug(f"'{self.identifier}' clean.")
 
     def dequeue(self) -> Optional[QT]:
         try:
             return self._queue.get_nowait()
-        except Empty:
+        except queue.Empty:
             return None
 
     def force_terminate(self):
@@ -137,3 +139,82 @@ class WorkerInterface(Generic[QT], LogClassMixin):
         self.time_elapsed = self._end_counter - self._start_counter
 
         self.logger.info(f"Total time elapsed: '{self.time_elapsed:.2f}' seconds")
+
+
+class ThreadWorkerInterface(Generic[QT], LogClassMixin):
+    """
+    this is a clean abstraction for blender operators that require similar "worker" behavior in a separate thread
+
+    features execution through threading (and start / end callbacks if necessary),
+    a queue + polling mechanism for maintaining communication with main thread,
+    and `threading.Event`-based cancellation.
+    """
+
+    def __init__(
+        self,
+        owner_name: str,
+        worker_fn: Callable[[queue.Queue[QT], threading.Event], None],
+    ):
+        # create queue and cancel event
+        self._queue: queue.Queue[QT] = queue.Queue[QT]()
+        self._cancel_event: threading.Event = threading.Event()
+
+        self._wrapped_fn = record_work_time(
+            worker_fn, self._start_work_callback, self._end_work_callback
+        )
+
+        self._thread = threading.Thread(
+            target=self._wrapped_fn,
+            args=(self._queue, self._cancel_event),
+            daemon=True,
+        )
+        self._id: Optional[int] = None
+        self._owner_name: str = owner_name
+
+    @property
+    def identifier(self) -> str:
+        return str(self._id) if self._id is not None else self._owner_name
+
+    def start(self):
+        self._thread.start()
+        self._id = self._thread.native_id
+
+    def cancel(self):
+        self._cancel_event.set()
+        self.logger.debug(f"Thread '{self.identifier}' was cancelled.")
+
+    def was_cancelled(self):
+        return self._cancel_event.is_set()
+
+    def cleanup(self):
+        self.cancel()
+
+        # drain queue
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+        self.logger.debug(f"'{self.identifier}' clean.")
+
+    def dequeue(self) -> Optional[QT]:
+        try:
+            return self._queue.get_nowait()
+        except queue.Empty:
+            return None
+
+    def _start_work_callback(self, start_time: float):
+        start: str = datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
+
+        self.logger.info(
+            f"Worker thread for '{self._owner_name}' started with ID '{self._id}' at time '{start}'."
+        )
+
+    def _end_work_callback(self, end_time: float, time_elapsed: float):
+        end: str = datetime.fromtimestamp(end_time).strftime("%H:%M:%S")
+
+        self.logger.info(
+            f"Worker thread for '{self._owner_name}' with ID '{self._id}' ended at time '{end}'."
+        )
+
+        self.logger.info(f"Total time elapsed: '{time_elapsed:.2f}' seconds")

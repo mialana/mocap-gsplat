@@ -4,17 +4,15 @@ from interfaces import VGGTInterface
 from operators.base_ot import MosplatOperatorBase
 
 
-class ProcessKwargs(NamedTuple):
+class ThreadKwargs(NamedTuple):
     pass
 
 
-class Mosplat_OT_run_inference(
-    MosplatOperatorBase[Tuple[str, int, int, str], ProcessKwargs]
-):
+class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs]):
     @classmethod
     def _contexted_poll(cls, pkg):
-        if VGGTInterface().model is None:
-            cls._poll_error_msg_list.append("Model must be initialized.")
+        # if VGGTInterface().model is None:
+        #     cls._poll_error_msg_list.append("Model must be initialized.")
         if not pkg.props.was_frame_range_extracted:
             cls._poll_error_msg_list.append("Frame range must be extracted.")
 
@@ -22,7 +20,7 @@ class Mosplat_OT_run_inference(
 
     def _queue_callback(self, pkg, event, next):
 
-        return "RUNNING_MODAL"
+        return super()._queue_callback(pkg, event, next)
 
     def _contexted_invoke(self, pkg, event):
         return self.execute_with_package(pkg)
@@ -30,16 +28,20 @@ class Mosplat_OT_run_inference(
     def _contexted_execute(self, pkg):
         prefs = pkg.prefs
 
-        self.launch_subprocess(
+        self.launch_thread(
             pkg.context,
-            pwargs=ProcessKwargs(),
+            twargs=ThreadKwargs(),
         )
 
         return "RUNNING_MODAL"
 
     @staticmethod
-    def _operator_subprocess(queue, cancel_event, *, pwargs):
-        pass
+    def _operator_thread(queue, cancel_event, *, twargs):
+        import time
+
+        time.sleep(4)
+
+        queue.put(("done", "we are done"))
 
 
 def process_entrypoint(*args, **kwargs):

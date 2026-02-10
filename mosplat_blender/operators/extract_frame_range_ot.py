@@ -73,7 +73,6 @@ class Mosplat_OT_extract_frame_range(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
-        from jaxtyping import Float
         from safetensors.torch import save_file
         from torchcodec.decoders import VideoDecoder
 
