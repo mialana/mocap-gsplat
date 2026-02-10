@@ -112,7 +112,7 @@ class Mosplat_OT_extract_frame_range(
                 )
 
                 save_file(
-                    {SavedTensorFileName._tensor_key_name(): tensor},
+                    {SavedTensorFileName._default_tensor_key(): tensor},
                     filename=out_file,
                     metadata=FrameTensorMetadata(
                         frame_idx=idx, media_files=files

@@ -137,11 +137,11 @@ class VGGTInterface(LogClassMixin):
 
         depth = predictions["depth"]
         depth_conf = predictions["depth_conf"]
-        pointmap = predictions["world_points"]
+        point_map = predictions["world_points"]
         pointmap_conf = predictions["world_points_conf"]
 
         if options.inference_mode == ModelInferenceMode.POINT_MAP:
-            world_points = pointmap
+            world_points = point_map
             conf_map = pointmap_conf
         else:
             world_points = predictions["world_points"]
@@ -191,7 +191,7 @@ class VGGTInterface(LogClassMixin):
         intrinsic = intrinsic.reshape(B, 3, 3).cpu()
         depth = depth.reshape(B, H, W, 1).cpu()
         depth_conf = depth_conf.reshape(B, H, W).cpu()
-        pointmap = pointmap.reshape(B, H, W, 3).cpu()
+        point_map = point_map.reshape(B, H, W, 3).cpu()
 
         return PointCloudTensors(
             xyz=xyz,
@@ -202,7 +202,7 @@ class VGGTInterface(LogClassMixin):
             intrinsic=intrinsic,
             depth=depth,
             depth_conf=depth_conf,
-            point_map=pointmap,
+            point_map=point_map,
             _metadata=metadata,
         )
 

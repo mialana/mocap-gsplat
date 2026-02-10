@@ -1,11 +1,14 @@
 from pathlib import Path
 from typing import Counter, List, NamedTuple, Tuple
 
-from infrastructure.macros import load_and_verify_tensor
+from infrastructure.macros import load_and_verify_default_tensor, load_and_verify_tensor
 from infrastructure.schemas import (
     FrameTensorMetadata,
+    PointCloudTensors,
     SavedTensorFileName,
     TensorFileFormatLookup,
+    UserAssertionError,
+    UserFacingError,
     VGGTModelOptions,
 )
 from interfaces import VGGTInterface
@@ -64,6 +67,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
     @staticmethod
     def _operator_thread(queue, cancel_event, *, twargs):
         import torch
+        from safetensors.torch import save_file
 
         files, (start, end), tensor_file_formats, options = twargs
         in_file_formatter = tensor_file_formats[SavedTensorFileName.PREPROCESSED]
@@ -81,19 +85,48 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 in_file = Path(in_file_formatter.format(frame_idx=idx))
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
 
-                images_tensor = load_and_verify_tensor(
-                    idx, in_file, files, media_files_counter, device_str
-                )
-                metadata: FrameTensorMetadata = FrameTensorMetadata(idx, files)
+                try:
+                    _ = load_and_verify_tensor(
+                        idx, in_file, device_str, media_files_counter, options
+                    )
+                    queue.put(
+                        (
+                            "update",
+                            f"Previous point cloud inference data found on disk for frame '{idx}'",
+                        )
+                    )
+                    continue
+                except (OSError, UserAssertionError):
+                    pass
 
-                pc_tensors = VGGTInterface().run_inference(
-                    images_tensor, metadata, options
+                images_tensor = load_and_verify_default_tensor(
+                    idx, in_file, device_str, media_files_counter
+                )
+                if images_tensor is None:
+                    raise RuntimeError("Poll-guard failed.")
+
+                new_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                    idx, files, options
+                )
+
+                pc_tensors: PointCloudTensors = VGGTInterface().run_inference(
+                    images_tensor, new_metadata, options
+                )
+                save_file(
+                    pc_tensors.to_dict(),
+                    out_file,
+                    metadata=pc_tensors._metadata.to_dict(),
                 )
 
                 queue.put(("update", f"Ran inference on frame '{idx}'"))
             except Exception as e:
-                queue.put(("warning", str(e)))
+                msg = UserFacingError.make_msg(
+                    f"Error ocurred while running inference on frame '{idx}'.", e
+                )
+                queue.put(("warning", msg))
                 continue
+
+        queue.put(("done", "Inference complete for current frame range."))
 
 
 def process_entrypoint(*args, **kwargs):

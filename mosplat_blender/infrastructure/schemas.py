@@ -19,7 +19,6 @@ from typing import (
     ClassVar,
     Dict,
     List,
-    Literal,
     NamedTuple,
     Optional,
     Self,
@@ -168,7 +167,7 @@ class LogEntryLevelEnum(StrEnum):
 
 class SavedTensorFileName(StrEnum):
     @staticmethod
-    def _tensor_key_name() -> str:
+    def _default_tensor_key() -> str:
         return "data"
 
     RAW = auto()
@@ -250,25 +249,6 @@ class PropertyMeta(NamedTuple):
     description: str
 
 
-class FrameTensorMetadata(NamedTuple):
-    frame_idx: int
-    media_files: List[Path]
-
-    def to_dict(self) -> Dict[str, str]:
-        return {
-            "frame_idx": str(self.frame_idx),
-            "media_files": json.dumps([str(file) for file in self.media_files]),
-        }
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, str]) -> Self:
-        try:
-            files = [Path(file_str) for file_str in json.loads(d["media_files"])]
-            return cls(frame_idx=int(d["frame_idx"]), media_files=files)
-        except (KeyError, json.JSONDecodeError) as e:
-            raise OSError(str(e)) from e
-
-
 class ModelInferenceMode(StrEnum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
@@ -287,6 +267,51 @@ class VGGTModelOptions:
     confidence_percentile: float = 95.0
     enable_black_mask: bool = True
     enable_white_mask: bool = False
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> Self:
+        new_dict = d
+        mode: str = new_dict.get("inference_mode", "")
+        if not mode:
+            raise KeyError("Expected `inference_mode` in options as dictionary.")
+        new_dict.setdefault("inference_mode", ModelInferenceMode(mode))
+
+        return cls(**new_dict)
+
+
+class FrameTensorMetadata(NamedTuple):
+    frame_idx: int
+    media_files: List[Path]
+    model_options: Optional[VGGTModelOptions] = None
+
+    def to_dict(self) -> Dict[str, str]:
+        d: Dict[str, str] = {
+            "frame_idx": str(self.frame_idx),
+            "media_files": json.dumps([str(file) for file in self.media_files]),
+        }
+        if self.model_options:
+            d |= {"model_options": json.dumps(self.model_options.to_dict())}
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, str]) -> Self:
+        try:
+            files = [Path(file_str) for file_str in json.loads(d["media_files"])]
+
+            model_options: Optional[VGGTModelOptions] = None
+            options: str = d.get("model_options", "")
+            if options:
+                model_options = VGGTModelOptions.from_dict(json.loads(options))
+            return cls(
+                frame_idx=int(d["frame_idx"]),
+                media_files=files,
+                model_options=model_options,
+            )
+        except (KeyError, json.JSONDecodeError) as e:
+            raise OSError(str(e)) from e
 
 
 @dataclass(frozen=True)
@@ -308,7 +333,12 @@ class PointCloudTensors:
     depth_conf: Float32[torch.Tensor, "B H W"]
     point_map: Optional[Float32[torch.Tensor, "B H W 3"]]
 
-    _metadata: FrameTensorMetadata = field(metadata={"skip_to_dict": True})
+    _metadata: FrameTensorMetadata
+
+    def to_dict(self) -> Dict[str, torch.Tensor]:
+        d = asdict(self)
+        d.pop("_metadata")
+        return d
 
 
 @dataclass(frozen=True)

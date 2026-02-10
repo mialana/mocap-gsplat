@@ -10,7 +10,7 @@ from infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
-    load_and_verify_tensor,
+    load_and_verify_default_tensor,
     save_tensor_stack_png_preview,
 )
 from infrastructure.schemas import (
@@ -115,9 +115,11 @@ class Mosplat_OT_run_preprocess_script(
                 in_file = Path(in_file_formatter.format(frame_idx=idx))
                 out_file = Path(out_file_formatter.format(frame_idx=idx))
 
-                tensor = load_and_verify_tensor(
-                    idx, in_file, files, media_files_counter, device_str
+                tensor = load_and_verify_default_tensor(
+                    idx, in_file, device_str, media_files_counter
                 )
+                if tensor is None:
+                    raise RuntimeError("Poll-guard failed.")
 
                 new_tensor: ImagesTensorType = preprocess_fn(idx, files, tensor)
 
@@ -136,7 +138,7 @@ class Mosplat_OT_run_preprocess_script(
 
                 new_metadata = FrameTensorMetadata(frame_idx=idx, media_files=files)
                 save_file(
-                    {SavedTensorFileName._tensor_key_name(): new_tensor},
+                    {SavedTensorFileName._default_tensor_key(): new_tensor},
                     filename=out_file,
                     metadata=new_metadata.to_dict(),
                 )
@@ -144,12 +146,16 @@ class Mosplat_OT_run_preprocess_script(
                 save_tensor_stack_png_preview(new_tensor, out_file)
                 queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
-                queue.put(("warning", str(e), None))
+                msg = UserFacingError.make_msg(
+                    f"Error ocurred while running preprocess script on frame '{idx}'.",
+                    e,
+                )
+                queue.put(("warning", msg, None))
                 continue
 
         frame_range = data.get_frame_range(start, end - 1)  # inclusive
         if not frame_range:
-            msg = UnexpectedError.make_msg(f"Poll-guard failed.")
+            msg = UnexpectedError.make_msg("Poll-guard failed.")
             queue.put(("error", msg, None))
         else:
             frame_range.applied_preprocess_script = (
