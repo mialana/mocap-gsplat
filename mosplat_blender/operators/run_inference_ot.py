@@ -87,7 +87,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
                 try:
                     _ = load_and_verify_tensor(
-                        idx, in_file, device_str, media_files_counter, options
+                        idx, out_file, device_str, media_files_counter, options
                     )
                     queue.put(
                         (
@@ -100,7 +100,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     pass
 
                 images_tensor = load_and_verify_default_tensor(
-                    idx, in_file, device_str, media_files_counter
+                    idx, in_file, device_str, media_files_counter, options=None
                 )
                 if images_tensor is None:
                     raise RuntimeError("Poll-guard failed.")
@@ -115,7 +115,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 save_file(
                     pc_tensors.to_dict(),
                     out_file,
-                    metadata=pc_tensors._metadata.to_dict(),
+                    metadata=new_metadata.to_dict(),
                 )
 
                 queue.put(("update", f"Ran inference on frame '{idx}'"))

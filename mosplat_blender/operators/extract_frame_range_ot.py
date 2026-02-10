@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from numbers import Integral
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
@@ -78,13 +79,16 @@ class Mosplat_OT_extract_frame_range(
 
         files, (start, end), out_file_formatter, data = pwargs
 
-        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
-        device: torch.device = torch.device(device_str)
+        torchcodec_device: str = (
+            "cuda"
+            if not sys.platform == "win32" and torch.cuda.is_available()
+            else "cpu"  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
+        )
 
         decoders: List[VideoDecoder] = []
         try:
             for media_file in files:
-                dec = VideoDecoder(media_file, device=device)
+                dec = VideoDecoder(media_file, device=torchcodec_device)
                 decoders.append(dec)
         except ValueError as e:
             # exit early wherever error occurs and put error on queue
@@ -93,6 +97,7 @@ class Mosplat_OT_extract_frame_range(
 
         # create a new frame range with both limits at start
         new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
+        data.add_frame_range(new_frame_range)
 
         for idx in range(start, end):
             if cancel_event.is_set():

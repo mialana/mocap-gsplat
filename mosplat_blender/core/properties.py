@@ -78,7 +78,7 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
     data = self.metadata_accessor.to_dataclass()
 
     start, end = self.frame_range_
-    self.was_frame_range_extracted = bool(data.get_frame_range(start, end - 1))
+    self.was_frame_range_extracted = bool(data.query_frame_range(start, end - 1))
 
     self.logger.info(f"Frame range updated to '{start}-{end}'.")
 
@@ -293,7 +293,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         name="Frame Range",
         description="Start and end frame of data to be processed.",
         size=2,
-        default=(0, 30),
+        default=(0, 12),
         min=0,
         options={"SKIP_SAVE"},
         update=update_frame_range,

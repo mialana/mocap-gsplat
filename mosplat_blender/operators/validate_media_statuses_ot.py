@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple
 
@@ -46,8 +47,11 @@ class Mosplat_OT_validate_media_statuses(
 
         files, data = pwargs
 
-        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
-        device: torch.device = torch.device(device_str)
+        torchcodec_device: str = (
+            "cuda"
+            if not sys.platform == "win32" and torch.cuda.is_available()
+            else "cpu"  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
+        )
 
         status_lookup, accumulator = data.status_accumulator()
 
@@ -63,7 +67,9 @@ class Mosplat_OT_validate_media_statuses(
             if status.needs_reextraction(data=data):
                 try:
                     # create decoder here so torchcodec only needs to be imported once
-                    decoder: VideoDecoder = VideoDecoder(status.filepath, device=device)
+                    decoder: VideoDecoder = VideoDecoder(
+                        status.filepath, device=torchcodec_device
+                    )
                     metadata: VideoStreamMetadata = decoder.metadata
                     status.from_torchcodec(metadata)
 

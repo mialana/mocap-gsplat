@@ -153,12 +153,13 @@ class Mosplat_OT_run_preprocess_script(
                 queue.put(("warning", msg, None))
                 continue
 
-        frame_range = data.get_frame_range(start, end - 1)  # inclusive
-        if not frame_range:
+        frame_range = data.query_frame_range(start, end - 1)  # inclusive
+        if not frame_range or len(frame_range) > 1:
             msg = UnexpectedError.make_msg("Poll-guard failed.")
             queue.put(("error", msg, None))
+            return
         else:
-            frame_range.applied_preprocess_script = (
+            frame_range[0].applied_preprocess_script = (
                 AppliedPreprocessScript.from_file_path(script)
             )
             queue.put(("done", f"Ran '{script}' on frames '{start}-{end}'", data))

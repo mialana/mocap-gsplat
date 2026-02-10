@@ -291,9 +291,10 @@ class FrameTensorMetadata(NamedTuple):
         d: Dict[str, str] = {
             "frame_idx": str(self.frame_idx),
             "media_files": json.dumps([str(file) for file in self.media_files]),
+            "model_options": (
+                json.dumps(self.model_options.to_dict()) if self.model_options else ""
+            ),
         }
-        if self.model_options:
-            d |= {"model_options": json.dumps(self.model_options.to_dict())}
         return d
 
     @classmethod
@@ -575,27 +576,27 @@ class MediaIOMetadata:
 
         return status_lookup, self._accumulate_media_status
 
-    def get_frame_range(self, start: int, end: int) -> Optional[ProcessedFrameRange]:
+    def query_frame_range(self, start: int, end: int) -> List[ProcessedFrameRange]:
         """end must be inclusive"""
-        return next(
+        return list(
             (
                 frame_range
                 for frame_range in self.processed_frame_ranges
                 if (frame_range.start_frame == start and frame_range.end_frame == end)
-            ),
-            None,
+            )
         )
 
     def add_frame_range(self, frame_range: ProcessedFrameRange) -> bool:
         start = frame_range.start_frame
         end = frame_range.end_frame
-        existing_frame_range = self.get_frame_range(start, end)
+        existing_frame_ranges = self.query_frame_range(start, end)
         self.processed_frame_ranges.append(frame_range)
 
-        if not existing_frame_range:
+        if not existing_frame_ranges:
             return True  # processed a new frame range
 
         # new frame range overrides old
-        self.processed_frame_ranges.remove(existing_frame_range)
+        for frame_range in existing_frame_ranges:
+            self.processed_frame_ranges.remove(frame_range)
 
         return False  # already existed
