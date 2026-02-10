@@ -120,7 +120,10 @@ class Mosplat_OT_extract_frame_range(
                     {SavedTensorFileName._default_tensor_key(): tensor},
                     filename=out_file,
                     metadata=FrameTensorMetadata(
-                        frame_idx=idx, media_files=files
+                        frame_idx=idx,
+                        media_files=files,
+                        preprocess_script=None,
+                        model_options=None,
                     ).to_dict(),
                 )
                 save_tensor_stack_png_preview(tensor, out_file)

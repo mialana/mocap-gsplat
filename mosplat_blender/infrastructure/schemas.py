@@ -337,14 +337,14 @@ class PointCloudTensors:
     # confidence level of each point
     conf: Float32[torch.Tensor, "N"]
 
-    # which camera each point came from
-    cam_idx: Int32[torch.Tensor, "N"]
-
     extrinsic: Float32[torch.Tensor, "B 3 4"]
     intrinsic: Float32[torch.Tensor, "B 3 3"]
     depth: Float32[torch.Tensor, "B H W 1"]
     depth_conf: Float32[torch.Tensor, "B H W"]
     point_map: Optional[Float32[torch.Tensor, "B H W 3"]]
+
+    # which camera each point came from
+    cam_idx: Int32[torch.Tensor, "N"]
 
     _metadata: FrameTensorMetadata
 

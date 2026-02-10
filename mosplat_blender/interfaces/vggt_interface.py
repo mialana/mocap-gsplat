@@ -115,31 +115,41 @@ class VGGTInterface(LogClassMixin):
             raise DeveloperError("Model not initialized.")
 
         import torch
-        from vggt.utils.geometry import unproject_depth_map_to_point_map
-        from vggt.utils.load_fn import load_and_preprocess_images
+        from jaxtyping import Float32, Int32, UInt8
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
-        images = crop_tensor(
+        extrinsic: Float32[torch.Tensor, "B 3 4"]
+        intrinsic: Float32[torch.Tensor, "B 3 3"]
+
+        images = crop_tensor(  # crop down
             images.to(device=self.device, dtype=self.dtype), max_size=518, multiple=14
         )
 
         with torch.inference_mode():
             predictions: Dict[str, torch.Tensor] = self.model(images)
 
-        extrinsic, intrinsic = pose_encoding_to_extri_intri(
+        extri_intri = pose_encoding_to_extri_intri(
             predictions["pose_enc"], images.shape[-2:], build_intrinsics=True
         )
-        if intrinsic is None:
+
+        if extri_intri[1] is None:
             raise UnexpectedError("`build_intrinsics` argument ineffective.")
+
+        extrinsic: Float32[torch.Tensor, "B 3 4"] = extri_intri[0]
+        intrinsic: Float32[torch.Tensor, "B 3 3"] = extri_intri[1]
 
         predictions["extrinsic"] = extrinsic
         predictions["intrinsic"] = intrinsic
 
-        depth = predictions["depth"]
-        depth_conf = predictions["depth_conf"]
-        point_map = predictions["world_points"]
-        pointmap_conf = predictions["world_points_conf"]
+        depth: Float32[torch.Tensor, "1 B H W 1"] = predictions["depth"]
+        depth_conf: Float32[torch.Tensor, "1 B H W"] = predictions["depth_conf"]
+        point_map: Float32[torch.Tensor, "1 B H W 3"] = predictions["world_points"]
+        pointmap_conf: Float32[torch.Tensor, "1 B H W"] = predictions[
+            "world_points_conf"
+        ]
 
+        world_points: Float32[torch.Tensor, "1 B H W 3"]
+        conf_map: Float32[torch.Tensor, "1 B H W"]
         if options.inference_mode == ModelInferenceMode.POINT_MAP:
             world_points = point_map
             conf_map = pointmap_conf
@@ -147,16 +157,18 @@ class VGGTInterface(LogClassMixin):
             world_points = predictions["world_points"]
             conf_map = depth_conf
 
-        S, B, H, W, _ = world_points.shape
-        B = S * B
+        S, B, H, W, _ = world_points.shape  # Scene, Batch, Height, Width, Positions
+        B = S * B  # flatten first two dimensions
 
-        world_points = world_points.reshape(B, H, W, 3)
-        conf_map = conf_map.reshape(B, H, W)
+        world_points: Float32[torch.Tensor, "B H W 3"] = world_points.reshape(
+            B, H, W, 3
+        )
+        conf_map: Float32[torch.Tensor, "B H W"] = conf_map.reshape(B, H, W)
 
-        xyz = world_points.reshape(-1, 3)
-        conf = conf_map.reshape(-1)
+        xyz: Float32[torch.Tensor, "N 3"] = world_points.reshape(-1, 3)
+        conf: Float32[torch.Tensor, "N"] = conf_map.reshape(-1)
 
-        rgb = (
+        rgb: UInt8[torch.Tensor, "N 3"] = (
             images.permute(0, 2, 3, 1)
             .reshape(-1, 3)
             .clamp(0, 1)
@@ -164,23 +176,25 @@ class VGGTInterface(LogClassMixin):
             .to(torch.uint8)
         )
 
-        cam_idx = torch.repeat_interleave(
-            torch.arange(B, device=conf.device, dtype=torch.int32),
-            H * W,
-        )
-
         if conf.numel():
-            conf_threshold = torch.quantile(conf, options.confidence_percentile / 100.0)
+            conf_threshold: Float32[torch.Tensor, "1"] = torch.quantile(
+                conf, options.confidence_percentile / 100.0
+            )
         else:
-            conf_threshold = conf.new_tensor(0.0)
+            conf_threshold: Float32[torch.Tensor, "1"] = conf.new_tensor(0.0)
 
-        mask = (conf >= conf_threshold) & (conf > 1e-5)
+        mask: Float32[torch.Tensor, "N"] = (conf >= conf_threshold) & (conf > 1e-5)
 
         if options.enable_black_mask:
             mask &= rgb.sum(dim=1) >= 16
 
         if options.enable_white_mask:
             mask &= ~((rgb[:, 0] > 240) & (rgb[:, 1] > 240) & (rgb[:, 2] > 240))
+
+        cam_idx: Int32[torch.Tensor, "N"] = torch.repeat_interleave(
+            torch.arange(B, device=conf.device, dtype=torch.int32),
+            H * W,
+        )
 
         xyz = xyz[mask].cpu()
         rgb = rgb[mask].cpu()
@@ -197,12 +211,12 @@ class VGGTInterface(LogClassMixin):
             xyz=xyz,
             rgb=rgb,
             conf=conf,
-            cam_idx=cam_idx,
             extrinsic=extrinsic,
             intrinsic=intrinsic,
             depth=depth,
             depth_conf=depth_conf,
             point_map=point_map,
+            cam_idx=cam_idx,
             _metadata=metadata,
         )
 

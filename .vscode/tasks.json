@@ -5,7 +5,7 @@
             "label": "build",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
-            "args": ["${workspaceFolder}/scripts/build.py", "--cpu"],
+            "args": ["${workspaceFolder}/scripts/build.py"],
             "problemMatcher": [],
             "group": {
                 "kind": "build"
@@ -20,7 +20,7 @@
             "label": "build development",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
-            "args": ["${workspaceFolder}/scripts/build.py", "--dev", "--cpu"],
+            "args": ["${workspaceFolder}/scripts/build.py", "--dev"],
             "problemMatcher": [],
             "group": {
                 "kind": "build"
