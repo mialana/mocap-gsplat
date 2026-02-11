@@ -3,8 +3,6 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
-import mathutils
-
 from infrastructure.mixins import CtxPackage
 from infrastructure.schemas import SavedTensorFileName, UnexpectedError
 from operators.base_ot import MosplatOperatorBase
@@ -26,17 +24,6 @@ MESH_NAME = "pc_mesh"
 PLAYER_NAME = "PointCloudPlaybackManager"
 
 PLY_FILE_FORMATTER = None
-
-PLY_TRANSFORM_MATRIX = mathutils.Matrix(
-    (
-        (1, 0, 0, 0),
-        (0, 0, 1, 0),
-        (0, -1, 0, 0),
-        (0, 0, 0, 1),
-    )
-)
-
-PLY_SCALE_MATRIX = mathutils.Matrix.Scale(100.0, 4)
 
 
 class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
@@ -76,6 +63,7 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
         self.ensure_player(pkg)
         self.setup_geometry_nodes()
+        self.setup_material()
 
         # prevent duplicate registration of handler
         for handler in bpy.app.handlers.frame_change_pre:
@@ -209,6 +197,7 @@ def on_frame_change(scene: Scene):
 
 def import_ply_mesh_for_frame(curr_frame: int) -> Mesh:
     import bpy
+    import mathutils
 
     if not PLY_FILE_FORMATTER:
         raise UnexpectedError(f"Global PLY file formatter string no longer in scope.")
@@ -226,7 +215,7 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Mesh:
 
     new_mesh: Mesh = cast(Mesh, created_obj.data.copy())
 
-    transform = mathutils.Matrix(
+    PLY_TRANSFORM_MATRIX = mathutils.Matrix(
         (
             (1, 0, 0, 0),
             (0, 0, 1, 0),
@@ -235,9 +224,9 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Mesh:
         )
     )
 
-    scale = mathutils.Matrix.Scale(100.0, 4)
+    PLY_SCALE_MATRIX = mathutils.Matrix.Scale(100.0, 4)
 
-    new_mesh.transform(scale @ transform)
+    new_mesh.transform(PLY_SCALE_MATRIX @ PLY_TRANSFORM_MATRIX)
     new_mesh.update()
 
     bpy.data.objects.remove(created_obj, do_unlink=True)

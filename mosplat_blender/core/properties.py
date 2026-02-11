@@ -83,6 +83,8 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
         scene.frame_start = start
         scene.frame_end = end - 1
 
+    OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINTCLOUD_PREVIEW, "INVOKE_DEFAULT")
+
     self.logger.info(f"Frame range updated to '{start}-{end}'.")
 
 

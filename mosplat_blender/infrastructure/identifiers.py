@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum, auto
-from pathlib import Path
 from string import capwords
-from typing import Dict, List, Self, Tuple, TypeAlias
 
 from infrastructure.schemas import AddonMeta
 
@@ -49,6 +47,7 @@ class OperatorIDEnum(StrEnum):
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()
     RUN_INFERENCE = auto()
+    INSTALL_POINTCLOUD_PREVIEW = auto()
 
 
 class PanelIDEnum(StrEnum):
