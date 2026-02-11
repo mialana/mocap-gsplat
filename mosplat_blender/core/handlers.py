@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Optional, Tuple
 from bpy.app.handlers import persistent
 
 from core.checks import check_addonpreferences, check_propertygroup
-from infrastructure.schemas import MediaIOMetadata
+from infrastructure.schemas import MediaIOMetadata, UserFacingError
 from interfaces.logging_interface import LoggingInterface
 
 if TYPE_CHECKING:
-    from bpy.types import Property, Scene
+    from bpy.types import Scene
 
     from core.preferences import Mosplat_AP_Global
     from core.properties import Mosplat_PG_Global
@@ -99,3 +99,26 @@ def handle_reset_properties_timer_entrypoint(scene: Optional[Scene] = None) -> N
         props.property_unset(prop_meta.id)
 
     logger.info("Properties reset.")
+
+
+@persistent
+def handle_set_render_engine(scene: Scene):
+    pass
+
+
+def handle_set_render_engine_timer_entrypoint(scene: Optional[Scene] = None) -> None:
+    from bpy import context
+
+    scene = scene or context.scene
+    if not scene:
+        return
+
+    try:
+        setattr(scene.render, "engine", "CYCLES")
+        setattr(scene.cycles, "device", "GPU")
+    except AttributeError as e:
+        msg = UserFacingError.make_msg(
+            "Could not configure render engine as 'CYCLES'. Try again manually in UI.",
+            e,
+        )
+        logger.error(msg)

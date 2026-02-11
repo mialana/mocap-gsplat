@@ -78,6 +78,11 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
     start, end = self.frame_range_
     self.was_frame_range_extracted = bool(data.query_frame_range(start, end - 1))
 
+    scene = context.scene
+    if scene:
+        scene.frame_start = start
+        scene.frame_end = end - 1
+
     self.logger.info(f"Frame range updated to '{start}-{end}'.")
 
 
@@ -269,7 +274,7 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
         items=ModelInferenceModeEnumItems,
         default=ModelInferenceMode.POINTMAP.value,
     )
-    confidence_percentile: FloatProperty(name="Confidence Percentile", default=97.5)
+    confidence_percentile: FloatProperty(name="Confidence Percentile", default=98.5)
     enable_black_mask: BoolProperty(name="Enable Black Mask", default=True)
     enable_white_mask: BoolProperty(name="Enable White Mask", default=False)
 

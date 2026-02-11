@@ -97,6 +97,8 @@ def set_handlers():
         load_post.append(core.handlers.handle_load_from_json)
     if not core.handlers.handle_reset_properties in load_post:
         load_post.append(core.handlers.handle_reset_properties)
+    if not core.handlers.handle_set_render_engine in load_post:
+        load_post.append(core.handlers.handle_set_render_engine)
 
     if not core.handlers.handle_save_to_json in bpy.app.handlers.undo_post:
         bpy.app.handlers.undo_post.append(core.handlers.handle_save_to_json)
@@ -110,6 +112,9 @@ def set_handlers():
     bpy.app.timers.register(
         core.handlers.handle_reset_properties_timer_entrypoint, first_interval=0
     )
+    bpy.app.timers.register(
+        core.handlers.handle_set_render_engine_timer_entrypoint, first_interval=0
+    )
 
 
 def unset_handlers():
@@ -118,6 +123,8 @@ def unset_handlers():
         load_post.remove(core.handlers.handle_load_from_json)
     if core.handlers.handle_reset_properties in load_post:
         load_post.remove(core.handlers.handle_reset_properties)
+    if core.handlers.handle_set_render_engine in load_post:
+        load_post.remove(core.handlers.handle_set_render_engine)
     if core.handlers.handle_save_to_json in bpy.app.handlers.undo_post:
         bpy.app.handlers.undo_post.remove(core.handlers.handle_save_to_json)
     if core.handlers.handle_save_to_json in bpy.app.handlers.redo_post:

@@ -145,6 +145,18 @@ def save_tensor_stack_png_preview(tensor: ImagesTensorType, tensor_out_file: Pat
     save_image(tensor, preview_png_file)
 
 
+def save_tensor_stack_separate_png_previews(
+    tensor: ImagesTensorType, tensor_out_file: Path
+):
+    from torchvision.utils import save_image
+
+    for idx, img in enumerate(tensor):
+        preview_png_file: Path = (
+            tensor_out_file.parent / f"{tensor_out_file.stem}.{idx:04d}.png"
+        )
+        save_image(img, preview_png_file)
+
+
 def load_and_verify_tensor(
     in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
 ) -> Dict[str, torch.Tensor]:

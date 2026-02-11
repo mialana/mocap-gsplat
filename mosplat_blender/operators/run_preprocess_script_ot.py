@@ -11,8 +11,8 @@ from infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
     load_and_verify_default_tensor,
-    load_and_verify_tensor,
     save_tensor_stack_png_preview,
+    save_tensor_stack_separate_png_previews,
 )
 from infrastructure.schemas import (
     AppliedPreprocessScript,
@@ -126,7 +126,9 @@ class Mosplat_OT_run_preprocess_script(
                 )
 
                 try:
-                    _ = load_and_verify_tensor(out_file, device_str, new_metadata)
+                    _ = load_and_verify_default_tensor(
+                        out_file, device_str, new_metadata
+                    )
                     queue.put(
                         (
                             "update",
@@ -134,7 +136,7 @@ class Mosplat_OT_run_preprocess_script(
                             None,
                         )
                     )
-                    continue
+                    # continue
                 except (OSError, UserAssertionError):
                     pass
 
@@ -169,7 +171,7 @@ class Mosplat_OT_run_preprocess_script(
                     metadata=new_metadata.to_dict(),
                 )
 
-                save_tensor_stack_png_preview(new_tensor, out_file)
+                save_tensor_stack_separate_png_previews(new_tensor, out_file)
                 queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(
