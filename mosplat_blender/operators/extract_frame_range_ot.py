@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from functools import partial
 from numbers import Integral
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
@@ -19,7 +20,7 @@ from operators.base_ot import MosplatOperatorBase
 class ProcessKwargs(NamedTuple):
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
-    out_file_formatter: str
+    exported_file_formatter: str
     data: MediaIOMetadata
 
 
@@ -41,9 +42,7 @@ class Mosplat_OT_extract_frame_range(
         # try setting all the properties that are needed for the op
         self._media_files: List[Path] = props.media_files(prefs)
         self._frame_range: Tuple[int, int] = props.frame_range_
-        self._out_file_formatter: str = props.generate_safetensor_filepath_formatters(
-            prefs, [SavedTensorFileName.RAW]
-        )[SavedTensorFileName.RAW]
+        self._exported_file_formatter: str = props.exported_file_formatter(prefs)
 
         return self.execute_with_package(pkg)
 
@@ -53,7 +52,7 @@ class Mosplat_OT_extract_frame_range(
             pwargs=ProcessKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
-                out_file_formatter=self._out_file_formatter,
+                exported_file_formatter=self._exported_file_formatter,
                 data=self.data,
             ),
         )
@@ -77,7 +76,13 @@ class Mosplat_OT_extract_frame_range(
         from safetensors.torch import save_file
         from torchcodec.decoders import VideoDecoder
 
-        files, (start, end), out_file_formatter, data = pwargs
+        files, (start, end), exported_file_formatter, data = pwargs
+
+        out_file_formatter = partial(
+            exported_file_formatter.format,
+            file_name=SavedTensorFileName.RAW,
+            file_ext="safetensors",
+        )
 
         torchcodec_device: str = (
             "cuda"
@@ -103,7 +108,7 @@ class Mosplat_OT_extract_frame_range(
             if cancel_event.is_set():
                 return
 
-            out_file = Path(out_file_formatter.format(frame_idx=idx))
+            out_file = Path(out_file_formatter(frame_idx=idx))
 
             if is_path_accessible(out_file):
                 note = f"Safetensor data for frame '{idx}' already found on disk."

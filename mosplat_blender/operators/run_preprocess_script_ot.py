@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from collections import Counter
+from functools import partial
 from pathlib import Path
 from types import ModuleType
 from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
@@ -20,7 +20,6 @@ from infrastructure.schemas import (
     ImagesTensorType,
     MediaIOMetadata,
     SavedTensorFileName,
-    TensorFileFormatLookup,
     UnexpectedError,
     UserAssertionError,
     UserFacingError,
@@ -34,7 +33,7 @@ class ProcessKwargs(NamedTuple):
     preprocess_script: Path
     media_files: List[Path]
     frame_range: Tuple[int, int]
-    tensor_file_formatters: TensorFileFormatLookup
+    exported_file_formatter: str
     data: MediaIOMetadata
 
 
@@ -59,11 +58,7 @@ class Mosplat_OT_run_preprocess_script(
         self._preprocess_script: Path = prefs.preprocess_media_script_file_
         self._frame_range: Tuple[int, int] = props.frame_range_
 
-        self._tensor_file_formats: TensorFileFormatLookup = (
-            props.generate_safetensor_filepath_formatters(
-                prefs, [SavedTensorFileName.RAW, SavedTensorFileName.PREPROCESSED]
-            )
-        )
+        self._exported_file_formattter: str = props.exported_file_formatter(prefs)
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
@@ -74,7 +69,7 @@ class Mosplat_OT_run_preprocess_script(
                 preprocess_script=self._preprocess_script,
                 media_files=self._media_files,
                 frame_range=self._frame_range,
-                tensor_file_formatters=self._tensor_file_formats,
+                exported_file_formatter=self._exported_file_formattter,
                 data=self.data,
             ),
         )
@@ -96,9 +91,17 @@ class Mosplat_OT_run_preprocess_script(
         import torch
         from safetensors.torch import save_file
 
-        script, files, (start, end), tensor_file_formats, data = pwargs
-        in_file_formatter = tensor_file_formats[SavedTensorFileName.RAW]
-        out_file_formatter = tensor_file_formats[SavedTensorFileName.PREPROCESSED]
+        script, files, (start, end), exported_file_formatter, data = pwargs
+        in_file_formatter = partial(
+            exported_file_formatter.format,
+            file_name=SavedTensorFileName.RAW,
+            file_ext="safetensors",
+        )
+        out_file_formatter = partial(
+            exported_file_formatter.format,
+            file_name=SavedTensorFileName.PREPROCESSED,
+            file_ext="safetensors",
+        )
 
         preprocess_fn = _retrieve_preprocess_fn(queue, script)
         if not preprocess_fn:
@@ -112,8 +115,8 @@ class Mosplat_OT_run_preprocess_script(
             if cancel_event.is_set():
                 return
             try:
-                in_file = Path(in_file_formatter.format(frame_idx=idx))
-                out_file = Path(out_file_formatter.format(frame_idx=idx))
+                in_file = Path(in_file_formatter(frame_idx=idx))
+                out_file = Path(out_file_formatter(frame_idx=idx))
 
                 new_metadata: FrameTensorMetadata = FrameTensorMetadata(
                     idx,

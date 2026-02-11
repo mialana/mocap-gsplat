@@ -1,13 +1,18 @@
+from functools import partial
 from pathlib import Path
-from typing import Counter, List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple
 
-from infrastructure.macros import load_and_verify_default_tensor, load_and_verify_tensor
+from infrastructure.macros import (
+    load_and_verify_default_tensor,
+    load_and_verify_tensor,
+    save_ply_ascii,
+    save_ply_binary,
+)
 from infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
     PointCloudTensors,
     SavedTensorFileName,
-    TensorFileFormatLookup,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
@@ -20,7 +25,7 @@ class ThreadKwargs(NamedTuple):
     preprocess_script: Path
     media_files: List[Path]
     frame_range: Tuple[int, int]
-    tensor_file_formatters: TensorFileFormatLookup
+    exported_file_formatter: str
     model_options: VGGTModelOptions
 
 
@@ -46,12 +51,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         self._frame_range: Tuple[int, int] = props.frame_range_
         self._preprocess_script: Path = prefs.preprocess_media_script_file_
 
-        self._tensor_file_formats: TensorFileFormatLookup = (
-            props.generate_safetensor_filepath_formatters(
-                prefs,
-                [SavedTensorFileName.PREPROCESSED, SavedTensorFileName.MODEL_INFERENCE],
-            )
-        )
+        self._exported_file_formatter: str = props.exported_file_formatter(prefs)
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
@@ -61,7 +61,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 preprocess_script=self._preprocess_script,
                 media_files=self._media_files,
                 frame_range=self._frame_range,
-                tensor_file_formatters=self._tensor_file_formats,
+                exported_file_formatter=self._exported_file_formatter,
                 model_options=pkg.props.options_accessor.to_dataclass(),
             ),
         )
@@ -73,9 +73,22 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         import torch
         from safetensors.torch import save_file
 
-        script, files, (start, end), tensor_file_formats, options = twargs
-        in_file_formatter = tensor_file_formats[SavedTensorFileName.PREPROCESSED]
-        out_file_formatter = tensor_file_formats[SavedTensorFileName.MODEL_INFERENCE]
+        script, files, (start, end), exported_file_formatter, options = twargs
+        in_file_formatter = partial(
+            exported_file_formatter.format,
+            file_name=SavedTensorFileName.PREPROCESSED,
+            file_ext="safetensors",
+        )
+        out_file_formatter = partial(
+            exported_file_formatter.format,
+            file_name=SavedTensorFileName.MODEL_INFERENCE,
+            file_ext="safetensors",
+        )
+        ply_file_formatter = partial(
+            exported_file_formatter.format,
+            file_name=SavedTensorFileName.POINTCLOUD,
+            file_ext="ply",
+        )
 
         device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -84,24 +97,37 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
+
+            in_file = Path(in_file_formatter(frame_idx=idx))
+            out_file = Path(out_file_formatter(frame_idx=idx))
+            ply_out_file = Path(ply_file_formatter(frame_idx=idx))
+
+            new_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                idx, files, applied_preprocess_script, options
+            )
+
+            pc_tensors: PointCloudTensors
             try:
-                in_file = Path(in_file_formatter.format(frame_idx=idx))
-                out_file = Path(out_file_formatter.format(frame_idx=idx))
-                new_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx, files, applied_preprocess_script, options
-                )
 
                 try:
-                    _ = load_and_verify_tensor(out_file, device_str, new_metadata)
+                    tensors = load_and_verify_tensor(out_file, device_str, new_metadata)
+                    pc_tensors = PointCloudTensors.from_dict(tensors, new_metadata)
+
+                    write_pointcloud_tensors_to_disk(ply_out_file, pc_tensors)
                     queue.put(
                         (
                             "update",
                             f"Previous point cloud inference data found on disk for frame '{idx}'",
                         )
                     )
-                    continue
+                    # continue
                 except (OSError, UserAssertionError):
                     pass
+                except (TypeError, ValueError) as e:
+                    msg = UserFacingError.make_msg(
+                        f"Tensor data loaded from '{out_file}' was corrupted.", e
+                    )
+                    queue.put(("warning", msg))
 
                 validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
                     idx,
@@ -115,7 +141,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 if images_tensor is None:
                     raise RuntimeError("Poll-guard failed.")
 
-                pc_tensors: PointCloudTensors = VGGTInterface().run_inference(
+                pc_tensors = VGGTInterface().run_inference(
                     images_tensor, new_metadata, options
                 )
                 save_file(
@@ -123,6 +149,8 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     out_file,
                     metadata=new_metadata.to_dict(),
                 )
+
+                write_pointcloud_tensors_to_disk(ply_out_file, pc_tensors)
 
                 queue.put(("update", f"Ran inference on frame '{idx}'"))
             except Exception as e:
@@ -133,6 +161,10 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 continue
 
         queue.put(("done", "Inference complete for current frame range."))
+
+
+def write_pointcloud_tensors_to_disk(out_file: Path, pc_tensors: PointCloudTensors):
+    save_ply_ascii(out_file, pc_tensors.xyz, pc_tensors.rgb)
 
 
 def process_entrypoint(*args, **kwargs):

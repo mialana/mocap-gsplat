@@ -55,8 +55,6 @@ from infrastructure.schemas import (
     MediaIOMetadata,
     ModelInferenceMode,
     ProcessedFrameRange,
-    SavedTensorFileName,
-    TensorFileFormatLookup,
     VGGTModelOptions,
 )
 
@@ -269,9 +267,9 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
     inference_mode: EnumProperty(
         name="Inference Mode",
         items=ModelInferenceModeEnumItems,
-        default=ModelInferenceMode.POINT_MAP.value,
+        default=ModelInferenceMode.POINTMAP.value,
     )
-    confidence_percentile: FloatProperty(name="Confidence Percentile", default=95.0)
+    confidence_percentile: FloatProperty(name="Confidence Percentile", default=97.5)
     enable_black_mask: BoolProperty(name="Enable Black Mask", default=True)
     enable_white_mask: BoolProperty(name="Enable White Mask", default=False)
 
@@ -376,11 +374,6 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
             )
         return result
 
-    def generate_safetensor_filepath_formatters(
-        self, prefs: Mosplat_AP_Global, names: List[SavedTensorFileName]
-    ) -> TensorFileFormatLookup:
+    def exported_file_formatter(self, prefs: Mosplat_AP_Global) -> str:
         data_dir = check_media_output_dir(prefs, self)
-        return {
-            name: str(data_dir / PER_FRAME_DIRNAME / f"{name}.safetensors")
-            for name in names
-        }
+        return str(data_dir / PER_FRAME_DIRNAME / "{file_name}.{file_ext}")

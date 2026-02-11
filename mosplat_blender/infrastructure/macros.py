@@ -28,13 +28,10 @@ from typing import (
 
 if TYPE_CHECKING:
     import torch
+    from jaxtyping import Float32, UInt8
     from safetensors import safe_open
 
-    from infrastructure.schemas import (
-        FrameTensorMetadata,
-        ImagesTensorType,
-        VGGTModelOptions,
-    )
+    from infrastructure.schemas import FrameTensorMetadata, ImagesTensorType
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
@@ -251,3 +248,70 @@ def crop_tensor(
     images = images[:, :, top : top + crop_H, left : left + crop_W]
 
     return images
+
+
+def save_ply_ascii(
+    out_file: Path, xyz: Float32[torch.Tensor, "N 3"], rgb: UInt8[torch.Tensor, "N 3"]
+):
+    assert xyz.shape[0] == rgb.shape[0], "'xyz' tensor shape dim 0 should match 'rgb'."
+    assert (
+        xyz.shape[1] == 3 and rgb.shape[1] == 3
+    ), "'xyz' and 'rgb' should have shape 3 in last dimension."
+
+    xyz = xyz.cpu()
+    rgb = rgb.cpu()
+
+    N = xyz.shape[0]
+
+    with open(out_file, "w") as f:
+        f.write("ply\n")
+        f.write("format ascii 1.0\n")
+        f.write(f"element vertex {N}\n")
+        f.write("property float x\n")
+        f.write("property float y\n")
+        f.write("property float z\n")
+        f.write("property uchar red\n")
+        f.write("property uchar green\n")
+        f.write("property uchar blue\n")
+        f.write("end_header\n")
+
+        for i in range(N):
+            x, y, z = xyz[i]
+            r, g, b = rgb[i]
+            f.write(f"{x} {y} {z} {r} {g} {b}\n")
+
+
+def save_ply_binary(
+    out_file: Path, xyz: Float32[torch.Tensor, "N 3"], rgb: UInt8[torch.Tensor, "N 3"]
+):
+    import numpy as np
+
+    assert xyz.dtype == torch.float32
+    assert rgb.dtype == torch.uint8
+    assert xyz.shape == rgb.shape
+    assert xyz.device.type == "cpu"
+
+    N = xyz.shape[0]
+
+    header = (
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        f"element vertex {N}\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property uchar red\n"
+        "property uchar green\n"
+        "property uchar blue\n"
+        "end_header\n"
+    )
+
+    with open(out_file, "wb") as f:
+        f.write(header.encode("ascii"))
+
+        xyz_bytes = xyz.view(torch.uint8)
+        rgb_bytes = rgb
+
+        for i in range(N):
+            f.write(xyz_bytes[i].cpu().numpy().astype(np.float32).tobytes())
+            f.write(rgb_bytes[i].cpu().numpy().astype(np.uint8).tobytes())

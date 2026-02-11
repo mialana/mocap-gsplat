@@ -143,15 +143,15 @@ class VGGTInterface(LogClassMixin):
 
         depth: Float32[torch.Tensor, "1 B H W 1"] = predictions["depth"]
         depth_conf: Float32[torch.Tensor, "1 B H W"] = predictions["depth_conf"]
-        point_map: Float32[torch.Tensor, "1 B H W 3"] = predictions["world_points"]
+        pointmap: Float32[torch.Tensor, "1 B H W 3"] = predictions["world_points"]
         pointmap_conf: Float32[torch.Tensor, "1 B H W"] = predictions[
             "world_points_conf"
         ]
 
         world_points: Float32[torch.Tensor, "1 B H W 3"]
         conf_map: Float32[torch.Tensor, "1 B H W"]
-        if options.inference_mode == ModelInferenceMode.POINT_MAP:
-            world_points = point_map
+        if options.inference_mode == ModelInferenceMode.POINTMAP:
+            world_points = pointmap
             conf_map = pointmap_conf
         else:
             world_points = predictions["world_points"]
@@ -205,7 +205,7 @@ class VGGTInterface(LogClassMixin):
         intrinsic = intrinsic.reshape(B, 3, 3).cpu()
         depth = depth.reshape(B, H, W, 1).cpu()
         depth_conf = depth_conf.reshape(B, H, W).cpu()
-        point_map = point_map.reshape(B, H, W, 3).cpu()
+        pointmap = pointmap.reshape(B, H, W, 3).cpu()
 
         return PointCloudTensors(
             xyz=xyz,
@@ -215,7 +215,7 @@ class VGGTInterface(LogClassMixin):
             intrinsic=intrinsic,
             depth=depth,
             depth_conf=depth_conf,
-            point_map=point_map,
+            pointmap=pointmap,
             cam_idx=cam_idx,
             _metadata=metadata,
         )

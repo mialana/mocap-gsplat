@@ -173,9 +173,7 @@ class SavedTensorFileName(StrEnum):
     RAW = auto()
     PREPROCESSED = auto()
     MODEL_INFERENCE = auto()
-
-
-TensorFileFormatLookup: TypeAlias = Dict[SavedTensorFileName, str]
+    POINTCLOUD = auto()
 
 
 class AddonMeta:
@@ -257,13 +255,13 @@ class ModelInferenceMode(StrEnum):
     def to_blender_enum_item(self) -> BlenderEnumItem:
         return (self.value, self.value.capitalize(), "")
 
-    POINT_MAP = auto()
+    POINTMAP = auto()
     DEPTH_CAM = auto()
 
 
 @dataclass(frozen=True)
 class VGGTModelOptions:
-    inference_mode: ModelInferenceMode = ModelInferenceMode.POINT_MAP
+    inference_mode: ModelInferenceMode = ModelInferenceMode.POINTMAP
     confidence_percentile: float = 95.0
     enable_black_mask: bool = True
     enable_white_mask: bool = False
@@ -341,7 +339,7 @@ class PointCloudTensors:
     intrinsic: Float32[torch.Tensor, "B 3 3"]
     depth: Float32[torch.Tensor, "B H W 1"]
     depth_conf: Float32[torch.Tensor, "B H W"]
-    point_map: Optional[Float32[torch.Tensor, "B H W 3"]]
+    pointmap: Optional[Float32[torch.Tensor, "B H W 3"]]
 
     # which camera each point came from
     cam_idx: Int32[torch.Tensor, "N"]
@@ -352,6 +350,15 @@ class PointCloudTensors:
         d = asdict(self)
         d.pop("_metadata")
         return d
+
+    @classmethod
+    def from_dict(
+        cls, d: Dict[str, torch.Tensor], metadata: FrameTensorMetadata
+    ) -> Self:
+        try:
+            return cls(**d, _metadata=metadata)
+        except (TypeError, ValueError):  # make the error type clear
+            raise
 
 
 @dataclass(frozen=True)
