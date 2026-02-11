@@ -274,7 +274,7 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
         items=ModelInferenceModeEnumItems,
         default=ModelInferenceMode.POINTMAP.value,
     )
-    confidence_percentile: FloatProperty(name="Confidence Percentile", default=98.5)
+    confidence_percentile: FloatProperty(name="Confidence Percentile", default=97.5)
     enable_black_mask: BoolProperty(name="Enable Black Mask", default=True)
     enable_white_mask: BoolProperty(name="Enable White Mask", default=False)
 
@@ -296,7 +296,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         name="Frame Range",
         description="Start and end frame of data to be processed.",
         size=2,
-        default=(0, 12),
+        default=(0, 60),
         min=0,
         options={"SKIP_SAVE"},
         update=update_frame_range,

@@ -81,6 +81,7 @@ def setup_geometry_nodes(obj):
     input_node = nodes.new("NodeGroupInput")
     output_node = nodes.new("NodeGroupOutput")
     mesh_to_points = nodes.new("GeometryNodeMeshToPoints")
+    setattr(mesh_to_points.inputs["Radius"], "default_value", 0.15)
     set_material = nodes.new("GeometryNodeSetMaterial")
 
     # Layout (optional, aesthetic)
@@ -139,7 +140,7 @@ def import_ply_mesh(filepath):
         )
     )
 
-    scale = mathutils.Matrix.Scale(10.0, 4)
+    scale = mathutils.Matrix.Scale(100.0, 4)
 
     mesh.transform(scale @ transform)
     mesh.update()

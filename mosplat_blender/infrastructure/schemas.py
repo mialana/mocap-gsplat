@@ -253,7 +253,8 @@ class ModelInferenceMode(StrEnum):
         return name.upper()
 
     def to_blender_enum_item(self) -> BlenderEnumItem:
-        return (self.value, self.value.capitalize(), "")
+        human_readable = self.value.replace("_", " ").upper()
+        return (self.value, human_readable, "")
 
     POINTMAP = auto()
     DEPTH_CAM = auto()
