@@ -76,6 +76,7 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
     def ensure_player(self, pkg: CtxPackage):
         import bpy
+        from bpy.types import Mesh
 
         scene = pkg.context.scene
         assert scene
@@ -178,6 +179,7 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
 def on_frame_change(scene: Scene):
     import bpy
+    from bpy.types import Mesh
 
     obj: Optional[Object] = bpy.data.objects.get(PLAYER_NAME)
     if obj is None:
@@ -198,6 +200,7 @@ def on_frame_change(scene: Scene):
 def import_ply_mesh_for_frame(curr_frame: int) -> Mesh:
     import bpy
     import mathutils
+    from bpy.types import Mesh
 
     if not PLY_FILE_FORMATTER:
         raise UnexpectedError(f"Global PLY file formatter string no longer in scope.")
