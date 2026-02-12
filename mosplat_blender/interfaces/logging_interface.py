@@ -280,6 +280,9 @@ class LoggingInterface:
 
         from mosplat_blender.core.checks import check_propertygroup
 
+        if self._blender_log_entry_queue.empty():
+            return
+
         try:
             log_hub = check_propertygroup(context.scene).log_hub_accessor
 

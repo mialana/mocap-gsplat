@@ -1,14 +1,10 @@
 """
-defers registration and unregistration to `main.py`,
-following native Python practices to keep implementation logic out of `__init__.py`.
+defers registration and unregistration to `main.py`, following native Python practices to keep implementation logic out of `__init__.py`.
 
-it does however call the `init_once` function of the logging interface,
-which allows the created logger to become the local "root logger" that other
-loggers in the addon will propogate from (i.e. inherit handlers and formatters).
-this is because propogation hierarchies  in the `logging` module follows dot notation,
-so this module is essentially `A`, other files in this directory like `main.py`
-as well as subdirectories' `__init__.py`'s are `A.B`, files within subdirectories
-are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logging.Logger.propagate)
+defers registration and unregistration to `main.py`, following native Python practices to keep implementation logic out of `__init__.py`.
+
+it does however initialize a local root logger using the module's name, which allows the created logger to become the local "root logger" that other loggers in the addon will propogate from (i.e. inherit handlers and formatters).
+this is because propogation hierarchies  in the `logging` module follows dot notation, so this module is essentially `A`, other files in this directory like `main.py` as well as subdirectories' `__init__.py`'s are `A.B`, files within subdirectories are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logging.Logger.propagate)
 """
 
 import os
@@ -17,7 +13,6 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 
 from mosplat_blender.infrastructure.schemas import AddonMeta, EnvVariableEnum
 from mosplat_blender.interfaces import LoggingInterface
@@ -29,11 +24,11 @@ def register():
     resolve_addon_registration_id()
     setup_env()
 
-    # delay import of `main` until after env setup
-    from mosplat_blender.main import register_addon
-
     # initialize handlers and local "root" logger
     LoggingInterface(__name__)
+
+    # delay import of `main` until after env setup
+    from mosplat_blender.main import register_addon
 
     register_addon()
 
@@ -41,11 +36,17 @@ def register():
 def unregister():
     from mosplat_blender.main import unregister_addon
 
-    unregister_addon()
+    should_clear = True
+    try:
+        unregister_addon()
+    except Exception as e:
+        if LoggingInterface.instance:
+            LoggingInterface.instance._root_logger.error(str(e))
+        should_clear = False
 
     LoggingInterface.cleanup_interface()
 
-    if EnvVariableEnum.TESTING in os.environ:
+    if EnvVariableEnum.TESTING in os.environ and should_clear:
         clear_terminal()  # for dev QOL
 
     for var in EnvVariableEnum:
@@ -57,14 +58,13 @@ def resolve_addon_registration_id():
     from bpy import context
 
     global ADDON_REGISTRATION_ID
-    assert __package__  # running as an add-on guarantees `__package__` always exists
     assert context.preferences
 
-    module_name: str = __package__.rpartition(".")[-1]
+    base_module_name: str = __name__.rpartition(".")[-1]
 
     # target last loaded
     for addon in reversed(context.preferences.addons.values()):
-        if addon and module_name in addon.module:
+        if addon and base_module_name in addon.module:
             ADDON_REGISTRATION_ID = addon.module
             break
 

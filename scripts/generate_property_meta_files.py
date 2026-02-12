@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -143,10 +144,16 @@ class MetaImportInjector(cst.CSTTransformer):
         if self.found:
             return updated_node
 
+        match = re.search(r"[A-Za-z0-9]", self.module_name)
+        assert match
+        dot_count = match.start()
+
+        relative = tuple([cst.Dot() for _ in range(dot_count)])
+
         import_node = cst.ImportFrom(
             module=self._from_dotted_name(self.module_name),
             names=[cst.ImportAlias(cst.Name(s)) for s in sorted(self.symbols)],
-            relative=(),
+            relative=relative,
         )
 
         body: list[cst.CSTNode] = list(updated_node.body)
@@ -267,7 +274,8 @@ def patch_original_file(
     source = py_file.read_text(encoding="utf-8")
     module = cst.parse_module(source)
 
-    module_name = dot_abs_path(meta_path, ADDON_SRC_DIR)
+    module_name = dot_abs_path(meta_path, root_dir=ADDON_SRC_DIR)
+    # module_name = dot_rel_path(meta_path, source_path=py_file)
 
     module = module.visit(MetaImportInjector(module_name, meta_symbols))
 
@@ -302,12 +310,11 @@ def patch_original_file(
         print(f"PATCHED '{py_file}'.")
 
 
-def dot_rel_path(source_path: Path, dest_path: Path) -> str:
-    source_dir = source_path.resolve()
+def dot_rel_path(dest_path: Path, *, source_path: Path) -> str:
+    source_path = source_path.resolve()
     dest_path = dest_path.resolve()
 
-    # filesystem-style relative path
-    rel = os.path.relpath(dest_path, start=source_dir)
+    rel = os.path.relpath(dest_path, source_path)
 
     # drop ".py"
     rel = os.path.splitext(rel)[0]
@@ -328,7 +335,7 @@ def dot_rel_path(source_path: Path, dest_path: Path) -> str:
         return dots
 
 
-def dot_abs_path(dest_path: Path, root_dir: Path) -> str:
+def dot_abs_path(dest_path: Path, *, root_dir: Path) -> str:
     dest_path = dest_path.resolve()
 
     rel = os.path.relpath(dest_path, start=root_dir)
@@ -376,10 +383,13 @@ def generate_meta_file(py_file: Path):
 
     meta_exists = meta_path.exists()
 
+    import_str = dot_abs_path(SCHEMAS_MODULE, root_dir=ADDON_SRC_DIR)
+    # import_str = dot_rel_path(SCHEMAS_MODULE, source_path=meta_path)
+
     meta_lines = [
         TIMESTAMP_STR,
         "",
-        f"from {dot_abs_path(SCHEMAS_MODULE, ADDON_SRC_DIR)} import PropertyMeta",
+        f"from {import_str} import PropertyMeta",
         "from typing import NamedTuple",
         "",
     ]

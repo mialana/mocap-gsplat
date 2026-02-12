@@ -3,6 +3,7 @@
     "files.autoSaveDelay": 3000,
     "python.languageServer": "Pylance",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "files.saveConflictResolution": "overwriteFileOnDisk",
     "[python]": {
         "editor.rulers": [
             {
@@ -24,7 +25,5 @@
     "blender.addon.reloadOnSave": false,
     "blender.addon.logLevel": "info",
     "blender.addon.buildTaskName": "prereload",
-    "blender.addon.justMyCode": false,
-    "blender.addon.sourceDirectory": "./mosplat_blender",
-    "files.saveConflictResolution": "overwriteFileOnDisk"
+    "blender.addon.justMyCode": false
 }

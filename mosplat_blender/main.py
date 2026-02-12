@@ -14,7 +14,7 @@ from mosplat_blender.infrastructure.schemas import (
     DeveloperError,
     UnexpectedError,
 )
-from mosplat_blender.interfaces import LoggingInterface
+from mosplat_blender.interfaces import LoggingInterface, VGGTInterface
 from mosplat_blender.operators import MosplatOperatorBase, operator_factory
 
 logger = LoggingInterface.configure_logger_instance(__name__)
@@ -47,9 +47,11 @@ def register_addon():
             pregistration_fn()  # we call pre-registration function here
             bpy.utils.register_class(cls)
         except (ValueError, RuntimeError, AttributeError) as e:
-            raise DeveloperError(
+            msg = DeveloperError.make_msg(
                 f"Exception during registration of `{cls.__name__}`.", e
-            ) from e
+            )
+            logger.error(msg)
+            return
 
     # do not catch thrown exceptions as we should not successfully register without addon preferences or property groups
     setattr(
@@ -73,22 +75,22 @@ def unregister_addon():
     """essentially all operations here should be guarded with try blocks"""
     try:
         delattr(bpy.types.Scene, ADDON_META.global_props_name)
-    except AttributeError:
-        logger.error(f"Error removing add-on properties.")
+    except AttributeError as e:
+        raise DeveloperError("Error removing add-on properties.", e) from e
 
     # unregister all classes
     for cls, _ in reversed(registration_factory):
         try:
             bpy.utils.unregister_class(cls)
-        except RuntimeError:
-            logger.error(f"Exception during unregistration of `{cls.__name__=}`")
+        except (RuntimeError, ValueError) as e:
+            raise DeveloperError(
+                f"Exception during unregistration of `{cls.__name__=}`", e
+            ) from e
 
     try:
-        from mosplat_blender.interfaces import VGGTInterface
-
         VGGTInterface.cleanup_interface()
     except UnexpectedError as e:
-        logger.error(f"Error during VGGT cleanup: {str(e)}")
+        raise DeveloperError(f"Error during VGGT cleanup", e) from e
 
     unset_handlers()
 
