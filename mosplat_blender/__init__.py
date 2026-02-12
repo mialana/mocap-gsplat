@@ -14,18 +14,18 @@ are `A.B.C`, and so on (ref: https://docs.python.org/3/library/logging.html#logg
 import os
 import sys
 from pathlib import Path
-
-# save package before modifying path
-ADDON_PACKAGE_ORIGINAL = __package__ or str(Path(__file__).resolve().parent)
+from typing import Optional
 
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from infrastructure.schemas import AddonMeta, EnvVariableEnum
 from interfaces import LoggingInterface
 
+ADDON_REGISTRATION_ID: Optional[str] = None
+
 
 def register():
-    AddonMeta(ADDON_PACKAGE_ORIGINAL)  # initialize global addon meta
+    resolve_addon_registration_id()
     setup_env()
 
     # delay import of `main` until after env setup
@@ -52,16 +52,34 @@ def unregister():
             os.environ.pop(var.value, None)
 
 
+def resolve_addon_registration_id():
+    from bpy import context
+
+    global ADDON_REGISTRATION_ID
+    assert __package__  # running as an add-on guarantees `__package__` always exists
+    assert context.preferences
+
+    module_name: str = __package__.rpartition(".")[-1]
+
+    # target last loaded
+    for addon in reversed(context.preferences.addons.values()):
+        if addon and module_name in addon.module:
+            ADDON_REGISTRATION_ID = addon.module
+            break
+
+
 def setup_env():
     from dotenv import load_dotenv
+
+    assert ADDON_REGISTRATION_ID
+
+    AddonMeta(ADDON_REGISTRATION_ID)  # initialize global addon meta
 
     load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
 
     # keep this module's name within env during execution
     os.environ.setdefault(EnvVariableEnum.ROOT_MODULE_NAME, __name__)
-    os.environ.setdefault(
-        EnvVariableEnum.ADDON_PACKAGE_ORIGINAL, ADDON_PACKAGE_ORIGINAL
-    )
+    os.environ.setdefault(EnvVariableEnum.ADDON_REGISTRATION_ID, ADDON_REGISTRATION_ID)
 
 
 def clear_terminal():

@@ -56,7 +56,8 @@ def check_addonpreferences(
         raise UserFacingError("Blender preferences unavailable in this context.")
 
     try:
-        found_preferences = prefs_ctx.addons[_ADDON_META.global_prefs_id].preferences
+        id: str = _ADDON_META.global_prefs_id
+        found_preferences = prefs_ctx.addons[id].preferences
 
         if TYPE_CHECKING:
             # OK to use `cast` here as we've guarded its existence with a try-block, and we created it

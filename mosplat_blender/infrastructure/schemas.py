@@ -135,7 +135,7 @@ class EnvVariableEnum(StrEnum):
 
     TESTING = auto()
     ROOT_MODULE_NAME = auto()
-    ADDON_PACKAGE_ORIGINAL = auto()
+    ADDON_REGISTRATION_ID = auto()
     SUBPROCESS_FLAG = auto()
 
 
@@ -187,7 +187,7 @@ class AddonMeta:
 
     def __init__(self, full_id: Optional[str] = None):
         if not full_id:
-            full_id = os.environ.get(EnvVariableEnum.ADDON_PACKAGE_ORIGINAL)
+            full_id = os.environ.get(EnvVariableEnum.ADDON_REGISTRATION_ID)
             if not full_id:
                 raise DeveloperError("`AddonMeta` canot retrieve its full ID")
 
