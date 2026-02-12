@@ -9,7 +9,12 @@ import bpy
 
 import core
 from infrastructure.mixins import PreregristrationFn
-from infrastructure.schemas import AddonMeta, DeveloperError, UnexpectedError
+from infrastructure.schemas import (
+    AddonMeta,
+    DeveloperError,
+    UnexpectedError,
+    UserFacingError,
+)
 from interfaces import LoggingInterface
 from operators import MosplatOperatorBase, operator_factory
 

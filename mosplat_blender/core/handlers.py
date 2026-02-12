@@ -51,10 +51,9 @@ def load_metadata_property_group_from_json(
     """base entrypoint for restoring directly to property group"""
     prefs = prefs or check_addonpreferences(context.preferences)
 
-    result = load_metadata_dataclass_from_json(props, prefs)
-    props.metadata_accessor.from_dataclass(result[0])  # transfer data to property group
-
-    return result
+    data, msg = load_metadata_dataclass_from_json(props, prefs)
+    props.metadata_accessor.from_dataclass(data)  # transfer data to property group
+    return data, msg
 
 
 def load_metadata_dataclass_from_json(
@@ -64,12 +63,20 @@ def load_metadata_dataclass_from_json(
     media_directory = props.media_directory_
     dc = MediaIOMetadata(base_directory=str(media_directory))
 
-    # get destination path for json
-    json_filepath = props.media_io_metadata_filepath(prefs)
+    try:
 
-    load_msg = dc.load_from_JSON(json_path=json_filepath)
+        # get destination path for json
+        json_filepath = props.media_io_metadata_filepath(prefs)
 
-    return (dc, load_msg)
+        load_msg = dc.load_from_JSON(json_path=json_filepath)
+
+        return (dc, load_msg)
+    except (UserWarning, UserFacingError) as e:
+        msg = UserFacingError.make_msg(
+            "Unable to parse media directory for metadata. We can fall back to default values.",
+            e,
+        )
+        return (dc, msg)
 
 
 @persistent

@@ -83,13 +83,21 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
         scene.frame_start = start
         scene.frame_end = end - 1
 
-    OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINTCLOUD_PREVIEW, "INVOKE_DEFAULT")
+    try:
+        OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINTCLOUD_PREVIEW, "INVOKE_DEFAULT")
+    except RuntimeError as e:
+        self.logger.error(str(e))
+        return
 
     self.logger.info(f"Frame range updated to '{start}-{end}'.")
 
 
 def update_media_directory(self: Mosplat_PG_Global, context: Context):
-    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
+    try:
+        OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
+    except RuntimeError as e:
+        self.logger.error(str(e))
+        return
 
     self.logger.info(f"'{self._meta.media_directory.name}' updated.")
 
@@ -288,7 +296,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
     media_directory: StringProperty(
         name="Media Directory",
         description="Filepath to directory containing media files to be processed.",
-        default=str(Path.home() / "Desktop" / "caroline_shot"),
+        default=str(Path.home()),
         subtype="DIR_PATH",
         update=update_media_directory,
         options={"SKIP_SAVE"},
