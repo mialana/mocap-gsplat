@@ -12,7 +12,6 @@ from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Counter,
     Dict,
     Iterable,
     List,
@@ -31,7 +30,10 @@ if TYPE_CHECKING:
     from jaxtyping import Float32, UInt8
     from safetensors import safe_open
 
-    from infrastructure.schemas import FrameTensorMetadata, ImagesTensorType
+    from mosplat_blender.infrastructure.schemas import (
+        FrameTensorMetadata,
+        ImagesTensorType,
+    )
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
@@ -162,7 +164,7 @@ def load_and_verify_tensor(
 ) -> Dict[str, torch.Tensor]:
     from safetensors import SafetensorError, safe_open
 
-    from infrastructure.schemas import (
+    from mosplat_blender.infrastructure.schemas import (
         FrameTensorMetadata,
         UserAssertionError,
         UserFacingError,
@@ -205,7 +207,7 @@ def load_and_verify_tensor(
 def load_and_verify_default_tensor(
     in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
 ) -> Optional[ImagesTensorType]:
-    from infrastructure.schemas import SavedTensorFileName
+    from mosplat_blender.infrastructure.schemas import SavedTensorFileName
 
     tensors = load_and_verify_tensor(in_file, device_str, new_metadata)
     return tensors.get(SavedTensorFileName._default_tensor_key())

@@ -8,25 +8,28 @@ from typing import TYPE_CHECKING, Set
 from bpy.props import IntProperty, StringProperty
 from bpy.types import AddonPreferences, Context
 
-from core.checks import check_media_extensions_set
-from core.meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
-from infrastructure.constants import (
+from mosplat_blender.core.checks import check_media_extensions_set
+from mosplat_blender.core.meta.preferences_meta import (
+    MOSPLAT_AP_GLOBAL_META,
+    Mosplat_AP_Global_Meta,
+)
+from mosplat_blender.infrastructure.constants import (
     DEFAULT_MAX_LOG_ENTRIES,
     DEFAULT_PREPROCESS_SCRIPT,
     PENN_DEFAULT_PREPROCESS_SCRIPT,
 )
-from infrastructure.identifiers import OperatorIDEnum
-from infrastructure.macros import try_access_path
-from infrastructure.mixins import EnforceAttributesMixin
-from infrastructure.schemas import (
+from mosplat_blender.infrastructure.identifiers import OperatorIDEnum
+from mosplat_blender.infrastructure.macros import try_access_path
+from mosplat_blender.infrastructure.mixins import EnforceAttributesMixin
+from mosplat_blender.infrastructure.schemas import (
     AddonMeta,
     UnexpectedError,
     UserFacingError,
 )
-from interfaces import LoggingInterface, VGGTInterface
+from mosplat_blender.interfaces import LoggingInterface, VGGTInterface
 
 if TYPE_CHECKING:
-    from core.preferences import Mosplat_AP_Global
+    from mosplat_blender.core.preferences import Mosplat_AP_Global
 
 LoggingHandler = LoggingInterface.LoggingHandler
 

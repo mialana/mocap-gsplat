@@ -9,8 +9,8 @@ import os
 from pathlib import Path
 from typing import List
 
-from infrastructure.schemas import DeveloperError
-from interfaces.logging_interface import LoggingInterface
+from mosplat_blender.infrastructure.schemas import DeveloperError
+from mosplat_blender.interfaces.logging_interface import LoggingInterface
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 

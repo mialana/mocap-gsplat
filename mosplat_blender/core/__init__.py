@@ -8,16 +8,16 @@ This is opposed to `infrastructure`, where `__init__.py` is empty, and individua
 
 from typing import List, Tuple, Type
 
-import core.checks as checks
-import core.handlers as handlers
-from core.panels import (
+import mosplat_blender.core.checks as checks
+import mosplat_blender.core.handlers as handlers
+from mosplat_blender.core.panels import (
     MosplatPanelBase,
     MosplatUIListBase,
     panel_factory,
     ui_list_factory,
 )
-from core.preferences import Mosplat_AP_Global
-from core.properties import (
+from mosplat_blender.core.preferences import Mosplat_AP_Global
+from mosplat_blender.core.properties import (
     Mosplat_PG_AppliedPreprocessScript,
     Mosplat_PG_Global,
     Mosplat_PG_LogEntry,
@@ -29,7 +29,7 @@ from core.properties import (
     Mosplat_PG_VGGTModelOptions,
     MosplatPropertyGroupBase,
 )
-from infrastructure.mixins import PreregristrationFn
+from mosplat_blender.infrastructure.mixins import PreregristrationFn
 
 preferences_factory: Tuple[Type[Mosplat_AP_Global], PreregristrationFn] = (
     Mosplat_AP_Global,

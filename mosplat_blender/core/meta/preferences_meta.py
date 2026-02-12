@@ -1,10 +1,10 @@
-# 2026-02-07 20:38:18.090281
+# 2026-02-12 09:15:55.452178
 # created using 'generate_property_meta_files.py'
 
 
 from typing import NamedTuple
 
-from infrastructure.schemas import PropertyMeta
+from mosplat_blender.infrastructure.schemas import PropertyMeta
 
 
 class Mosplat_AP_Global_Meta(NamedTuple):

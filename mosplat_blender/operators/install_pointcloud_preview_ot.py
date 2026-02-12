@@ -3,9 +3,9 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
-from infrastructure.mixins import CtxPackage
-from infrastructure.schemas import SavedTensorFileName, UnexpectedError
-from operators.base_ot import MosplatOperatorBase
+from mosplat_blender.infrastructure.mixins import CtxPackage
+from mosplat_blender.infrastructure.schemas import SavedTensorFileName, UnexpectedError
+from mosplat_blender.operators.base_ot import MosplatOperatorBase
 
 if TYPE_CHECKING:
     from bpy.types import (

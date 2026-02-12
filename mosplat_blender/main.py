@@ -7,16 +7,15 @@ from typing import Sequence, Tuple, Type, Union
 
 import bpy
 
-import core
-from infrastructure.mixins import PreregristrationFn
-from infrastructure.schemas import (
+from mosplat_blender import core
+from mosplat_blender.infrastructure.mixins import PreregristrationFn
+from mosplat_blender.infrastructure.schemas import (
     AddonMeta,
     DeveloperError,
     UnexpectedError,
-    UserFacingError,
 )
-from interfaces import LoggingInterface
-from operators import MosplatOperatorBase, operator_factory
+from mosplat_blender.interfaces import LoggingInterface
+from mosplat_blender.operators import MosplatOperatorBase, operator_factory
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 
@@ -85,7 +84,7 @@ def unregister_addon():
             logger.error(f"Exception during unregistration of `{cls.__name__=}`")
 
     try:
-        from interfaces import VGGTInterface
+        from mosplat_blender.interfaces import VGGTInterface
 
         VGGTInterface.cleanup_interface()
     except UnexpectedError as e:

@@ -1,5 +1,5 @@
-from core.panels.base_pt import MosplatPanelBase
-from infrastructure.identifiers import OperatorIDEnum
+from mosplat_blender.core.panels.base_pt import MosplatPanelBase
+from mosplat_blender.infrastructure.identifiers import OperatorIDEnum
 
 
 class Mosplat_PT_Main(MosplatPanelBase):

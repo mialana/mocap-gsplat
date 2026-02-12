@@ -328,7 +328,7 @@ def dot_rel_path(source_path: Path, dest_path: Path) -> str:
         return dots
 
 
-def dot_abs_path(dest_path: Path, root_dir) -> str:
+def dot_abs_path(dest_path: Path, root_dir: Path) -> str:
     dest_path = dest_path.resolve()
 
     rel = os.path.relpath(dest_path, start=root_dir)
@@ -336,7 +336,7 @@ def dot_abs_path(dest_path: Path, root_dir) -> str:
     # drop ".py"
     rel = os.path.splitext(rel)[0]
 
-    parts = rel.split(os.sep)
+    parts = [root_dir.name] + rel.split(os.sep)
 
     if parts:
         return ".".join(parts)

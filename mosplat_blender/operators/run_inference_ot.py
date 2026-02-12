@@ -2,13 +2,12 @@ from functools import partial
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
-from infrastructure.macros import (
+from mosplat_blender.infrastructure.macros import (
     load_and_verify_default_tensor,
     load_and_verify_tensor,
     save_ply_ascii,
-    save_ply_binary,
 )
-from infrastructure.schemas import (
+from mosplat_blender.infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
     PointCloudTensors,
@@ -17,8 +16,8 @@ from infrastructure.schemas import (
     UserFacingError,
     VGGTModelOptions,
 )
-from interfaces import VGGTInterface
-from operators.base_ot import MosplatOperatorBase
+from mosplat_blender.interfaces import VGGTInterface
+from mosplat_blender.operators.base_ot import MosplatOperatorBase
 
 
 class ThreadKwargs(NamedTuple):

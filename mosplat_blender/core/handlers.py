@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from bpy.app.handlers import persistent
 
-from core.checks import check_addonpreferences, check_propertygroup
-from infrastructure.schemas import MediaIOMetadata, UserFacingError
-from interfaces.logging_interface import LoggingInterface
+from mosplat_blender.core.checks import check_addonpreferences, check_propertygroup
+from mosplat_blender.infrastructure.schemas import MediaIOMetadata, UserFacingError
+from mosplat_blender.interfaces.logging_interface import LoggingInterface
 
 if TYPE_CHECKING:
     from bpy.types import Scene
 
-    from core.preferences import Mosplat_AP_Global
-    from core.properties import Mosplat_PG_Global
+    from mosplat_blender.core.preferences import Mosplat_AP_Global
+    from mosplat_blender.core.properties import Mosplat_PG_Global
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 

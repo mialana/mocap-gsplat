@@ -1,10 +1,10 @@
 import os
 from pathlib import Path
 
-from core.panels.base_pt import MosplatPanelBase, column_factory
-from core.properties import Mosplat_PG_MediaIOMetadata
-from infrastructure.identifiers import OperatorIDEnum
-from infrastructure.schemas import EnvVariableEnum, MediaFileStatus
+from mosplat_blender.core.panels.base_pt import MosplatPanelBase, column_factory
+from mosplat_blender.core.properties import Mosplat_PG_MediaIOMetadata
+from mosplat_blender.infrastructure.identifiers import OperatorIDEnum
+from mosplat_blender.infrastructure.schemas import EnvVariableEnum, MediaFileStatus
 
 _median_as_status: MediaFileStatus = MediaFileStatus(filepath="DIRECTORY MEDIANS")
 

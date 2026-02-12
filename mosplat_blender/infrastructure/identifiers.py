@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum, auto
 from string import capwords
 
-from infrastructure.schemas import AddonMeta
+from mosplat_blender.infrastructure.schemas import AddonMeta
 
 
 class OperatorIDEnum(StrEnum):

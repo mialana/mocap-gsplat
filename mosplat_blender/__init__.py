@@ -16,10 +16,11 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-sys.path.append(str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from infrastructure.schemas import AddonMeta, EnvVariableEnum
-from interfaces import LoggingInterface
+
+from mosplat_blender.infrastructure.schemas import AddonMeta, EnvVariableEnum
+from mosplat_blender.interfaces import LoggingInterface
 
 ADDON_REGISTRATION_ID: Optional[str] = None
 
@@ -29,7 +30,7 @@ def register():
     setup_env()
 
     # delay import of `main` until after env setup
-    from main import register_addon
+    from mosplat_blender.main import register_addon
 
     # initialize handlers and local "root" logger
     LoggingInterface(__name__)
@@ -38,7 +39,7 @@ def register():
 
 
 def unregister():
-    from main import unregister_addon
+    from mosplat_blender.main import unregister_addon
 
     unregister_addon()
 

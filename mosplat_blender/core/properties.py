@@ -16,14 +16,14 @@ from bpy.props import (
 )
 from bpy.types import Context, PropertyGroup
 
-from core.checks import (
+from mosplat_blender.core.checks import (
     check_frame_range_poll_result,
     check_media_directory,
     check_media_files,
     check_media_io_metadata_filepath,
     check_media_output_dir,
 )
-from core.meta.properties_meta import (
+from mosplat_blender.core.meta.properties_meta import (
     MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META,
     MOSPLAT_PG_GLOBAL_META,
     MOSPLAT_PG_LOGENTRY_META,
@@ -43,11 +43,15 @@ from core.meta.properties_meta import (
     Mosplat_PG_ProcessedFrameRange_Meta,
     Mosplat_PG_VGGTModelOptions_Meta,
 )
-from infrastructure.constants import PER_FRAME_DIRNAME
-from infrastructure.identifiers import OperatorIDEnum
-from infrastructure.mixins import D, DataclassInteropMixin, EnforceAttributesMixin
-from infrastructure.protocols import SupportsCollectionProperty
-from infrastructure.schemas import (
+from mosplat_blender.infrastructure.constants import PER_FRAME_DIRNAME
+from mosplat_blender.infrastructure.identifiers import OperatorIDEnum
+from mosplat_blender.infrastructure.mixins import (
+    D,
+    DataclassInteropMixin,
+    EnforceAttributesMixin,
+)
+from mosplat_blender.infrastructure.protocols import SupportsCollectionProperty
+from mosplat_blender.infrastructure.schemas import (
     AppliedPreprocessScript,
     BlenderEnumItem,
     LogEntryLevelEnum,
@@ -59,7 +63,7 @@ from infrastructure.schemas import (
 )
 
 if TYPE_CHECKING:
-    from core.preferences import Mosplat_AP_Global
+    from mosplat_blender.core.preferences import Mosplat_AP_Global
 
 LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
     member.to_blender_enum_item() for member in LogEntryLevelEnum

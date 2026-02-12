@@ -6,15 +6,15 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
-from infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
-from infrastructure.macros import (
+from mosplat_blender.infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
+from mosplat_blender.infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
     load_and_verify_default_tensor,
     save_tensor_stack_png_preview,
     save_tensor_stack_separate_png_previews,
 )
-from infrastructure.schemas import (
+from mosplat_blender.infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
     ImagesTensorType,
@@ -24,7 +24,7 @@ from infrastructure.schemas import (
     UserAssertionError,
     UserFacingError,
 )
-from operators.base_ot import MosplatOperatorBase
+from mosplat_blender.operators.base_ot import MosplatOperatorBase
 
 QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 
@@ -171,7 +171,7 @@ class Mosplat_OT_run_preprocess_script(
                     metadata=new_metadata.to_dict(),
                 )
 
-                save_tensor_stack_separate_png_previews(new_tensor, out_file)
+                save_tensor_stack_png_preview(new_tensor, out_file)
                 queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(

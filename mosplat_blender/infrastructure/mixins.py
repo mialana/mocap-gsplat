@@ -20,9 +20,12 @@ from typing import (
     TypeVar,
 )
 
-from infrastructure.constants import _MISSING_
-from infrastructure.protocols import SupportsCollectionProperty, SupportsDataclass
-from infrastructure.schemas import DeveloperError, EnvVariableEnum
+from mosplat_blender.infrastructure.constants import _MISSING_
+from mosplat_blender.infrastructure.protocols import (
+    SupportsCollectionProperty,
+    SupportsDataclass,
+)
+from mosplat_blender.infrastructure.schemas import DeveloperError, EnvVariableEnum
 
 S = TypeVar("S")
 
@@ -42,8 +45,8 @@ class CtxPackage(NamedTuple):
 if TYPE_CHECKING:
     from bpy.types import Context
 
-    from core.preferences import Mosplat_AP_Global
-    from core.properties import Mosplat_PG_Global
+    from mosplat_blender.core.preferences import Mosplat_AP_Global
+    from mosplat_blender.core.properties import Mosplat_PG_Global
 
 
 class LogClassMixin:
@@ -59,7 +62,7 @@ class LogClassMixin:
 
     @classmethod
     def _create_logger_for_class(cls, label: Optional[str] = None):
-        from interfaces import LoggingInterface
+        from mosplat_blender.interfaces import LoggingInterface
 
         cls.class_logger = LoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{label if label else cls.__name__}"
@@ -205,11 +208,11 @@ class APAccessorMixin:
     if TYPE_CHECKING:
         from bpy.types import Context  # local import
 
-        from core.preferences import Mosplat_AP_Global
+        from mosplat_blender.core.preferences import Mosplat_AP_Global
 
     @staticmethod
     def prefs(context) -> Mosplat_AP_Global:
-        from core.checks import check_addonpreferences
+        from mosplat_blender.core.checks import check_addonpreferences
 
         return check_addonpreferences(context.preferences)
 
@@ -220,11 +223,11 @@ class PGAccessorMixin:
     if TYPE_CHECKING:
         from bpy.types import Context  # local import
 
-        from core.properties import Mosplat_PG_Global
+        from mosplat_blender.core.properties import Mosplat_PG_Global
 
     @staticmethod
     def props(context: Context) -> Mosplat_PG_Global:
-        from core.checks import check_propertygroup
+        from mosplat_blender.core.checks import check_propertygroup
 
         return check_propertygroup(context.scene)
 
