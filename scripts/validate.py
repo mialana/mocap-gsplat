@@ -5,7 +5,7 @@ ADDON_HUMAN_READABLE = os.getenv("ADDON_HUMAN_READABLE", "mosplat_blender")
 
 
 def main():
-    zip_path = Path(__file__).resolve().parent.parent / f"{ADDON_HUMAN_READABLE}.zip"
+    zip_path = Path(__file__).resolve().parents[1] / f"{ADDON_HUMAN_READABLE}.zip"
 
     if not zip_path.exists():
         print(f"Zip created from build does not exist at path on system: {zip_path}")

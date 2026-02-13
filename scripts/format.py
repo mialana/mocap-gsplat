@@ -53,7 +53,7 @@ def check(target_directories: list[Path]):
 
 
 def main():
-    ADDON_SRC_DIR = Path(__file__).resolve().parent.parent / ADDON_HUMAN_READABLE
+    ADDON_SRC_DIR = Path(__file__).resolve().parents[1] / ADDON_HUMAN_READABLE
     SCRIPTS_DIR = Path(__file__).resolve().parent
 
     target_directories = [ADDON_SRC_DIR, SCRIPTS_DIR]

@@ -8,6 +8,7 @@ this is because propogation hierarchies  in the `logging` module follows dot not
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,7 @@ from .infrastructure.schemas import AddonMeta, EnvVariableEnum
 from .interfaces import LoggingInterface
 
 ADDON_REGISTRATION_ID: Optional[str] = None
+SUBPROC_IMPORT_ROOT_DIR: Optional[str] = None
 
 
 def register():
@@ -50,6 +52,9 @@ def unregister():
         if var.value in os.environ:
             os.environ.pop(var.value, None)
 
+    if SUBPROC_IMPORT_ROOT_DIR and SUBPROC_IMPORT_ROOT_DIR in sys.path:
+        sys.path.remove(SUBPROC_IMPORT_ROOT_DIR)  # all clean!
+
 
 def resolve_addon_registration_id():
     from bpy import context
@@ -69,15 +74,22 @@ def resolve_addon_registration_id():
 def setup_env():
     from dotenv import load_dotenv
 
+    global SUBPROC_IMPORT_ROOT_DIR
+
     assert ADDON_REGISTRATION_ID
 
-    AddonMeta(ADDON_REGISTRATION_ID)  # initialize global addon meta
+    meta = AddonMeta(ADDON_REGISTRATION_ID)  # initialize global addon meta
 
     load_dotenv(Path(__file__).resolve().parent / ".production.env", verbose=True)
 
     # keep this module's name within env during execution
     os.environ.setdefault(EnvVariableEnum.ROOT_MODULE_NAME, __name__)
     os.environ.setdefault(EnvVariableEnum.ADDON_REGISTRATION_ID, ADDON_REGISTRATION_ID)
+
+    # subprocess will resolve imports from the addon's parent directory. we need to insert into `sys.path` to ensure the import will work
+    SUBPROC_IMPORT_ROOT_DIR = str(meta.addon_parent_dir)
+    if SUBPROC_IMPORT_ROOT_DIR not in sys.path:
+        sys.path.insert(0, SUBPROC_IMPORT_ROOT_DIR)
 
 
 def clear_terminal():

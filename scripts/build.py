@@ -129,7 +129,7 @@ def get_args(defaults: ArgparseDefaults):
 
 def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     """generate global build context using results of argparse."""
-    repo_dir: Path = Path(__file__).resolve().parent.parent  # used in `.env`
+    repo_dir: Path = Path(__file__).resolve().parents[1]  # used in `.env`
 
     ADDON_SRC_DIR: Path = repo_dir / ADDON_HUMAN_READABLE  # used in `.env` and argparse
 

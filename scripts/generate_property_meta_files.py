@@ -22,7 +22,7 @@ BLENDER_PROPERTY_TYPES = {
     "IntVectorProperty",
 }
 
-pyproject_toml_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+pyproject_toml_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
 ISORT_CONFIG = isort.Config(settings_file=str(pyproject_toml_path))
 
 timestamp: datetime = datetime.now()
@@ -521,8 +521,7 @@ if __name__ == "__main__":
     args = get_args()
 
     addon_src_dir: Path = (
-        args.addon_src_dir
-        or Path(__file__).resolve().parent.parent / ADDON_HUMAN_READABLE
+        args.addon_src_dir or Path(__file__).resolve().parents[1] / ADDON_HUMAN_READABLE
     )
 
     main(

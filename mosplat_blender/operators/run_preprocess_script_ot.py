@@ -12,7 +12,6 @@ from ..infrastructure.macros import (
     import_module_from_path_dynamic,
     load_and_verify_default_tensor,
     save_tensor_stack_png_preview,
-    save_tensor_stack_separate_png_previews,
 )
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,

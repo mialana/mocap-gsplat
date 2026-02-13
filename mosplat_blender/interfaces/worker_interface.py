@@ -5,6 +5,7 @@ import multiprocessing.context as mp_ctx
 import multiprocessing.synchronize as mp_sync
 import os
 import queue
+import sys
 import threading
 import time
 from datetime import datetime
@@ -43,9 +44,7 @@ class SubprocessWorkerInterface(Generic[QT], LogClassMixin):
         self._cancel_event: mp_sync.Event = self._ctx.Event()
 
         self._process: mp_ctx.SpawnProcess = self._ctx.Process(
-            target=worker_fn,
-            args=(self._queue, self._cancel_event),
-            daemon=True,
+            target=worker_fn, args=(self._queue, self._cancel_event), daemon=True
         )
         self._pid: Optional[int] = None
         self._owner_name: str = owner_name
@@ -78,7 +77,8 @@ class SubprocessWorkerInterface(Generic[QT], LogClassMixin):
             self._process.join(timeout=_TIMEOUT_LAZY_)
             self.force_terminate()
 
-        threading.Thread(target=reaper_thread, daemon=True).start()
+        if self._process.is_alive():
+            threading.Thread(target=reaper_thread, daemon=True).start()
 
     def was_cancelled(self):
         return not self._cancel_event.is_set()
@@ -121,7 +121,8 @@ class SubprocessWorkerInterface(Generic[QT], LogClassMixin):
             self._process.join()
             self._end_timer()
 
-        threading.Thread(target=watcher_thread, daemon=True).start()
+        if self._process.is_alive():
+            threading.Thread(target=watcher_thread, daemon=True).start()
 
     def _end_timer(self):
         if not self._start_counter:

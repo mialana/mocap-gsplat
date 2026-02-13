@@ -178,11 +178,6 @@ class DataclassInteropMixin(Generic[D]):
         if data_cls is None:
             cls = self.__class__
             raise DeveloperError(f"No dataclass interop exists for {cls.__qualname__}.")
-        elif data_cls is not None and not isinstance(data, data_cls):
-            cls = self.__class__
-            raise DeveloperError(
-                f"Passed in instance of '{data.__class__.__name__}' when expecting '{data_cls.__name__}' for dataclass interop of '{cls.__qualname__}'."
-            )
 
         for fld in fields(data):
             value = getattr(data, fld.name)

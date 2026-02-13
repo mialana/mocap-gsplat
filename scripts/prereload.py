@@ -32,7 +32,7 @@ def run_script_wrapper(script_name: str, call_args: list[str]):
 
 
 def main():
-    ADDON_SRC_DIR = Path(__file__).resolve().parent.parent / ADDON_HUMAN_READABLE
+    ADDON_SRC_DIR = Path(__file__).resolve().parents[1] / ADDON_HUMAN_READABLE
 
     SCRIPTS_DIR = Path(__file__).resolve().parent
     FORMAT_SCRIPT = SCRIPTS_DIR / "format.py"

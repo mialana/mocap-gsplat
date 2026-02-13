@@ -68,7 +68,7 @@ def update_model_preferences(self: Mosplat_AP_Global, context: Context):
 
 class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     _meta: Mosplat_AP_Global_Meta = MOSPLAT_AP_GLOBAL_META
-    bl_idname = AddonMeta().global_prefs_id
+    bl_idname = AddonMeta().global_runtime_module_id
 
     cache_dir: StringProperty(
         name="Cache Directory",

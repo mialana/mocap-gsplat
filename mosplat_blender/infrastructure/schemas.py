@@ -33,6 +33,7 @@ from .macros import (
     int_median,
     try_access_path,
 )
+from .protocols import SupportsToFromDict
 
 if TYPE_CHECKING:
     import torch
@@ -179,6 +180,8 @@ class SavedTensorFileName(StrEnum):
 class AddonMeta:
     instance: ClassVar[Optional[Self]] = None
 
+    __addon_parent_dir: Path = Path(__file__).resolve().parents[2]
+
     def __new__(cls, *args) -> Self:
         if cls.instance:
             return cls.instance  # early return if already exists
@@ -214,7 +217,7 @@ class AddonMeta:
         return f"{self.__full_id}_props"
 
     @property
-    def global_prefs_id(self) -> str:
+    def global_runtime_module_id(self) -> str:
         """
         this is the `bl_idname` that blender expects our `AddonPreferences` to have.
         i.e. even though our addon id is `mosplat_blender`, the id would be the evaluated
@@ -239,6 +242,19 @@ class AddonMeta:
     @property
     def media_io_metadata_filename(self) -> str:
         return f"{self.shortname}_metadata.json"
+
+    @property
+    def addon_parent_dir(self) -> Path:
+        """parent directory of the addon's root module."""
+        return self.__addon_parent_dir
+
+    def main_proc_import_to_subproc_import(self, module: str) -> str:
+        runtime_prefix = self.global_runtime_module_id
+
+        if not module.startswith(runtime_prefix):
+            return module
+        static_prefix = self.base_id
+        return f"{static_prefix}{module.removeprefix(runtime_prefix)}"
 
 
 class PropertyMeta(NamedTuple):
@@ -394,6 +410,9 @@ class ProcessedFrameRange:
         )
     )
 
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
     @classmethod
     def from_dict(cls, d: Dict) -> ProcessedFrameRange:
         instance = cls(**d)
@@ -417,6 +436,9 @@ class MediaFileStatus:
     @classmethod
     def from_dict(cls, d: Dict) -> MediaFileStatus:
         return cls(**d)
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
 
     def overwrite(
         self,
@@ -494,7 +516,13 @@ class MediaIOMetadata:
     media_file_statuses: List[MediaFileStatus] = field(default_factory=list)
     processed_frame_ranges: List[ProcessedFrameRange] = field(default_factory=list)
 
-    def load_from_dict(self, d: Dict) -> None:
+    @classmethod
+    def from_dict(cls, d: Dict) -> MediaIOMetadata:
+        instance = cls(base_directory=d["base_directory"])
+        instance._load_from_dict(d)
+        return instance
+
+    def _load_from_dict(self, d: Dict) -> None:
         """mutates an instance with data from a dict"""
         self.base_directory = d["base_directory"]
         self.is_valid_media_directory = d["is_valid_media_directory"]
@@ -512,15 +540,12 @@ class MediaIOMetadata:
             for p in d.get("processed_frame_ranges", [])
         ]
 
-    @classmethod
-    def from_dict(cls, d: Dict) -> MediaIOMetadata:
-        instance = cls(base_directory=d["base_directory"])
-        instance.load_from_dict(d)
-        return instance
+    def to_dict(self) -> Dict:
+        return asdict(self)
 
     def to_JSON(self, dest_path: Path):
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        as_dict = asdict(self)
+        as_dict = self.to_dict()
 
         with dest_path.open("w", encoding="utf-8") as f:
             json.dump(as_dict, f, sort_keys=True, indent=4)
@@ -541,7 +566,7 @@ class MediaIOMetadata:
         try:
             with json_path.open("r", encoding="utf-8") as f:
                 data: Dict = json.load(f)
-            self.load_from_dict(data)
+            self._load_from_dict(data)
             return f"Cached data successfully loaded from '{json_path}'."
 
         except (TypeError, json.JSONDecodeError):

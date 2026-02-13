@@ -50,16 +50,16 @@ DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
 
 # path location of the shipped preprocess script
 DEFAULT_PREPROCESS_SCRIPT: Final[str] = str(
-    Path(__file__).resolve().parent.parent / "bin" / "fix_mocap_camera_rotations.py"
+    Path(__file__).resolve().parents[1] / "bin" / "fix_mocap_camera_rotations.py"
 )
 # path location of the shipped preprocess script that is specific for penn's mocap system
 PENN_DEFAULT_PREPROCESS_SCRIPT: Final[str] = str(
-    Path(__file__).resolve().parent.parent / "bin" / "mask_out_background.py"
+    Path(__file__).resolve().parents[1] / "bin" / "mask_out_background.py"
 )
 # target function in script
 PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
 
 # path location of hf model download via subprocess script
 DOWNLOAD_HF_WITH_PROGRESS_SCRIPT: Final[Path] = (
-    Path(__file__).resolve().parent.parent / "lib" / "download_hf_with_progress.py"
+    Path(__file__).resolve().parents[1] / "lib" / "download_hf_with_progress.py"
 )

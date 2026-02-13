@@ -1,40 +1,51 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import multiprocessing as mp
 import multiprocessing.synchronize as mp_sync
 import os
 import queue
+import sys
 import threading
 from dataclasses import dataclass
 from functools import partial
+from types import ModuleType
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     ClassVar,
     Final,
+    Generator,
     Generic,
     List,
     NamedTuple,
     Optional,
     Set,
     Tuple,
+    Type,
     TypeAlias,
     TypeVar,
     Union,
+    cast,
 )
 
 from ..infrastructure.constants import _TIMER_INTERVAL_
 from ..infrastructure.identifiers import OperatorIDEnum
 from ..infrastructure.macros import immutable_to_set as im_to_set
 from ..infrastructure.mixins import ContextAccessorMixin, CtxPackage
+from ..infrastructure.protocols import SupportsToFromDict
 from ..infrastructure.schemas import (
+    AddonMeta,
     DeveloperError,
     EnvVariableEnum,
     MediaIOMetadata,
     UnexpectedError,
     UserFacingError,
 )
+
+# only used at runtime for generic typing
 from ..interfaces.worker_interface import (
     QT,
     SubprocessWorkerInterface,
@@ -42,22 +53,17 @@ from ..interfaces.worker_interface import (
 )
 
 if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
-    from bpy.types import Operator, Timer  # pyright: ignore[reportRedeclaration]
+    # ensure modules that use `bpy` are not imported in subprocess
+    from bpy.types import Operator, Timer
 
-    from ..core.checks import (
-        check_addonpreferences,
-        check_propertygroup,
-        check_window_manager,
-    )
+    # completely avoid importing from core in subprocess
+    from ..core.checks import check_window_manager
     from ..core.handlers import load_metadata_property_group_from_json
 else:
     Operator: TypeAlias = object
     Timer: TypeAlias = object
-    check_addonpreferences = lambda c: c
-    check_propertygroup = lambda c: c
     check_window_manager = lambda c: c
     load_metadata_property_group_from_json = lambda c: c
-
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
@@ -73,6 +79,7 @@ if TYPE_CHECKING:
 
     from ..core.preferences import Mosplat_AP_Global
     from ..core.properties import Mosplat_PG_Global
+
 
 OPERATOR_PROCESS_ENTRYPOINT_FN = "process_entrypoint"
 
@@ -321,29 +328,22 @@ class MosplatOperatorBase(
     def launch_subprocess(self, context: Context, *, pwargs: K):
         """`pwargs` as in keyword args for subprocess"""
 
-        try:
-            process_entrypoint: Callable = self._operator_subprocess.__globals__[
-                OPERATOR_PROCESS_ENTRYPOINT_FN
-            ]
-            assert isinstance(process_entrypoint, Callable)
-        except (KeyError, AssertionError) as e:
-            raise DeveloperError(
-                f"'{self.bl_idname}' wants to use a process worker, "
-                "but does not properly define a global process entrypoint function.",
-                e,
-            ) from e
+        with self.SUBPROCESS_MANAGER(pwargs) as (
+            process_entrypoint,
+            ImportedWorkerInterface,
+            new_pwargs,
+        ):
+            worker_fn = partial(process_entrypoint, pwargs=new_pwargs)
 
-        worker_fn = partial(process_entrypoint, pwargs=pwargs)
+            self.subprocess_worker = ImportedWorkerInterface(self.bl_idname, worker_fn)
+            self.subprocess_worker.start()
 
-        self.subprocess_worker = SubprocessWorkerInterface(self.bl_idname, worker_fn)
-        self.subprocess_worker.start()
-
-        if not self.timer:
-            wm = self.wm(context)
-            self.timer = wm.event_timer_add(
-                time_step=_TIMER_INTERVAL_, window=context.window
-            )
-            wm.modal_handler_add(self)
+            if not self.timer:
+                wm = self.wm(context)
+                self.timer = wm.event_timer_add(
+                    time_step=_TIMER_INTERVAL_, window=context.window
+                )
+                wm.modal_handler_add(self)
 
     @staticmethod
     def _operator_subprocess(
@@ -436,3 +436,104 @@ class MosplatOperatorBase(
             raise UserFacingError(
                 "Operator cannot continue with insufficient permissions.", e
             ) from e
+
+    @contextlib.contextmanager
+    def SUBPROCESS_MANAGER(
+        self, pwargs: K
+    ) -> Generator[Tuple[Callable, Type[SubprocessWorkerInterface], K], Any, Any]:
+        """
+        to start subprocesses with `multiprocessing`, the passed function, arguments, and source module need to be pickled.
+        this causes a problem when combined with the relative path import constraint that Blender enforces. the reason being is that Blender addons are dynamically imported in a namespace that the subprocess will not be able to find on disk, so subsequently resolved relative paths will include that namespace and error out.
+        thus, we need to re-import the modules of all objects that need to be pickled using real, discoverable modules.
+        furthermore, if we pop the imported modules within this context manager, we can effectively use `multiprocessing` while still maintaining best practices within Blender's development constraints.
+        """
+        meta = AddonMeta()
+
+        # save state of sys modules beforehand
+        old_modules_keys = set(sys.modules.keys())
+
+        subproc_operator_import = meta.main_proc_import_to_subproc_import(
+            self.__module__
+        )
+        operator_module: ModuleType = importlib.import_module(subproc_operator_import)
+
+        subproc_worker_import = meta.main_proc_import_to_subproc_import(
+            SubprocessWorkerInterface.__module__
+        )
+        worker_module: ModuleType = importlib.import_module(subproc_worker_import)
+        worker_class_name = SubprocessWorkerInterface.__qualname__.rpartition(".")[-1]
+
+        PwargsClass: Type[K] = type(pwargs)
+        subproc_pwargs_import = meta.main_proc_import_to_subproc_import(
+            PwargsClass.__module__
+        )
+        pwargs_module: ModuleType = importlib.import_module(subproc_pwargs_import)
+        pwargs_class_name = PwargsClass.__qualname__.rpartition(".")[-1]
+
+        imported_modules: List[ModuleType] = [
+            operator_module,
+            worker_module,
+            pwargs_module,
+        ]
+
+        try:
+            process_entrypoint: Callable = getattr(
+                operator_module, OPERATOR_PROCESS_ENTRYPOINT_FN
+            )
+            assert isinstance(process_entrypoint, Callable)
+
+            ImportedWorkerClass: Type[SubprocessWorkerInterface] = getattr(
+                worker_module, worker_class_name
+            )
+
+            ImportedPwargsClass: Type[K] = getattr(pwargs_module, pwargs_class_name)
+
+        except (AttributeError, AssertionError) as e:
+            raise DeveloperError(
+                f"Cannot create subprocess imports for '{self.bl_idname}'.", e
+            ) from e
+
+        I = TypeVar("I")
+
+        def recreate_pwarg_item(item: I) -> I:
+            item_class = type(item)
+            mod_name = getattr(item_class, "__module__", "")
+            subproc_import = meta.main_proc_import_to_subproc_import(mod_name)
+            if mod_name == subproc_import:
+                return item
+
+            item_class_name: str = item_class.__qualname__.rpartition(".")[-1]
+
+            mod: ModuleType = importlib.import_module(subproc_import)
+            imported_modules.append(mod)
+
+            try:
+                ImportedItemClass = getattr(mod, item_class_name)
+            except AttributeError as e:
+                raise DeveloperError(
+                    f"Cannot create subprocess imports for '{self.bl_idname}'.", e
+                ) from e
+
+            if isinstance(item, SupportsToFromDict):
+                cls: SupportsToFromDict = ImportedItemClass
+                dictionary = item.to_dict()
+                new_item = cls.from_dict(dictionary)
+                return cast(I, new_item)  # at runtime,
+            else:
+                # make the developer to-do known!
+                raise DeveloperError(
+                    f"Encountered a subprocess argument without safe import support: {item=}"
+                )
+
+        # rebuild `pwargs` items
+        new_pwargs = ImportedPwargsClass._make(
+            [recreate_pwarg_item(item) for item in pwargs]
+        )
+
+        yield (process_entrypoint, ImportedWorkerClass, new_pwargs)
+
+        new_modules_keys = set(sys.modules.keys())
+
+        # pop all imported modules
+        for key in new_modules_keys - old_modules_keys:
+            sys.modules.pop(key)

@@ -4,7 +4,16 @@ many exist to prevent escape of blender types into .infrastructure
 """
 
 from dataclasses import Field
-from typing import Any, ClassVar, Iterator, Protocol, TypeVar, runtime_checkable
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Iterator,
+    Protocol,
+    Self,
+    TypeVar,
+    runtime_checkable,
+)
 
 T = TypeVar("T", covariant=True)
 
@@ -23,3 +32,11 @@ class SupportsCollectionProperty(Protocol[T]):
 @runtime_checkable
 class SupportsDataclass(Protocol):
     __dataclass_fields__: ClassVar[dict[str, Field[Any]]]
+
+
+@runtime_checkable
+class SupportsToFromDict(Protocol):
+    def to_dict(self) -> Dict: ...
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> Self: ...
