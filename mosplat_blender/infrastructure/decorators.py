@@ -17,8 +17,8 @@ from typing import (
     overload,
 )
 
-from mosplat_blender.infrastructure.constants import _MISSING_
-from mosplat_blender.infrastructure.schemas import DeveloperError
+from .constants import _MISSING_
+from .schemas import DeveloperError
 
 # maintains original callable's signature for `run_once` and `record_work_time`
 P = ParamSpec("P")

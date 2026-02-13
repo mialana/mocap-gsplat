@@ -1,5 +1,5 @@
-from mosplat_blender.infrastructure.schemas import AddonMeta
-from mosplat_blender.operators.base_ot import MosplatOperatorBase
+from ..infrastructure.schemas import AddonMeta
+from .base_ot import MosplatOperatorBase
 
 
 class Mosplat_OT_open_addon_preferences(MosplatOperatorBase):

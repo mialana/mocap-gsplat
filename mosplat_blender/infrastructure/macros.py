@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from jaxtyping import Float32, UInt8
     from safetensors import safe_open
 
-    from mosplat_blender.infrastructure.schemas import (
+    from .schemas import (
         FrameTensorMetadata,
         ImagesTensorType,
     )
@@ -164,7 +164,7 @@ def load_and_verify_tensor(
 ) -> Dict[str, torch.Tensor]:
     from safetensors import SafetensorError, safe_open
 
-    from mosplat_blender.infrastructure.schemas import (
+    from .schemas import (
         FrameTensorMetadata,
         UserAssertionError,
         UserFacingError,
@@ -207,7 +207,7 @@ def load_and_verify_tensor(
 def load_and_verify_default_tensor(
     in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
 ) -> Optional[ImagesTensorType]:
-    from mosplat_blender.infrastructure.schemas import SavedTensorFileName
+    from .schemas import SavedTensorFileName
 
     tensors = load_and_verify_tensor(in_file, device_str, new_metadata)
     return tensors.get(SavedTensorFileName._default_tensor_key())

@@ -17,12 +17,12 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Self, Tuple, TypeAlias
 
-from mosplat_blender.infrastructure.constants import (
+from ..infrastructure.constants import (
     COLORED_FORMATTER_FIELD_STYLES,
     COLORED_FORMATTER_LEVEL_STYLES,
 )
-from mosplat_blender.infrastructure.decorators import run_once_per_instance
-from mosplat_blender.infrastructure.schemas import (
+from ..infrastructure.decorators import run_once_per_instance
+from ..infrastructure.schemas import (
     DeveloperError,
     EnvVariableEnum,
     LogEntryLevelEnum,
@@ -33,7 +33,7 @@ from mosplat_blender.infrastructure.schemas import (
 BlenderLogEntry: TypeAlias = Tuple[LogEntryLevelEnum, str, str]
 
 if TYPE_CHECKING:
-    from mosplat_blender.core.preferences import Mosplat_AP_Global
+    from ..core.preferences import Mosplat_AP_Global
 
 
 class LoggingInterface:
@@ -278,7 +278,7 @@ class LoggingInterface:
         """pops items from local queue and adds to Blender collection property"""
         from bpy import context  # local runtime import for most up-to-date context
 
-        from mosplat_blender.core.checks import check_propertygroup
+        from ..core.checks import check_propertygroup
 
         if self._blender_log_entry_queue.empty():
             return

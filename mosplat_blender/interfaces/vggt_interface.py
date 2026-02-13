@@ -10,10 +10,10 @@ import multiprocessing.synchronize as mp_sync
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Self, Tuple, TypeAlias
 
-from mosplat_blender.infrastructure.decorators import run_once_per_instance
-from mosplat_blender.infrastructure.macros import crop_tensor
-from mosplat_blender.infrastructure.mixins import LogClassMixin
-from mosplat_blender.infrastructure.schemas import (
+from ..infrastructure.decorators import run_once_per_instance
+from ..infrastructure.macros import crop_tensor
+from ..infrastructure.mixins import LogClassMixin
+from ..infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
     ImagesTensorType,

@@ -7,15 +7,15 @@ from typing import Sequence, Tuple, Type, Union
 
 import bpy
 
-from mosplat_blender import core
-from mosplat_blender.infrastructure.mixins import PreregristrationFn
-from mosplat_blender.infrastructure.schemas import (
+from . import core
+from .infrastructure.mixins import PreregristrationFn
+from .infrastructure.schemas import (
     AddonMeta,
     DeveloperError,
     UnexpectedError,
 )
-from mosplat_blender.interfaces import LoggingInterface, VGGTInterface
-from mosplat_blender.operators import MosplatOperatorBase, operator_factory
+from .interfaces import LoggingInterface, VGGTInterface
+from .operators import MosplatOperatorBase, operator_factory
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 

@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple
 
-from mosplat_blender.infrastructure.schemas import MediaFileStatus, MediaIOMetadata
-from mosplat_blender.operators.base_ot import MosplatOperatorBase
+from ..infrastructure.schemas import MediaFileStatus, MediaIOMetadata
+from .base_ot import MosplatOperatorBase
 
 
 class ProcessKwargs(NamedTuple):

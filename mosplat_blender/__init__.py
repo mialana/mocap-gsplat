@@ -8,14 +8,11 @@ this is because propogation hierarchies  in the `logging` module follows dot not
 """
 
 import os
-import sys
 from pathlib import Path
 from typing import Optional
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from mosplat_blender.infrastructure.schemas import AddonMeta, EnvVariableEnum
-from mosplat_blender.interfaces import LoggingInterface
+from .infrastructure.schemas import AddonMeta, EnvVariableEnum
+from .interfaces import LoggingInterface
 
 ADDON_REGISTRATION_ID: Optional[str] = None
 
@@ -28,13 +25,13 @@ def register():
     LoggingInterface(__name__)
 
     # delay import of `main` until after env setup
-    from mosplat_blender.main import register_addon
+    from .main import register_addon
 
     register_addon()
 
 
 def unregister():
-    from mosplat_blender.main import unregister_addon
+    from .main import unregister_addon
 
     should_clear = True
     try:

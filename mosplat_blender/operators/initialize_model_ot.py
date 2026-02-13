@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import NamedTuple
 
-from mosplat_blender.infrastructure.schemas import UnexpectedError
-from mosplat_blender.interfaces import VGGTInterface
-from mosplat_blender.operators.base_ot import MosplatOperatorBase
+from ..infrastructure.schemas import UnexpectedError
+from ..interfaces import VGGTInterface
+from .base_ot import MosplatOperatorBase
 
 
 class Kwargs(NamedTuple):

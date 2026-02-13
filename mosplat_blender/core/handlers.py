@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from bpy.app.handlers import persistent
 
-from mosplat_blender.core.checks import check_addonpreferences, check_propertygroup
-from mosplat_blender.infrastructure.schemas import MediaIOMetadata, UserFacingError
-from mosplat_blender.interfaces.logging_interface import LoggingInterface
+from ..infrastructure.schemas import MediaIOMetadata, UserFacingError
+from ..interfaces.logging_interface import LoggingInterface
+from .checks import check_addonpreferences, check_propertygroup
 
 if TYPE_CHECKING:
     from bpy.types import Scene
 
-    from mosplat_blender.core.preferences import Mosplat_AP_Global
-    from mosplat_blender.core.properties import Mosplat_PG_Global
+    from .preferences import Mosplat_AP_Global
+    from .properties import Mosplat_PG_Global
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 
@@ -61,7 +61,7 @@ def load_metadata_dataclass_from_json(
 ) -> Tuple[MediaIOMetadata, str]:
     """base entrypoint for restoring to dataclass"""
     media_directory = props.media_directory_
-    dc = MediaIOMetadata(base_directory=str(media_directory))
+    dc: MediaIOMetadata = MediaIOMetadata(base_directory=str(media_directory))
 
     try:
 

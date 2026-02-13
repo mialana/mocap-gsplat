@@ -1,21 +1,21 @@
 from typing import Callable, Dict, List, Tuple, Type
 
-from mosplat_blender.core.panels.base_pt import (
+from ...infrastructure.identifiers import PanelIDEnum, UIListIDEnum
+from ...infrastructure.mixins import PreregristrationFn
+from ...infrastructure.schemas import AddonMeta
+from .base_pt import (
     MosplatPanelBase,
     MosplatPanelMetadata,
     MosplatUIListBase,
     MosplatUIListMetadata,
 )
-from mosplat_blender.core.panels.data_inference_pt import Mosplat_PT_data_inference
-from mosplat_blender.core.panels.log_entries_pt import (
+from .data_inference_pt import Mosplat_PT_data_inference
+from .log_entries_pt import (
     Mosplat_PT_log_entries,
     Mosplat_UL_log_entries,
 )
-from mosplat_blender.core.panels.main_pt import Mosplat_PT_Main
-from mosplat_blender.core.panels.preprocess_pt import Mosplat_PT_preprocess
-from mosplat_blender.infrastructure.identifiers import PanelIDEnum, UIListIDEnum
-from mosplat_blender.infrastructure.mixins import PreregristrationFn
-from mosplat_blender.infrastructure.schemas import AddonMeta
+from .main_pt import Mosplat_PT_Main
+from .preprocess_pt import Mosplat_PT_preprocess
 
 _ADDON_SHORTNAME = AddonMeta().shortname
 panel_registry: Dict[

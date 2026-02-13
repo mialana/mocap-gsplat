@@ -6,15 +6,15 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
-from mosplat_blender.infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
-from mosplat_blender.infrastructure.macros import (
+from ..infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
+from ..infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
     load_and_verify_default_tensor,
     save_tensor_stack_png_preview,
     save_tensor_stack_separate_png_previews,
 )
-from mosplat_blender.infrastructure.schemas import (
+from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
     ImagesTensorType,
@@ -24,7 +24,7 @@ from mosplat_blender.infrastructure.schemas import (
     UserAssertionError,
     UserFacingError,
 )
-from mosplat_blender.operators.base_ot import MosplatOperatorBase
+from .base_ot import MosplatOperatorBase
 
 QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 

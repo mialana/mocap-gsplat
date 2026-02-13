@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING, Dict, List, cast
 
 from bpy.types import bpy_prop_array
 
-from mosplat_blender.core.panels.base_pt import MosplatPanelBase, MosplatUIListBase
-from mosplat_blender.core.properties import Mosplat_PG_LogEntry, Mosplat_PG_LogEntryHub
-from mosplat_blender.infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
-from mosplat_blender.infrastructure.identifiers import UIListIDEnum
-from mosplat_blender.infrastructure.protocols import SupportsCollectionProperty
-from mosplat_blender.infrastructure.schemas import LogEntryLevelEnum
+from ...infrastructure.constants import DEFAULT_LOG_ENTRY_ROWS
+from ...infrastructure.identifiers import UIListIDEnum
+from ...infrastructure.protocols import SupportsCollectionProperty
+from ...infrastructure.schemas import LogEntryLevelEnum
+from ..properties import Mosplat_PG_LogEntry, Mosplat_PG_LogEntryHub
+from .base_pt import MosplatPanelBase, MosplatUIListBase
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems

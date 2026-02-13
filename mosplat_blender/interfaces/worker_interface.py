@@ -10,14 +10,14 @@ import time
 from datetime import datetime
 from typing import Callable, Generic, Optional, TypeAlias, TypeVar
 
+from ..infrastructure.constants import _TIMEOUT_LAZY_
+from ..infrastructure.decorators import record_work_time
+from ..infrastructure.macros import kill_subprocess_cross_platform
+from ..infrastructure.mixins import LogClassMixin
+from ..infrastructure.schemas import EnvVariableEnum
+
 QT = TypeVar("QT", bound=tuple)  # types elements of worker queue
 
-
-from mosplat_blender.infrastructure.constants import _TIMEOUT_LAZY_
-from mosplat_blender.infrastructure.decorators import record_work_time
-from mosplat_blender.infrastructure.macros import kill_subprocess_cross_platform
-from mosplat_blender.infrastructure.mixins import LogClassMixin
-from mosplat_blender.infrastructure.schemas import EnvVariableEnum
 
 StartWorkCallback: TypeAlias = Optional[Callable[[float], None]]
 EndWorkCallback: TypeAlias = Optional[Callable[[float, float], None]]

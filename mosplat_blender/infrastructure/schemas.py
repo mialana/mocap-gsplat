@@ -28,7 +28,7 @@ from typing import (
     cast,
 )
 
-from mosplat_blender.infrastructure.macros import (
+from .macros import (
     append_if_not_equals,
     int_median,
     try_access_path,
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     import torchcodec.decoders
     from jaxtyping import Float32
 
-    from mosplat_blender.core.properties import Mosplat_PG_MediaIOMetadata
+    from ..core.properties import Mosplat_PG_MediaIOMetadata
 
     ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
 else:

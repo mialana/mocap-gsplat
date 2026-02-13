@@ -6,18 +6,18 @@ from numbers import Integral
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
-from mosplat_blender.infrastructure.macros import (
+from ..infrastructure.macros import (
     is_path_accessible,
     save_tensor_stack_png_preview,
 )
-from mosplat_blender.infrastructure.schemas import (
+from ..infrastructure.schemas import (
     FrameTensorMetadata,
     ImagesTensorType,
     MediaIOMetadata,
     ProcessedFrameRange,
     SavedTensorFileName,
 )
-from mosplat_blender.operators.base_ot import MosplatOperatorBase
+from .base_ot import MosplatOperatorBase
 
 
 class ProcessKwargs(NamedTuple):

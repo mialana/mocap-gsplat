@@ -274,8 +274,8 @@ def patch_original_file(
     source = py_file.read_text(encoding="utf-8")
     module = cst.parse_module(source)
 
-    module_name = dot_abs_path(meta_path, root_dir=ADDON_SRC_DIR)
-    # module_name = dot_rel_path(meta_path, source_path=py_file)
+    # module_name = dot_abs_path(meta_path, root_dir=ADDON_SRC_DIR)
+    module_name = dot_rel_path(meta_path, source_path=py_file)
 
     module = module.visit(MetaImportInjector(module_name, meta_symbols))
 
@@ -383,8 +383,8 @@ def generate_meta_file(py_file: Path):
 
     meta_exists = meta_path.exists()
 
-    import_str = dot_abs_path(SCHEMAS_MODULE, root_dir=ADDON_SRC_DIR)
-    # import_str = dot_rel_path(SCHEMAS_MODULE, source_path=meta_path)
+    # import_str = dot_abs_path(SCHEMAS_MODULE, root_dir=ADDON_SRC_DIR)
+    import_str = dot_rel_path(SCHEMAS_MODULE, source_path=meta_path)
 
     meta_lines = [
         TIMESTAMP_STR,

@@ -1,27 +1,27 @@
 from typing import Dict, List, Tuple, Type
 
-from mosplat_blender.infrastructure.identifiers import OperatorIDEnum
-from mosplat_blender.infrastructure.mixins import PreregristrationFn
-from mosplat_blender.infrastructure.schemas import AddonMeta
-from mosplat_blender.operators.base_ot import (
+from ..infrastructure.identifiers import OperatorIDEnum
+from ..infrastructure.mixins import PreregristrationFn
+from ..infrastructure.schemas import AddonMeta
+from .base_ot import (
     MosplatOperatorBase,
     MosplatOperatorMetadata,
 )
-from mosplat_blender.operators.extract_frame_range_ot import (
+from .extract_frame_range_ot import (
     Mosplat_OT_extract_frame_range,
 )
-from mosplat_blender.operators.initialize_model_ot import Mosplat_OT_initialize_model
-from mosplat_blender.operators.install_pointcloud_preview_ot import (
+from .initialize_model_ot import Mosplat_OT_initialize_model
+from .install_pointcloud_preview_ot import (
     Mosplat_OT_install_pointcloud_preview,
 )
-from mosplat_blender.operators.open_addon_preferences_ot import (
+from .open_addon_preferences_ot import (
     Mosplat_OT_open_addon_preferences,
 )
-from mosplat_blender.operators.run_inference_ot import Mosplat_OT_run_inference
-from mosplat_blender.operators.run_preprocess_script_ot import (
+from .run_inference_ot import Mosplat_OT_run_inference
+from .run_preprocess_script_ot import (
     Mosplat_OT_run_preprocess_script,
 )
-from mosplat_blender.operators.validate_media_statuses_ot import (
+from .validate_media_statuses_ot import (
     Mosplat_OT_validate_media_statuses,
 )
 

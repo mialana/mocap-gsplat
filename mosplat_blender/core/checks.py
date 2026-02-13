@@ -12,18 +12,18 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Set, TypeGuard, cast
 
-from mosplat_blender.infrastructure.schemas import (
+from ..infrastructure.schemas import (
     AddonMeta,
     UnexpectedError,
     UserFacingError,
 )
-from mosplat_blender.interfaces import LoggingInterface
+from ..interfaces import LoggingInterface
 
 if TYPE_CHECKING:
     from bpy.types import Preferences, Scene, WindowManager
 
-    from mosplat_blender.core.preferences import Mosplat_AP_Global
-    from mosplat_blender.core.properties import Mosplat_PG_Global
+    from .preferences import Mosplat_AP_Global
+    from .properties import Mosplat_PG_Global
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 

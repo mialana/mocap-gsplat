@@ -24,18 +24,18 @@ from typing import (
     Union,
 )
 
-from mosplat_blender.infrastructure.constants import _TIMER_INTERVAL_
-from mosplat_blender.infrastructure.identifiers import OperatorIDEnum
-from mosplat_blender.infrastructure.macros import immutable_to_set as im_to_set
-from mosplat_blender.infrastructure.mixins import ContextAccessorMixin, CtxPackage
-from mosplat_blender.infrastructure.schemas import (
+from ..infrastructure.constants import _TIMER_INTERVAL_
+from ..infrastructure.identifiers import OperatorIDEnum
+from ..infrastructure.macros import immutable_to_set as im_to_set
+from ..infrastructure.mixins import ContextAccessorMixin, CtxPackage
+from ..infrastructure.schemas import (
     DeveloperError,
     EnvVariableEnum,
     MediaIOMetadata,
     UnexpectedError,
     UserFacingError,
 )
-from mosplat_blender.interfaces.worker_interface import (
+from ..interfaces.worker_interface import (
     QT,
     SubprocessWorkerInterface,
     ThreadWorkerInterface,
@@ -44,12 +44,12 @@ from mosplat_blender.interfaces.worker_interface import (
 if not EnvVariableEnum.SUBPROCESS_FLAG in os.environ or TYPE_CHECKING:
     from bpy.types import Operator, Timer  # pyright: ignore[reportRedeclaration]
 
-    from mosplat_blender.core.checks import (
+    from ..core.checks import (
         check_addonpreferences,
         check_propertygroup,
         check_window_manager,
     )
-    from mosplat_blender.core.handlers import load_metadata_property_group_from_json
+    from ..core.handlers import load_metadata_property_group_from_json
 else:
     Operator: TypeAlias = object
     Timer: TypeAlias = object
@@ -71,8 +71,8 @@ if TYPE_CHECKING:
 
     OpResultSetLike: TypeAlias = Union[OpResultTuple, OpResultSet]
 
-    from mosplat_blender.core.preferences import Mosplat_AP_Global
-    from mosplat_blender.core.properties import Mosplat_PG_Global
+    from ..core.preferences import Mosplat_AP_Global
+    from ..core.properties import Mosplat_PG_Global
 
 OPERATOR_PROCESS_ENTRYPOINT_FN = "process_entrypoint"
 

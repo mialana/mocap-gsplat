@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, ClassVar, List, Literal, Optional, Set, TypeAl
 
 from bpy.types import Context, Panel, UILayout, UIList
 
-from mosplat_blender.core.checks import check_addonpreferences, check_propertygroup
-from mosplat_blender.infrastructure.identifiers import PanelIDEnum
-from mosplat_blender.infrastructure.mixins import ContextAccessorMixin, CtxPackage
-from mosplat_blender.infrastructure.schemas import UnexpectedError, UserFacingError
+from ...infrastructure.identifiers import PanelIDEnum
+from ...infrastructure.mixins import ContextAccessorMixin, CtxPackage
+from ...infrastructure.schemas import UnexpectedError, UserFacingError
+from ..checks import check_addonpreferences, check_propertygroup
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems
