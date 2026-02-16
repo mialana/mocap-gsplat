@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import sys
 from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec, spec_from_file_location
-from os import stat_result
 from pathlib import Path
 from statistics import median
 from types import ModuleType
@@ -15,6 +16,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     LiteralString,
     Optional,
     Set,
@@ -26,22 +28,19 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    import torch
     from jaxtyping import Float32, UInt8
-    from safetensors import safe_open
+    from torch import Tensor
 
     from .schemas import (
         FrameTensorMetadata,
-        ImagesTensorType,
+        ImagesTensorF32,
+        ImagesTensorLike,
+        ImagesTensorUInt8,
     )
+
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Tuple)
-
-
-def int_median(iter: Iterable[int]) -> int:
-    return int(round(median(iter))) if iter else -1
-
 
 L = TypeVar("L", bound=LiteralString)
 I = TypeVar("I")
@@ -50,6 +49,10 @@ Immutable: TypeAlias = Union[Tuple[I, ...], I]
 
 # set is effectively immutable-like for our purposes
 ImmutableLike: TypeAlias = Union[Immutable[L], Set[L]]
+
+
+def int_median(iter: Iterable[int]) -> int:
+    return int(round(median(iter))) if iter else -1
 
 
 def immutable_to_set(im: ImmutableLike[L]) -> Set[L]:
@@ -64,7 +67,7 @@ def append_if_not_equals(iter: List[T], *, item: T, target: T) -> None:
         iter.append(item)
 
 
-def try_access_path(p: Path) -> stat_result:
+def try_access_path(p: Path) -> os.stat_result:
     """
     will raise `FileNotFoundError`, `OSError`, or `PermissionError`.
     returns the stat result of the file IF it is accessible.
@@ -139,20 +142,50 @@ def get_required_function(module: ModuleType, name: str) -> Callable:
     return fn
 
 
-def save_tensor_stack_png_preview(tensor: ImagesTensorType, tensor_out_file: Path):
+def to_0_1(tensor: ImagesTensorLike) -> ImagesTensorF32:
+    import torch
+
+    if tensor.dtype == torch.float32:
+        return tensor
+
+    assert (
+        tensor.dtype == torch.uint8
+    ), "Given tensor should only ever be of type float32 or uint8"
+
+    return tensor.to(torch.float32) / 255.0
+
+
+def to_0_255(tensor: ImagesTensorLike) -> ImagesTensorUInt8:
+    import torch
+
+    if tensor.dtype == torch.uint8:
+        return tensor
+
+    assert (
+        tensor.dtype == torch.float32
+    ), "Given tensor should only ever be of type float32 or uint8"
+
+    return (tensor.clamp(0, 1) * 255.0).round().to(torch.uint8)
+
+
+def save_tensor_stack_png_preview(tensor: ImagesTensorLike, tensor_out_file: Path):
     from torchvision.utils import save_image
+
+    tensor_0_1 = to_0_1(tensor)
 
     preview_png_file: Path = tensor_out_file.parent / f"{tensor_out_file.stem}.png"
 
-    save_image(tensor, preview_png_file, nrow=4)
+    save_image(tensor_0_1, preview_png_file, nrow=4)
 
 
 def save_tensor_stack_separate_png_previews(
-    tensor: ImagesTensorType, tensor_out_file: Path
+    tensor: ImagesTensorLike, tensor_out_file: Path
 ):
     from torchvision.utils import save_image
 
-    for idx, img in enumerate(tensor):
+    tensor_0_1 = to_0_1(tensor)
+
+    for idx, img in enumerate(tensor_0_1):
         preview_png_file: Path = (
             tensor_out_file.parent / f"{tensor_out_file.stem}.{idx:04d}.png"
         )
@@ -161,7 +194,7 @@ def save_tensor_stack_separate_png_previews(
 
 def load_and_verify_tensor(
     in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
-) -> Dict[str, torch.Tensor]:
+) -> Dict[str, Tensor]:
     from safetensors import SafetensorError, safe_open
 
     from .schemas import (
@@ -177,7 +210,7 @@ def load_and_verify_tensor(
         raise OSError from e
 
     try:
-        tensors: Dict[str, torch.Tensor] = {}
+        tensors: Dict[str, Tensor] = {}
         with safe_open(in_file, framework="pt", device=device_str) as f:
             file: safe_open = f
             for key in file.keys():
@@ -204,38 +237,60 @@ def load_and_verify_tensor(
     return tensors
 
 
-def load_and_verify_default_tensor(
+def load_and_verify_images_tensor(
     in_file: Path, device_str: str, new_metadata: FrameTensorMetadata
-) -> Optional[ImagesTensorType]:
+) -> Optional[ImagesTensorUInt8]:
+    """returns images saved as safetensors in UInt8 data type (to reduce file size)"""
     from .schemas import SavedTensorFileName
 
     tensors = load_and_verify_tensor(in_file, device_str, new_metadata)
-    return tensors.get(SavedTensorFileName._default_tensor_key())
+    tensor = tensors.get(SavedTensorFileName._images_tensor_key())
+    return to_0_255(tensor) if tensor is not None else None
 
 
-def pad_tensor(images: ImagesTensorType, multiple: int) -> ImagesTensorType:
+def save_images_tensor(
+    out_file: Path, metadata: FrameTensorMetadata, tensor: ImagesTensorLike
+):
+    from safetensors.torch import save_file
+
+    from .schemas import SavedTensorFileName
+
+    tensor_0_255 = to_0_255(tensor)
+
+    save_file(
+        {SavedTensorFileName._images_tensor_key(): tensor_0_255},
+        filename=out_file,
+        metadata=metadata.to_dict(),
+    )
+
+
+def pad_tensor(images: ImagesTensorLike, multiple: int) -> ImagesTensorF32:
     import torch
 
-    _, _, H, W = images.shape
+    images_0_1 = to_0_1(images)
+
+    _, _, H, W = images_0_1.shape
     pad_height = (multiple - H % multiple) % multiple
     pad_width = (multiple - W % multiple) % multiple
 
     return torch.nn.functional.pad(
-        images, (0, pad_width, 0, pad_height), mode="constant", value=0.0
+        images_0_1, (0, pad_width, 0, pad_height), mode="constant", value=0.0
     )
 
 
 def crop_tensor(
-    images: ImagesTensorType,
+    images: ImagesTensorLike,
     *,
     max_size: int,
     multiple: int,
     mode: str = "bilinear",
     align_corners: bool = False,
-) -> ImagesTensorType:
+) -> ImagesTensorF32:
     import torch.nn.functional as F
 
-    _, _, H, W = images.shape
+    images_0_1 = to_0_1(images)
+
+    _, _, H, W = images_0_1.shape
 
     # crop to max size
     max_hw = max(H, W)
@@ -244,8 +299,8 @@ def crop_tensor(
         new_H = int(round(H * scale))
         new_W = int(round(W * scale))
 
-        images = F.interpolate(
-            images,
+        images_0_1 = F.interpolate(
+            images_0_1,
             size=(new_H, new_W),
             mode=mode,
             align_corners=align_corners if mode in ("bilinear", "bicubic") else None,
@@ -259,21 +314,21 @@ def crop_tensor(
     top = (H - crop_H) // 2
     left = (W - crop_W) // 2
 
-    images = images[:, :, top : top + crop_H, left : left + crop_W]
+    images_0_1 = images_0_1[:, :, top : top + crop_H, left : left + crop_W]
 
-    return images
+    return images_0_1
 
 
 def save_ply_ascii(
-    out_file: Path, xyz: Float32[torch.Tensor, "N 3"], rgb: UInt8[torch.Tensor, "N 3"]
+    out_file: Path, xyz: Float32[Tensor, "N 3"], rgb: UInt8[Tensor, "N 3"]
 ):
-    assert xyz.shape[0] == rgb.shape[0], "'xyz' tensor shape dim 0 should match 'rgb'."
-    assert (
-        xyz.shape[1] == 3 and rgb.shape[1] == 3
-    ), "'xyz' and 'rgb' should have shape 3 in last dimension."
+    rgb_0_255 = to_0_255(rgb)
+
+    assert xyz.shape[0] == rgb.shape[0]
+    assert xyz.shape[1] == 3 and rgb.shape[1] == 3
 
     xyz = xyz.cpu()
-    rgb = rgb.cpu()
+    rgb_0_255 = rgb_0_255.cpu()
 
     N = xyz.shape[0]
 
@@ -291,21 +346,24 @@ def save_ply_ascii(
 
         for i in range(N):
             x, y, z = xyz[i]
-            r, g, b = rgb[i]
+            r, g, b = rgb_0_255[i]
             f.write(f"{x} {y} {z} {r} {g} {b}\n")
 
 
 def save_ply_binary(
-    out_file: Path, xyz: Float32[torch.Tensor, "N 3"], rgb: UInt8[torch.Tensor, "N 3"]
+    out_file: Path, xyz: Float32[Tensor, "N 3"], rgb: UInt8[Tensor, "N 3"]
 ):
     import numpy as np
+    import torch
 
+    rgb_0_255 = to_0_255(rgb)
     assert xyz.dtype == torch.float32
-    assert rgb.dtype == torch.uint8
     assert xyz.shape == rgb.shape
-    assert xyz.device.type == "cpu"
 
-    N = xyz.shape[0]
+    xyz_np = xyz.cpu().numpy()
+    rgb_np = rgb_0_255.cpu().numpy()
+
+    N = xyz_np.shape[0]
 
     header = (
         "ply\n"
@@ -320,12 +378,26 @@ def save_ply_binary(
         "end_header\n"
     )
 
+    vertex_dtype = np.dtype(
+        [
+            ("x", "<f4"),
+            ("y", "<f4"),
+            ("z", "<f4"),
+            ("red", "u1"),
+            ("green", "u1"),
+            ("blue", "u1"),
+        ]
+    )
+
     with open(out_file, "wb") as f:
         f.write(header.encode("ascii"))
 
-        xyz_bytes = xyz.view(torch.uint8)
-        rgb_bytes = rgb
+        vertices = np.empty(N, dtype=vertex_dtype)
+        vertices["x"] = xyz_np[:, 0]
+        vertices["y"] = xyz_np[:, 1]
+        vertices["z"] = xyz_np[:, 2]
+        vertices["red"] = rgb_np[:, 0]
+        vertices["green"] = rgb_np[:, 1]
+        vertices["blue"] = rgb_np[:, 2]
 
-        for i in range(N):
-            f.write(xyz_bytes[i].cpu().numpy().astype(np.float32).tobytes())
-            f.write(rgb_bytes[i].cpu().numpy().astype(np.uint8).tobytes())
+        f.write(vertices.tobytes())

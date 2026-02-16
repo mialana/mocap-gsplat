@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
 
 from ..infrastructure.macros import (
-    load_and_verify_default_tensor,
+    load_and_verify_images_tensor,
     load_and_verify_tensor,
     save_ply_ascii,
     save_ply_binary,
@@ -142,7 +142,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     preprocess_script=applied_preprocess_script,
                     model_options=None,
                 )  # options did not exist in 'run preprocess script' step
-                images_tensor = load_and_verify_default_tensor(
+                images_tensor = load_and_verify_images_tensor(
                     in_file, device_str, validation_metadata
                 )
                 if images_tensor is None:

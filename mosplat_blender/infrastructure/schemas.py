@@ -33,18 +33,21 @@ from .macros import (
     int_median,
     try_access_path,
 )
-from .protocols import SupportsToFromDict
 
 if TYPE_CHECKING:
     import torch
     import torchcodec.decoders
-    from jaxtyping import Float32
+    from jaxtyping import Float32, UInt8
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
 
-    ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
+    ImagesTensorF32: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
+    ImagesTensorUInt8: TypeAlias = UInt8[torch.Tensor, "B 3 H W"]
+    ImagesTensorLike: TypeAlias = Union[ImagesTensorUInt8, ImagesTensorF32]
 else:
-    ImagesTensorType: TypeAlias = Any
+    ImagesTensorF32: TypeAlias = Any
+    ImagesTensorUInt8: TypeAlias = Any
+    ImagesTensorLike: TypeAlias = Any
 
 
 class CustomError(ABC, RuntimeError):
@@ -168,8 +171,8 @@ class LogEntryLevelEnum(StrEnum):
 
 class SavedTensorFileName(StrEnum):
     @staticmethod
-    def _default_tensor_key() -> str:
-        return "data"
+    def _images_tensor_key() -> str:
+        return "images"
 
     RAW = auto()
     PREPROCESSED = auto()

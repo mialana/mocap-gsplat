@@ -8,11 +8,12 @@ from typing import List, NamedTuple, Optional, Tuple, cast
 
 from ..infrastructure.macros import (
     is_path_accessible,
+    save_images_tensor,
     save_tensor_stack_png_preview,
 )
 from ..infrastructure.schemas import (
     FrameTensorMetadata,
-    ImagesTensorType,
+    ImagesTensorUInt8,
     MediaIOMetadata,
     ProcessedFrameRange,
     SavedTensorFileName,
@@ -122,20 +123,16 @@ class Mosplat_OT_extract_frame_range(
 
                 tensor_list = [dec[cast(Integral, idx)] for dec in decoders]
                 # convert to 0.0-1.0 range
-                tensor: ImagesTensorType = (
-                    torch.stack(tensor_list, dim=0).float() / 255.0
-                )
+                tensor: ImagesTensorUInt8 = torch.stack(tensor_list, dim=0)
 
-                save_file(
-                    {SavedTensorFileName._default_tensor_key(): tensor},
-                    filename=out_file,
-                    metadata=FrameTensorMetadata(
-                        frame_idx=idx,
-                        media_files=files,
-                        preprocess_script=None,
-                        model_options=None,
-                    ).to_dict(),
+                new_metadata = FrameTensorMetadata(
+                    frame_idx=idx,
+                    media_files=files,
+                    preprocess_script=None,
+                    model_options=None,
                 )
+                save_images_tensor(out_file, new_metadata, tensor)
+
                 if preview:
                     save_tensor_stack_png_preview(tensor, out_file)
 

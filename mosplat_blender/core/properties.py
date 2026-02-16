@@ -35,6 +35,7 @@ from ..infrastructure.schemas import (
     VGGTModelOptions,
 )
 from .checks import (
+    check_addonpreferences,
     check_frame_range_poll_result,
     check_media_directory,
     check_media_files,
@@ -81,6 +82,15 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
 
     start, end = self.frame_range_
     self.was_frame_range_extracted = bool(data.query_frame_range(start, end - 1))
+
+    prefs = check_addonpreferences(context.preferences)
+    poll_result = check_frame_range_poll_result(prefs, self)
+    if len(poll_result) > 0:
+        poll_result_str = "\n".join(poll_result)
+        self.logger.warning(
+            f"Frame range updated to '{start}-{end}', but is currently considered invalid for the following reasons: \n{poll_result_str}\n. Pointcloud preview will be installed after fixes are made."
+        )
+        return  # ensure frame range is valid beforehand
 
     scene = context.scene
     if scene:

@@ -41,11 +41,13 @@ class Mosplat_OT_validate_media_statuses(
             self.data = new_data
             self.sync_to_props(props)
 
-        if status == "done":
-            first, _ = props.frame_range_
-            props.frame_range[0] = first  # trigger frame range update
-
         return super()._queue_callback(pkg, event, next)
+
+    def cleanup(self, pkg):
+        super().cleanup(pkg)
+
+        # trigger frame change update only after committing data
+        pkg.props.frame_range[0] = pkg.props.frame_range[0]
 
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):

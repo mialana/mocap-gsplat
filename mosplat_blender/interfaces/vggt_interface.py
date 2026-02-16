@@ -11,12 +11,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Self, Tuple, TypeAlias
 
 from ..infrastructure.decorators import run_once_per_instance
-from ..infrastructure.macros import crop_tensor
+from ..infrastructure.macros import crop_tensor, to_0_1
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
-    ImagesTensorType,
+    ImagesTensorLike,
     ModelInferenceMode,
     PointCloudTensors,
     UnexpectedError,
@@ -107,7 +107,7 @@ class VGGTInterface(LogClassMixin):
 
     def run_inference(
         self,
-        images: ImagesTensorType,
+        images: ImagesTensorLike,
         metadata: FrameTensorMetadata,
         options: VGGTModelOptions,
     ) -> PointCloudTensors:
@@ -118,18 +118,22 @@ class VGGTInterface(LogClassMixin):
         from jaxtyping import Float32, Int32, UInt8
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
+        images_f32 = to_0_1(images)  # ensure in 0-1 range
+
         extrinsic: Float32[torch.Tensor, "B 3 4"]
         intrinsic: Float32[torch.Tensor, "B 3 3"]
 
-        images = crop_tensor(  # crop down
-            images.to(device=self.device, dtype=self.dtype), max_size=518, multiple=14
+        images_f32 = crop_tensor(  # crop down
+            images_f32.to(device=self.device, dtype=self.dtype),
+            max_size=518,
+            multiple=14,
         )
 
         with torch.inference_mode():
-            predictions: Dict[str, torch.Tensor] = self.model(images)
+            predictions: Dict[str, torch.Tensor] = self.model(images_f32)
 
         extri_intri = pose_encoding_to_extri_intri(
-            predictions["pose_enc"], images.shape[-2:], build_intrinsics=True
+            predictions["pose_enc"], images_f32.shape[-2:], build_intrinsics=True
         )
 
         if extri_intri[1] is None:
@@ -169,7 +173,7 @@ class VGGTInterface(LogClassMixin):
         conf: Float32[torch.Tensor, "N"] = conf_map.reshape(-1)
 
         rgb: UInt8[torch.Tensor, "N 3"] = (
-            images.permute(0, 2, 3, 1)
+            images_f32.permute(0, 2, 3, 1)
             .reshape(-1, 3)
             .clamp(0, 1)
             .mul(255)

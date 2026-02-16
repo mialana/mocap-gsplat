@@ -4,19 +4,30 @@ import multiprocessing as mp
 from functools import partial
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
+from typing import (
+    Callable,
+    List,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TypeAlias,
+    TypeGuard,
+    assert_never,
+)
 
 from ..infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from ..infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
-    load_and_verify_default_tensor,
+    load_and_verify_images_tensor,
+    save_images_tensor,
     save_tensor_stack_png_preview,
+    to_0_1,
 )
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
-    ImagesTensorType,
+    ImagesTensorF32,
     MediaIOMetadata,
     SavedTensorFileName,
     UnexpectedError,
@@ -90,7 +101,6 @@ class Mosplat_OT_run_preprocess_script(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
-        from safetensors.torch import save_file
 
         script, files, (start, end), exported_file_formatter, preview, data = pwargs
 
@@ -128,7 +138,7 @@ class Mosplat_OT_run_preprocess_script(
                 )
 
                 try:
-                    _ = load_and_verify_default_tensor(
+                    _ = load_and_verify_images_tensor(
                         out_file, device_str, new_metadata
                     )
                     queue.put(
@@ -146,32 +156,19 @@ class Mosplat_OT_run_preprocess_script(
                     idx, files, preprocess_script=None, model_options=None
                 )  # preprocess script did not exist in extraction step
 
-                tensor = load_and_verify_default_tensor(
+                images_0_255 = load_and_verify_images_tensor(
                     in_file, device_str, validation_metadata
                 )
-                if tensor is None:
+                if images_0_255 is None:
                     raise RuntimeError("Poll-guard failed.")
+                images_0_1: ImagesTensorF32 = to_0_1(images_0_255)
 
-                new_tensor: ImagesTensorType = preprocess_fn(idx, files, tensor)
+                new_tensor = preprocess_fn(idx, files, images_0_1)
 
-                if not new_tensor.dtype == tensor.dtype:
-                    raise UserAssertionError(
-                        f"Data type of tensor cannot change after preprocess script",
-                        expected=tensor.dtype,
-                        actual=new_tensor.dtype,
-                    )
-                if not new_tensor.shape == tensor.shape:
-                    raise UserAssertionError(
-                        f"Shape of tensor cannot change after preprocess script",
-                        expected=tensor.shape,
-                        actual=new_tensor.shape,
-                    )
+                if not _verify_preprocess_script_return_value(new_tensor, images_0_1):
+                    assert_never(new_tensor)  # function errors if failed
 
-                save_file(
-                    {SavedTensorFileName._default_tensor_key(): new_tensor},
-                    filename=out_file,
-                    metadata=new_metadata.to_dict(),
-                )
+                save_images_tensor(out_file, new_metadata, new_tensor)
 
                 if preview:
                     save_tensor_stack_png_preview(new_tensor, out_file)
@@ -225,6 +222,33 @@ def _retrieve_preprocess_fn(
         return None
 
     return preprocess_fn
+
+
+def _verify_preprocess_script_return_value(
+    received_tensor, given_tensor: ImagesTensorF32
+) -> TypeGuard[ImagesTensorF32]:
+    import torch
+
+    if not isinstance(received_tensor, torch.Tensor):
+        raise UserAssertionError(
+            f"Return value of preprocess script must be a torch tensor",
+            expected=type(given_tensor).__name__,
+            actual=type(received_tensor).__name__,
+        )
+    if not received_tensor.dtype == given_tensor.dtype:
+        raise UserAssertionError(
+            f"Data type of tensor cannot change after preprocess script",
+            expected=given_tensor.dtype,
+            actual=received_tensor.dtype,
+        )
+    if not received_tensor.shape == given_tensor.shape:
+        raise UserAssertionError(
+            f"Shape of tensor cannot change after preprocess script",
+            expected=given_tensor.shape,
+            actual=received_tensor.shape,
+        )
+
+    return True
 
 
 def process_entrypoint(*args, **kwargs):

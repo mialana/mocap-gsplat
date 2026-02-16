@@ -6,8 +6,13 @@ To elaborate, motion capture data is often exported from **sparse view direction
 
 ## Requirements
 
--   Blender 4.2+
+- Blender 4.2+
+- FFmpeg with shared library build
 
 ## Installation
+
+### Pre-packaged Releases
+
+Visit the [Releases](https://github.com/mialana/mocap-gsplat/releases) page of this repository, where ZIP files corresponding to Windows, Linux, and MacOS
 
 ### From source
