@@ -33,6 +33,7 @@ class ProcessKwargs(NamedTuple):
     media_files: List[Path]
     frame_range: Tuple[int, int]
     exported_file_formatter: str
+    create_preview_images: bool
     data: MediaIOMetadata
 
 
@@ -69,6 +70,7 @@ class Mosplat_OT_run_preprocess_script(
                 media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formattter,
+                create_preview_images=bool(pkg.prefs.create_preview_images),
                 data=self.data,
             ),
         )
@@ -90,7 +92,8 @@ class Mosplat_OT_run_preprocess_script(
         import torch
         from safetensors.torch import save_file
 
-        script, files, (start, end), exported_file_formatter, data = pwargs
+        script, files, (start, end), exported_file_formatter, preview, data = pwargs
+
         in_file_formatter = partial(
             exported_file_formatter.format,
             file_name=SavedTensorFileName.RAW,
@@ -135,7 +138,7 @@ class Mosplat_OT_run_preprocess_script(
                             None,
                         )
                     )
-                    # continue
+                    continue
                 except (OSError, UserAssertionError):
                     pass
 
@@ -170,7 +173,8 @@ class Mosplat_OT_run_preprocess_script(
                     metadata=new_metadata.to_dict(),
                 )
 
-                save_tensor_stack_png_preview(new_tensor, out_file)
+                if preview:
+                    save_tensor_stack_png_preview(new_tensor, out_file)
                 queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(

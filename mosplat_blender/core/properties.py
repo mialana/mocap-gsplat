@@ -105,8 +105,6 @@ def update_media_directory(self: Mosplat_PG_Global, context: Context):
 
     self.logger.info(f"'{self._meta.media_directory.name}' updated.")
 
-    update_frame_range(self, context)
-
 
 class MosplatPropertyGroupBase(
     Generic[D],

@@ -1,4 +1,4 @@
-# 2026-02-12 19:09:12.354960
+# 2026-02-16 03:21:44.967640
 # created using 'generate_property_meta_files.py'
 
 
@@ -22,6 +22,8 @@ class Mosplat_AP_Global_Meta(NamedTuple):
     stdout_log_format: PropertyMeta
     blender_max_log_entries: PropertyMeta
     vggt_hf_id: PropertyMeta
+    create_preview_images: PropertyMeta
+    ply_file_format: PropertyMeta
 
 
 MOSPLAT_AP_GLOBAL_META = Mosplat_AP_Global_Meta(
@@ -88,5 +90,15 @@ MOSPLAT_AP_GLOBAL_META = Mosplat_AP_Global_Meta(
         id="vggt_hf_id",
         name="VGGT Hugging Face ID",
         description="ID of VGGT pre-trained model on Hugging Face",
+    ),
+    create_preview_images=PropertyMeta(
+        id="create_preview_images",
+        name="Create Preview Images",
+        description="Create preview images for 1. after raw frame extraction and 2. after running preprocess script. The images will be in the same directory as the binary processed data. Note that writing to disk is difficult to optimize and will cause a non-arbitrary increase in operation time.",
+    ),
+    ply_file_format=PropertyMeta(
+        id="ply_file_format",
+        name="PLY File Format",
+        description="Format of outputted point cloud files after running model inference",
     ),
 )

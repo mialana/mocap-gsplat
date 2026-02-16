@@ -144,7 +144,7 @@ def save_tensor_stack_png_preview(tensor: ImagesTensorType, tensor_out_file: Pat
 
     preview_png_file: Path = tensor_out_file.parent / f"{tensor_out_file.stem}.png"
 
-    save_image(tensor, preview_png_file)
+    save_image(tensor, preview_png_file, nrow=4)
 
 
 def save_tensor_stack_separate_png_previews(

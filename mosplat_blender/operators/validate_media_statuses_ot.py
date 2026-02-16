@@ -34,10 +34,17 @@ class Mosplat_OT_validate_media_statuses(
 
     def _queue_callback(self, pkg, event, next):
         status, msg, new_data = next
+        props = pkg.props
+
         # sync props regardless as the updated dataclass is still valid
         if new_data:
             self.data = new_data
-            self.sync_to_props(pkg.props)
+            self.sync_to_props(props)
+
+        if status == "done":
+            first, _ = props.frame_range_
+            props.frame_range[0] = first  # trigger frame range update
+
         return super()._queue_callback(pkg, event, next)
 
     @staticmethod

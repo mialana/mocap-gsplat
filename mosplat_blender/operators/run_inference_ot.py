@@ -1,11 +1,12 @@
 from functools import partial
 from pathlib import Path
-from typing import List, NamedTuple, Tuple
+from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
 
 from ..infrastructure.macros import (
     load_and_verify_default_tensor,
     load_and_verify_tensor,
     save_ply_ascii,
+    save_ply_binary,
 )
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
@@ -19,12 +20,15 @@ from ..infrastructure.schemas import (
 from ..interfaces import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
+PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
+
 
 class ThreadKwargs(NamedTuple):
     preprocess_script: Path
     media_files: List[Path]
     frame_range: Tuple[int, int]
     exported_file_formatter: str
+    ply_file_format: PlyFileFormat
     model_options: VGGTModelOptions
 
 
@@ -54,6 +58,9 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
+        ply_file_format: PlyFileFormat = cast(
+            PlyFileFormat, str(pkg.prefs.ply_file_format)
+        )
         self.launch_thread(
             pkg.context,
             twargs=ThreadKwargs(
@@ -61,6 +68,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
+                ply_file_format=ply_file_format,
                 model_options=pkg.props.options_accessor.to_dataclass(),
             ),
         )
@@ -72,7 +80,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         import torch
         from safetensors.torch import save_file
 
-        script, files, (start, end), exported_file_formatter, options = twargs
+        script, files, (start, end), exported_file_formatter, format, options = twargs
         in_file_formatter = partial(
             exported_file_formatter.format,
             file_name=SavedTensorFileName.PREPROCESSED,
@@ -112,14 +120,14 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     tensors = load_and_verify_tensor(out_file, device_str, new_metadata)
                     pc_tensors = PointCloudTensors.from_dict(tensors, new_metadata)
 
-                    write_pointcloud_tensors_to_disk(ply_out_file, pc_tensors)
+                    write_pointcloud_tensors_to_disk(ply_out_file, format, pc_tensors)
                     queue.put(
                         (
                             "update",
                             f"Previous point cloud inference data found on disk for frame '{idx}'",
                         )
                     )
-                    # continue
+                    continue
                 except (OSError, UserAssertionError):
                     pass
                 except (TypeError, ValueError) as e:
@@ -149,7 +157,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     metadata=new_metadata.to_dict(),
                 )
 
-                write_pointcloud_tensors_to_disk(ply_out_file, pc_tensors)
+                write_pointcloud_tensors_to_disk(ply_out_file, format, pc_tensors)
 
                 queue.put(("update", f"Ran inference on frame '{idx}'"))
             except Exception as e:
@@ -162,8 +170,13 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         queue.put(("done", "Inference complete for current frame range."))
 
 
-def write_pointcloud_tensors_to_disk(out_file: Path, pc_tensors: PointCloudTensors):
-    save_ply_ascii(out_file, pc_tensors.xyz, pc_tensors.rgb)
+def write_pointcloud_tensors_to_disk(
+    out_file: Path, format: PlyFileFormat, pc_tensors: PointCloudTensors
+):
+    if format == "ascii":
+        save_ply_ascii(out_file, pc_tensors.xyz, pc_tensors.rgb)
+    else:
+        save_ply_binary(out_file, pc_tensors.xyz, pc_tensors.rgb)
 
 
 def process_entrypoint(*args, **kwargs):

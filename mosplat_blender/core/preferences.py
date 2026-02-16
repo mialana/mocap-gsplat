@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Set, TypeAlias
 
-from bpy.props import IntProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty
 from bpy.types import AddonPreferences, Context
 
 from ..infrastructure.constants import (
@@ -97,7 +97,7 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         description="Format for resolving the path to a directory where processed data generated for the selected media directory will be outputted.\n"
         "Relative paths are resolved against the selected media directory path.\n"
         "The token {media_directory_name} will be replaced with the base name of the selected media directory.",
-        default=f"{os.curdir}{os.sep}{{media_directory_name}}_OUTPUT",
+        default=f"{os.curdir}{os.sep}{{media_directory_name}}__{AddonMeta().shortname}",
     )
 
     preprocess_media_script_file: StringProperty(
@@ -173,6 +173,22 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         update=update_model_preferences,
     )
 
+    create_preview_images: BoolProperty(
+        name="Create Preview Images",
+        description="Create preview images for 1. after raw frame extraction and 2. after running preprocess script. The images will be in the same directory as the binary processed data. Note that writing to disk is difficult to optimize and will cause a non-arbitrary increase in operation time.",
+        default=True,
+    )
+
+    ply_file_format: EnumProperty(
+        name="PLY File Format",
+        description="Format of outputted point cloud files after running model inference",
+        items=[
+            ("ascii", "ASCII", "Human-readable format"),
+            ("binary", "Binary", "Smaller file sizes"),
+        ],
+        default="binary",
+    )
+
     @property
     def cache_dir_logs_(self) -> Path:
         return Path(self.cache_dir) / self.cache_subdir_logs
@@ -225,6 +241,8 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         data_proc_box.prop(self, meta.preprocess_media_script_file.id)
         data_proc_box.prop(self, meta.media_extensions.id)
         data_proc_box.prop(self, meta.max_frame_range.id)
+        data_proc_box.prop(self, meta.create_preview_images.id)
+        data_proc_box.prop(self, meta.ply_file_format.id)
 
         layout.separator()
 

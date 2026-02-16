@@ -535,5 +535,7 @@ class MosplatOperatorBase(
         new_modules_keys = set(sys.modules.keys())
 
         # pop all imported modules
+        addon_base_id = meta.base_id
         for key in new_modules_keys - old_modules_keys:
-            sys.modules.pop(key)
+            if addon_base_id in key:  # do not pop standard lib modules
+                sys.modules.pop(key)

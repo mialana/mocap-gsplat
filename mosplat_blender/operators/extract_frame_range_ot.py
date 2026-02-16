@@ -24,6 +24,7 @@ class ProcessKwargs(NamedTuple):
     updated_media_files: List[Path]
     frame_range: Tuple[int, int]
     exported_file_formatter: str
+    create_preview_images: bool
     data: MediaIOMetadata
 
 
@@ -56,6 +57,7 @@ class Mosplat_OT_extract_frame_range(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
+                create_preview_images=bool(pkg.prefs.create_preview_images),
                 data=self.data,
             ),
         )
@@ -79,7 +81,7 @@ class Mosplat_OT_extract_frame_range(
         from safetensors.torch import save_file
         from torchcodec.decoders import VideoDecoder
 
-        files, (start, end), exported_file_formatter, data = pwargs
+        files, (start, end), exported_file_formatter, preview, data = pwargs
 
         out_file_formatter = partial(
             exported_file_formatter.format,
@@ -134,7 +136,8 @@ class Mosplat_OT_extract_frame_range(
                         model_options=None,
                     ).to_dict(),
                 )
-                save_tensor_stack_png_preview(tensor, out_file)
+                if preview:
+                    save_tensor_stack_png_preview(tensor, out_file)
 
                 note = f"Saved safetensor '{out_file}' to disk."
 
