@@ -58,8 +58,8 @@ class BuildContext:
     version_tag: str
     wheels_dir: Path
     ADDON_SRC_DIR: Path
+    ADDON_REQUIREMENTS_CUDA_TXT_FILE: Path
     ADDON_REQUIREMENTS_TXT_FILE: Path
-    ADDON_REQUIREMENTS_CPU_TXT_FILE: Path
     ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path
     DEV_REQUIREMENTS_TXT_FILE: Path
     MANIFEST_TOML_TXT_FILE: Path
@@ -114,16 +114,21 @@ def get_args(defaults: ArgparseDefaults):
     )
 
     parser.add_argument(
-        "-p",
-        "--cpu",
-        help="Build CPU version of PyTorch ecosystem wheels.",
+        "-u",
+        "--cuda",
+        help="Build CUDA version of PyTorch ecosystem wheels.",
         action="store_true",
     )
 
     args = parser.parse_args()
 
-    if args.dev:
-        args.clean = True  # post-process args before return
+    if args.cuda:
+        CUDA_HOME = os.environ.get("CUDA_HOME", None)
+        if CUDA_HOME is None or not Path(CUDA_HOME).resolve().is_dir():
+            print("Cannot install CUDA build without env variable `CUDA_HOME` set.")
+            args.cuda = False
+        print(f"`CUDA_HOME` detected at '{CUDA_HOME}', CUDA build will be installed.")
+
     return args
 
 
@@ -150,13 +155,13 @@ def prepare_context() -> Tuple[BuildContext, argparse.Namespace]:
     wheels_dir.mkdir(exist_ok=True)
     print(f"Wheels Directory Path: {wheels_dir}")
 
+    ADDON_REQUIREMENTS_CUDA_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.cuda.txt"
+    print(
+        f"Addon's `requirements.cuda.txt` File Path: {ADDON_REQUIREMENTS_CUDA_TXT_FILE}"
+    )
+
     ADDON_REQUIREMENTS_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.txt"
     print(f"Addon's `requirements.txt` File Path: {ADDON_REQUIREMENTS_TXT_FILE}")
-
-    ADDON_REQUIREMENTS_CPU_TXT_FILE: Path = ADDON_SRC_DIR / "requirements.cpu.txt"
-    print(
-        f"Addon's `requirements.cpu.txt` File Path: {ADDON_REQUIREMENTS_CPU_TXT_FILE}"
-    )
 
     ADDON_NOBINARY_REQUIREMENTS_TXT_FILE: Path = (
         ADDON_SRC_DIR / "requirements.nobinary.txt"
@@ -198,60 +203,11 @@ def get_version_tag_from_git() -> str:
         return "0.0.0"
 
 
-def install_dev_pypi_packages(ctx: BuildContext, cpu: bool):
-    """install wheels for development"""
-    print("Beginning install...")
-
-    pip_install_from_wheels_args_sublist = [  # shared between installation from wheels
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "--no-index",
-        "--only-binary=:all:",
-        "--find-links",
-        str(ctx.wheels_dir),
-        "-r",
-    ]
-    try:
-        subprocess.check_call(
-            [
-                *pip_install_from_wheels_args_sublist,
-                str(
-                    ctx.ADDON_REQUIREMENTS_CPU_TXT_FILE
-                    if cpu
-                    else ctx.ADDON_REQUIREMENTS_TXT_FILE
-                ),
-            ]
-        )
-        subprocess.check_call(
-            [
-                *pip_install_from_wheels_args_sublist,
-                str(ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE),
-            ]
-        )
-        subprocess.check_call(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "-r",
-                str(ctx.DEV_REQUIREMENTS_TXT_FILE),
-            ]
-        )
-
-    except subprocess.CalledProcessError as e:
-        e.add_note(f"Error while installing PyPI wheels for development.")
-        raise
-
-    print("Install complete")
-
-
 def download_pypi_wheels(
     ctx: BuildContext,
     blender_python_version: float,
-    cpu: bool,
+    cuda: bool,
+    clean: bool,
     should_install: bool,
 ):
     """use `subprocess` to invoke `pip download ...` on the addon's PyPI requirements"""
@@ -264,8 +220,8 @@ def download_pypi_wheels(
                 "download",
                 "-r",
                 str(
-                    ctx.ADDON_REQUIREMENTS_CPU_TXT_FILE
-                    if cpu
+                    ctx.ADDON_REQUIREMENTS_CUDA_TXT_FILE
+                    if cuda
                     else ctx.ADDON_REQUIREMENTS_TXT_FILE
                 ),
                 "--dest",
@@ -296,7 +252,59 @@ def download_pypi_wheels(
 
     if should_install:
         _()  # skip a line
-        install_dev_pypi_packages(ctx, cpu)
+        install_dev_pypi_packages(ctx, cuda, clean)
+
+
+def install_dev_pypi_packages(ctx: BuildContext, cuda: bool, clean: bool):
+    """install wheels for development"""
+    print("Beginning install...")
+
+    pip_install_from_wheels_args_sublist = [  # shared between installation from wheels
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--no-index",
+        "--only-binary=:all:",
+        "--find-links",
+        str(ctx.wheels_dir),
+        *(["--force-reinstall"] if clean else []),
+    ]
+    try:
+        subprocess.check_call(
+            [
+                *pip_install_from_wheels_args_sublist,
+                "-r",
+                str(
+                    ctx.ADDON_REQUIREMENTS_CUDA_TXT_FILE
+                    if cuda
+                    else ctx.ADDON_REQUIREMENTS_TXT_FILE
+                ),
+            ]
+        )
+        subprocess.check_call(
+            [
+                *pip_install_from_wheels_args_sublist,
+                "-r",
+                str(ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE),
+            ]
+        )
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "-r",
+                str(ctx.DEV_REQUIREMENTS_TXT_FILE),
+            ]
+        )
+
+    except subprocess.CalledProcessError as e:
+        e.add_note(f"Error while installing PyPI wheels for development.")
+        raise
+
+    print("Install complete")
 
 
 def generate_blender_manifest_toml(ctx: BuildContext):
@@ -381,21 +389,22 @@ def main():
         ctx.MANIFEST_TOML_TXT_FILE,
         ctx.wheels_dir,
         *([ctx.DEV_REQUIREMENTS_TXT_FILE] if args.dev else []),
-        *([ctx.ADDON_REQUIREMENTS_CPU_TXT_FILE] if args.cpu else []),
+        *([ctx.ADDON_REQUIREMENTS_CUDA_TXT_FILE] if args.cuda else []),
     ]:  # check that all required input resources are where they are supposed to be
         if not p.exists():
             raise RuntimeError(f"Expected {p!r} in file system, but was not found.")
 
     _()  # skip a line
 
-    if args.clean:
+    if args.dev or args.clean:
         clean(ctx.wheels_dir)
         _()  # skip a line
 
     download_pypi_wheels(
         ctx,
         blender_python_version=args.blender_python_version,
-        cpu=args.cpu,
+        cuda=args.cuda,
+        clean=args.clean,
         should_install=args.dev,
     )
     _()  # skip a line

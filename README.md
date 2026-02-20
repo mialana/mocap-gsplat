@@ -8,6 +8,10 @@ To elaborate, motion capture data is often exported from **sparse view direction
 
 - Blender 4.2+
 - FFmpeg with shared library build
+  - This project utilizes the new [https://github.com/meta-pytorch/torchcodec](module) 
+
+
+
 
 ## Installation
 

@@ -2,7 +2,9 @@
 # `pip download -r <addon_root>/requirements.txt  --dest <addon_root>/wheels/ --only-binary=:all: --python-version=<blender_python_version>`
 # refer to `<repo_root>/scripts/build.py` for more info
 
---extra-index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cu130
+--extra-index-url https://download.pytorch.org/whl/cu128
+--extra-index-url https://download.pytorch.org/whl/torchcodec/
 
 Pillow
 huggingface_hub
@@ -22,15 +24,16 @@ python-dotenv
 psutil
 jaxtyping
 
+gsplat
+
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"
 torchcodec; sys_platform == "darwin"
 
-# use cpu versions solely for smaller downloaded wheels in linux and windows releases
-torch==2.8.0+cpu; sys_platform == "win32"  # current `WinError 1114` in latest `2.9.1` branch (01-09-2026)
-torchvision==0.23.0+cpu; sys_platform == "win32"
-torchcodec==0.7; sys_platform == "win32"
+torch==2.8.0+cu128; sys_platform == "win32"  # current `WinError 1114` in latest `2.9.1` branch (01-09-2026)
+torchvision==0.23.0+cu128; sys_platform == "win32"
+torchcodec==0.7.0; sys_platform == "win32"
 
-torch==2.10.0+cpu; sys_platform == "linux"
-torchvision==0.25+cpu; sys_platform == "linux"
-torchcodec==0.10; sys_platform == "linux"
+torch==2.10.0+cu130; sys_platform == "linux"
+torchvision==0.25+cu130; sys_platform == "linux"
+torchcodec==0.10.0+cu130; sys_platform == "linux"

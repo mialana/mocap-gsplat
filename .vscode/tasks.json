@@ -5,7 +5,7 @@
             "label": "build",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
-            "args": ["${workspaceFolder}/scripts/build.py"],
+            "args": ["${workspaceFolder}/scripts/build.py", "--cuda"],
             "problemMatcher": [],
             "group": {
                 "kind": "build"
@@ -20,7 +20,7 @@
             "label": "build development",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
-            "args": ["${workspaceFolder}/scripts/build.py", "--dev"],
+            "args": ["${workspaceFolder}/scripts/build.py", "--dev", "--cuda"],
             "problemMatcher": [],
             "group": {
                 "kind": "build"
