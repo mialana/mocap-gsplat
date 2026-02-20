@@ -8,8 +8,7 @@ from ..infrastructure.macros import to_0_1
 from ..infrastructure.schemas import PointCloudTensors
 
 if TYPE_CHECKING:
-    from torch import Tensor
-    from torch import device as t_device
+    from torch import Tensor, device
     from torch.nn import ParameterDict
 
 
@@ -21,7 +20,7 @@ class SplatParams:
     opacities: Tensor
     sh: Tensor
 
-    def to(self, device: t_device) -> SplatParams:
+    def to(self, device: device) -> SplatParams:
         return SplatParams(
             means=self.means.to(device),
             scales=self.scales.to(device),
@@ -30,7 +29,7 @@ class SplatParams:
             sh=self.sh.to(device),
         )
 
-    def to_parameter_dict(self, device: t_device) -> ParameterDict:
+    def to_parameter_dict(self, device: device) -> ParameterDict:
         import torch
 
         return torch.nn.ParameterDict(
@@ -55,11 +54,13 @@ class TrainConfig:
     renorm_quat_period: int = 1
 
 
-def _norm_quat_xyzw(q: Tensor) -> Tensor:
+def norm_quat_xyzw(q: Tensor) -> Tensor:
+    """ensure quaternion magnitude of 1"""
     return q / (q.norm(dim=-1, keepdim=True) + 1e-12)
 
 
-def _quat_identity(M: int, device: t_device) -> Tensor:
+def quat_identity(M: int, device: device) -> Tensor:
+    """creates a quat where (x, y, z, w) = [0, 0, 0, 1]"""
     import torch
 
     q = torch.zeros((M, 4), device=device, dtype=torch.float32)
@@ -67,24 +68,35 @@ def _quat_identity(M: int, device: t_device) -> Tensor:
     return q
 
 
-def _sh_from_rgb_u8(rgb_u8: Tensor, sh_degree: int = 0) -> Tensor:
+def voxel_size_from_xyz(xyz: Tensor, factor: float = 0.005):
+    """derive voxel size as a reasonable factor of bounding box diagonal"""
+    bbox = xyz.max(dim=0)[0] - xyz.min(dim=0)[0]
+    diag = bbox.norm()
+    return diag * factor
+
+
+def sh_from_rgb_0_255(rgb_0_255: Tensor, sh_degree: int = 0) -> Tensor:
+    """derive spherical harmonics from RGB values, where only the DC (Direct Current) is filled in"""
     import torch
 
-    rgb = to_0_1(rgb_u8)
+    rgb_0_1 = to_0_1(rgb_0_255)
     K = (sh_degree + 1) ** 2
 
-    sh = torch.zeros((rgb.shape[0], K, 3), device=rgb.device, dtype=torch.float32)
+    sh = torch.zeros(
+        (rgb_0_1.shape[0], K, 3), device=rgb_0_1.device, dtype=torch.float32
+    )
 
-    sh[:, 0, :] = rgb
+    sh[:, 0, :] = rgb_0_1  # fill dimensions with RGB values, skipping `K` dimension
 
     return sh
 
 
-def init_scales_confidence(
+def init_scales_from_confidence(
     conf: Tensor,  # (N,)
     base_scale: float,
     scale_mult: float = 1.0,
 ) -> Tensor:
+    """use confidence values to initialize scale of splats"""
     import torch
 
     s = (float(base_scale) * float(scale_mult) / conf.clamp_min(1e-3)).to(torch.float32)
@@ -92,8 +104,7 @@ def init_scales_confidence(
 
 
 def _w2c_3x4_to_view_4x4(extrinsic: Tensor) -> Tensor:
-    """world-to-camera 3x4 to view 4x4"""
-
+    """world-to-camera to view by simply adding homogeneous bottom row [0, 0, 0, 1]"""
     import torch
 
     B = extrinsic.shape[0]
@@ -105,13 +116,13 @@ def _w2c_3x4_to_view_4x4(extrinsic: Tensor) -> Tensor:
 
 def fuse_points_voxel_hash(
     xyz: Tensor,  # (N,3) float32
-    rgb_u8: Tensor,  # (N,3) uint8
+    rgb_0_255: Tensor,  # (N,3) uint8
     conf: Tensor,  # (N,) float32
     voxel: float,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     import torch
 
-    if xyz.numel() == 0:
+    if xyz.numel() == 0:  # `numel` is num elements
         device = xyz.device
         return (
             torch.empty((0, 3), device=device, dtype=torch.float32),
@@ -121,76 +132,53 @@ def fuse_points_voxel_hash(
 
     device = xyz.device
     v = torch.tensor(voxel, device=device, dtype=xyz.dtype)
+    # map continuous 3D points to integer voxel grid
     key = torch.floor(xyz / v).to(torch.int64)
 
     hx = key[:, 0] * 73856093
     hy = key[:, 1] * 19349663
     hz = key[:, 2] * 83492791
-    h = (hx ^ hy ^ hz).to(torch.int64)
+    h = (hx ^ hy ^ hz).to(torch.int64)  # creates a 1D hash key
 
-    order = torch.argsort(h)
+    order = torch.argsort(h)  # define the order using sorted hash key
+    # apply order, effectively sorting by hash so that equal voxels become contiguous
     h = h[order]
     xyz = xyz[order]
-    rgb_u8 = rgb_u8[order]
+    rgb_0_255 = rgb_0_255[order]
     conf = conf[order]
 
-    new_group = torch.ones_like(h, dtype=torch.bool)
-    new_group[1:] = h[1:] != h[:-1]
-    group_id = torch.cumsum(new_group.to(torch.int64), dim=0) - 1
-    M = int(group_id[-1].item()) + 1
+    new_group = torch.ones_like(h, dtype=torch.bool)  # `True`'s are group boundaries
+    new_group[1:] = h[1:] != h[:-1]  # create groups of contiguous equal voxels
+    group_id = torch.cumsum(new_group.to(torch.int64), dim=0) - 1  # id to each group
+    M: int = int(group_id[-1].item()) + 1
 
-    w = conf.clamp_min(1e-6).to(xyz.dtype)
-    wsum = torch.zeros((M,), device=device, dtype=xyz.dtype).scatter_add_(
-        0, group_id, w
+    wt = conf.clamp_min(1e-6).to(xyz.dtype)  # weight from confidence
+    wt_sum = torch.zeros((M,), device=device, dtype=xyz.dtype).scatter_add_(
+        0, group_id, wt
     )
 
+    # get weighted average positions based off `xyz`
     means = torch.zeros((M, 3), device=device, dtype=xyz.dtype)
-    means.scatter_add_(0, group_id[:, None].expand(-1, 3), xyz * w[:, None])
-    means = means / wsum[:, None]
+    means.scatter_add_(0, group_id[:, None].expand(-1, 3), xyz * wt[:, None])
+    means = (means / wt_sum[:, None]).to(torch.float32)
 
-    rgb = rgb_u8.to(torch.float32)
+    # get weighted average rgb
+    rgb = rgb_0_255.to(torch.float32)
     rgb_acc = torch.zeros((M, 3), device=device, dtype=torch.float32)
     rgb_acc.scatter_add_(
-        0, group_id[:, None].expand(-1, 3), rgb * w[:, None].to(torch.float32)
+        0, group_id[:, None].expand(-1, 3), rgb * wt[:, None].to(torch.float32)
     )
     rgb_acc = (
-        (rgb_acc / wsum[:, None].to(torch.float32)).clamp(0.0, 255.0).to(torch.uint8)
+        (rgb_acc / wt_sum[:, None].to(torch.float32)).clamp(0.0, 255.0).to(torch.uint8)
+    )  # convert back to 'uint8'
+
+    # set voxel confidence based on the max confidence of views of voxel
+    conf_out = (
+        torch.zeros((M,), device=device, dtype=conf.dtype)
+        .scatter_reduce_(0, group_id, conf, reduce="amax")
+        .to(torch.float32)
     )
-
-    conf_out = torch.zeros((M,), device=device, dtype=conf.dtype).scatter_reduce_(
-        0, group_id, conf, reduce="amax"
-    )
-    return means.to(torch.float32), rgb_acc, conf_out.to(torch.float32)
-
-
-def estimate_tangent_frame_from_pointmap(
-    pointmap: Tensor,  # (B,H,W,3)
-    conf_map: Tensor,  # (B,H,W)
-) -> Tuple[Tensor, Tensor]:
-    import torch
-    import torch.nn.functional as F
-
-    dx = pointmap[:, :, 2:, :] - pointmap[:, :, :-2, :]
-    dy = pointmap[:, 2:, :, :] - pointmap[:, :-2, :, :]
-
-    dx = F.pad(dx, (0, 0, 1, 1, 0, 0))
-    dy = F.pad(dy, (0, 0, 0, 0, 1, 1))
-
-    n = torch.cross(dx, dy, dim=-1)
-    n = n / (n.norm(dim=-1, keepdim=True) + 1e-12)
-
-    t = dx / (dx.norm(dim=-1, keepdim=True) + 1e-12)
-    b = torch.cross(n, t, dim=-1)
-    b = b / (b.norm(dim=-1, keepdim=True) + 1e-12)
-
-    m = conf_map > 1e-5
-    z = torch.zeros_like(n)
-    n = torch.where(m[..., None], n, z)
-    t = torch.where(m[..., None], t, z)
-    b = torch.where(m[..., None], b, z)
-
-    frame = torch.stack([t, b, n], dim=-2)  # (B,H,W,3,3)
-    return frame, m
+    return means, rgb_acc, conf_out
 
 
 def init_splats_from_pointcloud(
@@ -209,12 +197,12 @@ def init_splats_from_pointcloud(
     M = means.shape[0]
     device = means.device
 
-    scales = init_scales_confidence(
+    scales = init_scales_from_confidence(
         conf_fused, base_scale=base_scale, scale_mult=scale_mult
     ).to(device)
-    quats = _norm_quat_xyzw(_quat_identity(M, device))
+    quats = norm_quat_xyzw(quat_identity(M, device))
     opacity = conf_fused.clamp(0.0, 1.0).to(torch.float32)
-    sh = _sh_from_rgb_u8(rgb_fused)
+    sh = sh_from_rgb_0_255(rgb_fused)
 
     return SplatParams(
         means=means,
@@ -225,103 +213,12 @@ def init_splats_from_pointcloud(
     )
 
 
-def train_3dgs(
-    params: SplatParams,
-    images: Tensor,
-    extrinsic: Tensor,
-    intrinsic: Tensor,
-    rasterizer: GsplatRasterizer,
-    config: TrainConfig = TrainConfig(),
-) -> SplatParams:
-    import torch
-    from gsplat import DefaultStrategy
-
-    device = images.device
-
-    param_dict = torch.nn.ParameterDict(
-        {
-            "means": torch.nn.Parameter(params.means.to(device)),
-            "scales": torch.nn.Parameter(params.scales.to(device)),
-            "quats": torch.nn.Parameter(params.quats_xyzw.to(device)),
-            "opacities": torch.nn.Parameter(params.opacities.squeeze(-1).to(device)),
-            "sh": torch.nn.Parameter(params.sh.to(device)),
-        }
-    )
-
-    optimizers: Dict[str, torch.optim.Optimizer] = {
-        k: torch.optim.Adam([v], lr=float(config.lr)) for k, v in param_dict.items()
-    }
-
-    strategy = DefaultStrategy()
-    strategy.check_sanity(param_dict, optimizers)
-    strategy_state = strategy.initialize_state()
-
-    B = images.shape[0]
-
-    for step in range(int(config.steps)):
-        idx = torch.randint(0, B, (config.cam_batch,), device=device)
-
-        tgt = images.index_select(0, idx)
-        ex = extrinsic.index_select(0, idx)
-        intr = intrinsic.index_select(0, idx)
-
-        bg = torch.zeros(
-            (config.cam_batch, 3, rasterizer.H, rasterizer.W),
-            device=device,
-            dtype=torch.float32,
-        )
-
-        splat_params = SplatParams(
-            means=param_dict["means"],
-            scales=param_dict["scales"],
-            quats_xyzw=param_dict["quats"],
-            opacities=param_dict["opacities"].unsqueeze(-1),
-            sh=param_dict["sh"],
-        )
-
-        pred, _, _, _ = rasterizer.render(splat_params, ex, intr, bg)
-
-        loss = float(config.l1_weight) * (pred - tgt).abs().mean()
-
-        strategy.step_pre_backward(
-            param_dict,
-            optimizers,
-            strategy_state,
-            step,
-            {},
-        )
-
-        for opt in optimizers.values():
-            opt.zero_grad(set_to_none=True)
-
-        loss.backward()
-
-        strategy.step_post_backward(
-            param_dict,
-            optimizers,
-            strategy_state,
-            step,
-            {},
-        )
-
-        for opt in optimizers.values():
-            opt.step()
-
-    return SplatParams(
-        means=param_dict["means"].detach(),
-        scales=param_dict["scales"].detach(),
-        quats_xyzw=_norm_quat_xyzw(param_dict["quats"].detach()),
-        opacities=param_dict["opacities"].detach().unsqueeze(1),
-        sh=param_dict["sh"].detach(),
-    )
-
-
 def init_from_pointcloud_tensors(
     pct: PointCloudTensors,
     voxel: float,
     base_scale: float,
     scale_mult: float = 1.0,
-    device: Optional[t_device] = None,
+    device: Optional[device] = None,
 ) -> SplatParams:
     dev = device if device is not None else pct.xyz.device
     return init_splats_from_pointcloud(
@@ -414,6 +311,97 @@ def save_ply_3dgs_binary(
     with open(out_file, "wb") as f:
         f.write(header_s.encode("ascii"))
         f.write(row.astype(np.float32).tobytes())
+
+
+def train_3dgs(
+    params: SplatParams,
+    images: Tensor,
+    extrinsic: Tensor,
+    intrinsic: Tensor,
+    rasterizer: GsplatRasterizer,
+    config: TrainConfig = TrainConfig(),
+) -> SplatParams:
+    import torch
+    from gsplat import DefaultStrategy
+
+    device = images.device
+
+    param_dict = torch.nn.ParameterDict(
+        {
+            "means": torch.nn.Parameter(params.means.to(device)),
+            "scales": torch.nn.Parameter(params.scales.to(device)),
+            "quats": torch.nn.Parameter(params.quats_xyzw.to(device)),
+            "opacities": torch.nn.Parameter(params.opacities.squeeze(-1).to(device)),
+            "sh": torch.nn.Parameter(params.sh.to(device)),
+        }
+    )
+
+    optimizers: Dict[str, torch.optim.Optimizer] = {
+        k: torch.optim.Adam([v], lr=float(config.lr)) for k, v in param_dict.items()
+    }
+
+    strategy = DefaultStrategy()
+    strategy.check_sanity(param_dict, optimizers)
+    strategy_state = strategy.initialize_state()
+
+    B = images.shape[0]
+
+    for step in range(int(config.steps)):
+        idx = torch.randint(0, B, (config.cam_batch,), device=device)
+
+        tgt = images.index_select(0, idx)
+        ex = extrinsic.index_select(0, idx)
+        intr = intrinsic.index_select(0, idx)
+
+        bg = torch.zeros(
+            (config.cam_batch, 3, rasterizer.H, rasterizer.W),
+            device=device,
+            dtype=torch.float32,
+        )
+
+        splat_params = SplatParams(
+            means=param_dict["means"],
+            scales=param_dict["scales"],
+            quats_xyzw=param_dict["quats"],
+            opacities=param_dict["opacities"].unsqueeze(-1),
+            sh=param_dict["sh"],
+        )
+
+        pred, _, _, _ = rasterizer.render(splat_params, ex, intr, bg)
+
+        loss = float(config.l1_weight) * (pred - tgt).abs().mean()
+
+        strategy.step_pre_backward(
+            param_dict,
+            optimizers,
+            strategy_state,
+            step,
+            {},
+        )
+
+        for opt in optimizers.values():
+            opt.zero_grad(set_to_none=True)
+
+        loss.backward()
+
+        strategy.step_post_backward(
+            param_dict,
+            optimizers,
+            strategy_state,
+            step,
+            {},
+        )
+
+        for opt in optimizers.values():
+            opt.step()
+
+    return SplatParams(
+        means=param_dict["means"].detach(),
+        scales=param_dict["scales"].detach(),
+        quats_xyzw=norm_quat_xyzw(param_dict["quats"].detach()),
+        opacities=param_dict["opacities"].detach().unsqueeze(1),
+        sh=param_dict["sh"].detach(),
+    )
 
 
 class GsplatRasterizer:

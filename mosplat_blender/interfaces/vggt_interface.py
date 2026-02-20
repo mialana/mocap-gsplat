@@ -180,7 +180,7 @@ class VGGTInterface(LogClassMixin):
             .to(torch.uint8)
         )
 
-        if conf.numel():
+        if conf.numel() > 0:  # `numel` is num elements
             conf_threshold: Float32[torch.Tensor, "1"] = torch.quantile(
                 conf, options.confidence_percentile / 100.0
             )
