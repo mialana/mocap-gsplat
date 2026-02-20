@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from ..infrastructure.macros import to_0_1
 from ..infrastructure.schemas import PointCloudTensors
@@ -10,33 +10,7 @@ from ..infrastructure.schemas import PointCloudTensors
 if TYPE_CHECKING:
     from torch import Tensor
     from torch import device as t_device
-
-
-def _c2w_from_w2c(extrinsic: Tensor) -> Tensor:
-    R = extrinsic[:, :3, :3]
-    t = extrinsic[:, :3, 3]
-    c = -(R.transpose(1, 2) @ t.unsqueeze(-1)).squeeze(-1)
-    return c
-
-
-def _projection_from_fov(
-    tanfovx: Tensor,
-    tanfovy: Tensor,
-    znear: float,
-    zfar: float,
-) -> Tensor:
-    import torch
-
-    B = tanfovx.shape[0]
-    P = torch.zeros((B, 4, 4), device=tanfovx.device, dtype=torch.float32)
-    z_sign = 1.0
-
-    P[:, 0, 0] = 1.0 / tanfovx
-    P[:, 1, 1] = 1.0 / tanfovy
-    P[:, 3, 2] = z_sign
-    P[:, 2, 2] = z_sign * (zfar / (zfar - znear))
-    P[:, 2, 3] = -(zfar * znear) / (zfar - znear)
-    return P
+    from torch.nn import ParameterDict
 
 
 @dataclass
@@ -44,8 +18,7 @@ class SplatParams:
     means: Tensor  # (M,3) float32
     scales: Tensor  # (M,3) float32 >0
     quats_xyzw: Tensor  # (M,4) float32 normalized
-    opacity: Tensor  # (M,1) float32 [0,1] (or logits if you choose)
-    colors: Tensor  # (M,3) float32 [0,1]
+    opacities: Tensor
     sh: Tensor
 
     def to(self, device: t_device) -> SplatParams:
@@ -53,9 +26,21 @@ class SplatParams:
             means=self.means.to(device),
             scales=self.scales.to(device),
             quats_xyzw=self.quats_xyzw.to(device),
-            opacity=self.opacity.to(device),
-            colors=self.colors.to(device),
-            sh=self.colors.to(device),
+            opacities=self.opacities.to(device),
+            sh=self.sh.to(device),
+        )
+
+    def to_parameter_dict(self, device: t_device) -> ParameterDict:
+        import torch
+
+        return torch.nn.ParameterDict(
+            {
+                "means": torch.nn.Parameter(self.means.to(device)),
+                "scales": torch.nn.Parameter(self.scales.to(device)),
+                "quats": torch.nn.Parameter(self.quats_xyzw.to(device)),
+                "opacities": torch.nn.Parameter(self.opacities.to(device)),
+                "sh": torch.nn.Parameter(self.sh.to(device)),
+            }
         )
 
 
@@ -63,11 +48,11 @@ class SplatParams:
 class TrainConfig:
     steps: int = 30_000
     lr: float = 1e-2
+    sh_degree: int = 0
     cam_batch: int = 1
     l1_weight: float = 1.0
     clamp_scales_min: float = 1e-6
     renorm_quat_period: int = 1
-    sh_degree: int = 0
 
 
 def _norm_quat_xyzw(q: Tensor) -> Tensor:
@@ -228,78 +213,125 @@ def init_splats_from_pointcloud(
         conf_fused, base_scale=base_scale, scale_mult=scale_mult
     ).to(device)
     quats = _norm_quat_xyzw(_quat_identity(M, device))
-    opacity = conf_fused.clamp(0.0, 1.0).unsqueeze(1).to(torch.float32)
-    colors = to_0_1(rgb_fused).to(device)
-    sh = _sh_from_rgb_u8(rgb_0_255)
+    opacity = conf_fused.clamp(0.0, 1.0).to(torch.float32)
+    sh = _sh_from_rgb_u8(rgb_fused)
 
     return SplatParams(
         means=means,
         scales=scales,
         quats_xyzw=quats,
-        opacity=opacity,
-        colors=colors,
+        opacities=opacity,
         sh=sh,
     )
 
 
 def train_3dgs(
     params: SplatParams,
-    images: Tensor,  # (B,3,H,W) float32 [0,1]
-    extrinsic: Tensor,  # (B,3,4)
-    intrinsic: Tensor,  # (B,3,3)
+    images: Tensor,
+    extrinsic: Tensor,
+    intrinsic: Tensor,
     rasterizer: GsplatRasterizer,
-    cfg: TrainConfig = TrainConfig(),
+    config: TrainConfig = TrainConfig(),
 ) -> SplatParams:
     import torch
+    from gsplat import DefaultStrategy
 
     device = images.device
-    params = params.to(device)
 
-    params.means.requires_grad_(True)
-    params.scales.requires_grad_(True)
-    params.quats_xyzw.requires_grad_(True)
-    params.opacity.requires_grad_(True)
-    params.colors.requires_grad_(True)
-    params.sh.requires_grad_(True)
-
-    opt = torch.optim.Adam(
-        [
-            params.means,
-            params.scales,
-            params.quats_xyzw,
-            params.opacity,
-            params.colors,
-            params.sh,
-        ],
-        lr=float(cfg.lr),
+    param_dict = torch.nn.ParameterDict(
+        {
+            "means": torch.nn.Parameter(params.means.to(device)),
+            "scales": torch.nn.Parameter(params.scales.to(device)),
+            "quats": torch.nn.Parameter(params.quats_xyzw.to(device)),
+            "opacities": torch.nn.Parameter(params.opacities.squeeze(-1).to(device)),
+            "sh": torch.nn.Parameter(params.sh.to(device)),
+        }
     )
+
+    optimizers: Dict[str, torch.optim.Optimizer] = {
+        k: torch.optim.Adam([v], lr=float(config.lr)) for k, v in param_dict.items()
+    }
+
+    strategy = DefaultStrategy()
+    strategy.check_sanity(param_dict, optimizers)
+    strategy_state = strategy.initialize_state()
 
     B = images.shape[0]
-    bg = torch.zeros(
-        (cfg.cam_batch, 3, rasterizer.H, rasterizer.W),
-        device=device,
-        dtype=torch.float32,
-    )
 
-    for iter in range(int(cfg.steps)):
-        idx = torch.randint(0, B, (cfg.cam_batch,), device=device)
+    for step in range(int(config.steps)):
+        idx = torch.randint(0, B, (config.cam_batch,), device=device)
+
         tgt = images.index_select(0, idx)
         ex = extrinsic.index_select(0, idx)
         intr = intrinsic.index_select(0, idx)
 
-        pred, _, _, _ = rasterizer.render(params, ex, intr, bg)
-        loss = float(cfg.l1_weight) * (pred - tgt).abs().mean()
+        bg = torch.zeros(
+            (config.cam_batch, 3, rasterizer.H, rasterizer.W),
+            device=device,
+            dtype=torch.float32,
+        )
 
-        opt.zero_grad(set_to_none=True)
+        splat_params = SplatParams(
+            means=param_dict["means"],
+            scales=param_dict["scales"],
+            quats_xyzw=param_dict["quats"],
+            opacities=param_dict["opacities"].unsqueeze(-1),
+            sh=param_dict["sh"],
+        )
+
+        pred, _, _, _ = rasterizer.render(splat_params, ex, intr, bg)
+
+        loss = float(config.l1_weight) * (pred - tgt).abs().mean()
+
+        strategy.step_pre_backward(
+            param_dict,
+            optimizers,
+            strategy_state,
+            step,
+            {},
+        )
+
+        for opt in optimizers.values():
+            opt.zero_grad(set_to_none=True)
+
         loss.backward()
-        opt.step()
 
-        if cfg.renorm_quat_period > 0 and (iter % cfg.renorm_quat_period) == 0:
-            with torch.no_grad():
-                params.quats_xyzw[:] = _norm_quat_xyzw(params.quats_xyzw)
-                params.scales[:] = params.scales.clamp_min(float(cfg.clamp_scales_min))
+        strategy.step_post_backward(
+            param_dict,
+            optimizers,
+            strategy_state,
+            step,
+            {},
+        )
 
-    return params
+        for opt in optimizers.values():
+            opt.step()
+
+    return SplatParams(
+        means=param_dict["means"].detach(),
+        scales=param_dict["scales"].detach(),
+        quats_xyzw=_norm_quat_xyzw(param_dict["quats"].detach()),
+        opacities=param_dict["opacities"].detach().unsqueeze(1),
+        sh=param_dict["sh"].detach(),
+    )
+
+
+def init_from_pointcloud_tensors(
+    pct: PointCloudTensors,
+    voxel: float,
+    base_scale: float,
+    scale_mult: float = 1.0,
+    device: Optional[t_device] = None,
+) -> SplatParams:
+    dev = device if device is not None else pct.xyz.device
+    return init_splats_from_pointcloud(
+        xyz=pct.xyz.to(dev),
+        rgb_0_255=pct.rgb.to(dev),
+        conf=pct.conf.to(dev),
+        voxel=voxel,
+        base_scale=base_scale,
+        scale_mult=scale_mult,
+    )
 
 
 def save_ply_3dgs_binary(
@@ -314,14 +346,12 @@ def save_ply_3dgs_binary(
     assert params.means.shape[1] == 3
     assert params.scales.shape[1] == 3
     assert params.quats_xyzw.shape[1] == 4
-    assert params.opacity.shape[1] == 1
-    assert params.colors.shape[1] == 3
+    assert params.opacities.shape[1] == 1
 
     means = params.means.detach().cpu().float()
     scales = params.scales.detach().cpu().float().clamp_min(1e-12)
     quats = params.quats_xyzw.detach().cpu().float()
-    opacity = params.opacity.detach().cpu().float()
-    colors = params.colors.detach().cpu().float()  # (M,3)
+    opacity = params.opacities.detach().cpu().float()
 
     if encode_scale_log:
         scales = scales.log()
@@ -330,11 +360,12 @@ def save_ply_3dgs_binary(
         x = opacity.clamp(1e-6, 1.0 - 1e-6)
         opacity = torch.log(x) - torch.log1p(-x)
 
-    M = means.shape[0]
+    sh = params.sh  # (M, K, 3)
+    M, K, _ = sh.shape
 
-    # Degree-0 only
-    f_dc = colors
-    f_rest = torch.zeros((M, 0), dtype=torch.float32)
+    # separate DC and rest
+    f_dc = sh[:, 0, :]  # (M,3)
+    f_rest = sh[:, 1:, :].reshape(M, -1)  # (M, 3*(K-1))
 
     props = (
         ("x", "float"),
@@ -372,6 +403,7 @@ def save_ply_3dgs_binary(
             means,
             zeros_n,
             f_dc,
+            f_rest,
             opacity,
             scales,
             quats,
@@ -382,24 +414,6 @@ def save_ply_3dgs_binary(
     with open(out_file, "wb") as f:
         f.write(header_s.encode("ascii"))
         f.write(row.astype(np.float32).tobytes())
-
-
-def init_from_pointcloud_tensors(
-    pct: PointCloudTensors,
-    voxel: float,
-    base_scale: float,
-    scale_mult: float = 1.0,
-    device: Optional[t_device] = None,
-) -> SplatParams:
-    dev = device if device is not None else pct.xyz.device
-    return init_splats_from_pointcloud(
-        xyz=pct.xyz.to(dev),
-        rgb_0_255=pct.rgb.to(dev),
-        conf=pct.conf.to(dev),
-        voxel=voxel,
-        base_scale=base_scale,
-        scale_mult=scale_mult,
-    )
 
 
 class GsplatRasterizer:
@@ -428,6 +442,8 @@ class GsplatRasterizer:
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         import torch
 
+        assert params.sh.shape[1] == (self.sh_degree + 1) ** 2
+
         device = params.means.device
 
         extrinsic = extrinsic.to(device=device, dtype=torch.float32)
@@ -438,7 +454,7 @@ class GsplatRasterizer:
         view = _w2c_3x4_to_view_4x4(extrinsic)
 
         # gsplat expects opacities as (..., N)
-        opacities = params.opacity.squeeze(-1)
+        opacities = params.opacities.squeeze(-1)
 
         render_colors, render_alphas, meta = self._rasterization(
             means=params.means,  # (M,3)
