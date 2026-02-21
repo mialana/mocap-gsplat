@@ -14,9 +14,8 @@ class Mosplat_PT_data_inference(MosplatPanelBase):
 
     def draw_with_layout(self, pkg, layout):
         props = pkg.props
-        column = layout.column()
 
-        init_model_box = column.box()
+        init_model_box = layout.box()
         init_model_box.row().operator(OperatorIDEnum.INITIALIZE_MODEL)
         progress = props.progress_accessor
         prog_curr: int = progress.current
@@ -29,4 +28,4 @@ class Mosplat_PT_data_inference(MosplatPanelBase):
         prop_box.prop(options, options._meta.inference_mode.id)
         prop_box.prop(options, options._meta.confidence_percentile.id)
 
-        column.row().operator(OperatorIDEnum.RUN_INFERENCE)
+        layout.row().operator(OperatorIDEnum.RUN_INFERENCE)

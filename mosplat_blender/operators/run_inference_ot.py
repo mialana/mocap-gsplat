@@ -4,7 +4,6 @@ from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
 
 from ..infrastructure.macros import (
     load_and_verify_tensor_file,
-    save_images_tensor,
     save_ply_ascii,
     save_ply_binary,
 )
@@ -22,11 +21,6 @@ from ..interfaces import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
-
-EXPECTED_TENSOR_KEYS = [
-    SavedTensorKey.IMAGES,
-    SavedTensorKey.IMAGES_MASK,
-]
 
 
 class ThreadKwargs(NamedTuple):
@@ -103,6 +97,12 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             file_ext="ply",
         )
 
+        image_tensor_keys: List[str] = [
+            SavedTensorKey.IMAGES,
+            SavedTensorKey.IMAGES_ALPHA,
+        ]
+        pointcloud_tensor_keys: List[str] = PointCloudTensors.keys()
+
         device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
 
         applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
@@ -124,10 +124,10 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
                 try:
                     _ = load_and_verify_tensor_file(
-                        in_file,
+                        out_file,
                         device_str,
                         new_metadata,
-                        keys=EXPECTED_TENSOR_KEYS,
+                        keys=pointcloud_tensor_keys,
                     )
                     queue.put(
                         (
@@ -135,56 +135,43 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                             f"Previous point cloud inference data found on disk for frame '{idx}'",
                         )
                     )
-                    # continue
-                except OSError:
-                    pass
-                except (UserAssertionError, UserFacingError) as e:
-                    msg = UserFacingError.make_msg(
-                        f"Tensor data loaded from '{out_file}' was corrupted.", e
+                except (OSError, UserAssertionError, UserFacingError) as e:
+                    validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                        idx,
+                        files,
+                        preprocess_script=applied_preprocess_script,
+                        model_options=None,
+                    )  # options did not exist in 'run preprocess script' step
+                    tensors = load_and_verify_tensor_file(
+                        in_file,
+                        device_str,
+                        validation_metadata,
+                        keys=image_tensor_keys,
                     )
-                    queue.put(("warning", msg))
+                    images = tensors[SavedTensorKey.IMAGES]
+                    images_alpha = tensors[SavedTensorKey.IMAGES_ALPHA]
 
-                validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx,
-                    files,
-                    preprocess_script=applied_preprocess_script,
-                    model_options=None,
-                )  # options did not exist in 'run preprocess script' step
-                tensors = load_and_verify_tensor_file(
-                    in_file,
-                    device_str,
-                    validation_metadata,
-                    EXPECTED_TENSOR_KEYS,
-                )
-                images = tensors[SavedTensorKey.IMAGES]
-                images_mask = tensors[SavedTensorKey.IMAGES_MASK]
+                    pc_tensors = VGGTInterface().run_inference(
+                        images, images_alpha, new_metadata, options
+                    )
+                    save_file(
+                        pc_tensors.to_dict(),
+                        out_file,
+                        metadata=new_metadata.to_dict(),
+                    )
+                    if format == "ascii":
+                        save_ply_ascii(ply_out_file, pc_tensors.xyz, pc_tensors.rgb)
+                    else:
+                        save_ply_binary(ply_out_file, pc_tensors.xyz, pc_tensors.rgb)
 
-                pc_tensors = VGGTInterface().run_inference(
-                    images, images_mask, new_metadata, options
-                )
-                save_file(
-                    pc_tensors.to_dict(),
-                    out_file,
-                    metadata=new_metadata.to_dict(),
-                )
-                _save_ply(ply_out_file, format, pc_tensors)
-
-                queue.put(("update", f"Ran inference on frame '{idx}'"))
+                    queue.put(("update", f"Ran inference on frame '{idx}'"))
             except Exception as e:
                 msg = UserFacingError.make_msg(
                     f"Error ocurred while running inference on frame '{idx}'.", e
                 )
                 queue.put(("warning", msg))
-                continue
 
         queue.put(("done", "Inference complete for current frame range."))
-
-
-def _save_ply(out_file: Path, format: PlyFileFormat, pc_tensors: PointCloudTensors):
-    if format == "ascii":
-        save_ply_ascii(out_file, pc_tensors.xyz, pc_tensors.rgb)
-    else:
-        save_ply_binary(out_file, pc_tensors.xyz, pc_tensors.rgb)
 
 
 def process_entrypoint(*args, **kwargs):

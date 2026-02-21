@@ -5,12 +5,12 @@ import torch
 from jaxtyping import Bool, Float32
 from torchvision.models.segmentation import FCN_ResNet50_Weights, fcn_resnet50
 
-ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
-ImagesMaskTensorType: TypeAlias = Bool[torch.Tensor, "B 1 H W"]
+ImagesTensor: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
+ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "B 1 H W"]
 
-CamMaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
+CamMaskTensor: TypeAlias = Bool[torch.Tensor, "B"]
 
-CAM_MASK: Optional[CamMaskTensorType] = None
+CAM_MASK: Optional[CamMaskTensor] = None
 PERSON_CLASS = 15
 
 weights = FCN_ResNet50_Weights.DEFAULT
@@ -19,17 +19,17 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = model.eval().to(device)  # set to evaluate
 
 COCO_DATASET_MEAN = torch.tensor(
-    [0.485, 0.456, 0.406], dtype=torch.float, device=device
+    [0.485, 0.456, 0.406], dtype=torch.float32, device=device
 )[None, :, None, None]
 
 COCO_DATASET_STD = torch.tensor(
-    [0.229, 0.224, 0.225], dtype=torch.float, device=device
+    [0.229, 0.224, 0.225], dtype=torch.float32, device=device
 )[None, :, None, None]
 
 
 def preprocess(
-    frame_idx: int, media_files: List[Path], images: ImagesTensorType
-) -> Tuple[ImagesTensorType, Optional[ImagesMaskTensorType]]:
+    frame_idx: int, media_files: List[Path], images: ImagesTensor
+) -> Tuple[ImagesTensor, Optional[ImagesAlphaTensor]]:
     global CAM_MASK
 
     if CAM_MASK is None:
@@ -44,33 +44,33 @@ def preprocess(
 
 @torch.no_grad()
 def _create_person_class_mask(
-    images: ImagesTensorType,
-) -> ImagesMaskTensorType:
+    images: ImagesTensor,
+) -> ImagesAlphaTensor:
     normalized = normalize_to_coco_dataset(images)
 
     # model has 21 classes in total
     outputs: Float32[torch.Tensor, "B 21 H W"] = model(normalized)["out"]
 
     # per-pixel, get the class which has the highest prediction likeliness
-    class_map: ImagesMaskTensorType = outputs.argmax(dim=1, keepdim=True)
+    class_map: ImagesAlphaTensor = outputs.argmax(dim=1, keepdim=True)
 
     # create a boolean mask of the pixel dimension
-    person_mask: ImagesMaskTensorType = class_map == PERSON_CLASS
+    person_mask: ImagesAlphaTensor = class_map == PERSON_CLASS
 
-    return person_mask
+    return (person_mask).to(torch.float32)
 
 
-def normalize_to_coco_dataset(images: ImagesTensorType) -> ImagesTensorType:
+def normalize_to_coco_dataset(images: ImagesTensor) -> ImagesTensor:
     return (images - COCO_DATASET_MEAN) / COCO_DATASET_STD
 
 
-def _rotate_180(x: ImagesTensorType) -> ImagesTensorType:
+def _rotate_180(x: ImagesTensor) -> ImagesTensor:
     return torch.flip(x, dims=(2, 3))
 
 
 def _create_camera_mask(
     media_filenames: List[Path], device: torch.device
-) -> CamMaskTensorType:
+) -> CamMaskTensor:
     all_cam_indices = torch.tensor(
         [
             int(file.name.replace("stream", "").split(".")[0])

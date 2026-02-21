@@ -296,7 +296,11 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
         items=ModelInferenceModeEnumItems,
         default=ModelInferenceMode.POINTMAP.value,
     )
-    confidence_percentile: FloatProperty(name="Confidence Percentile", default=50)
+    confidence_percentile: FloatProperty(
+        name="Confidence",
+        description="Minimum percentile for model-inferred confidence",
+        default=97.5,
+    )
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase):

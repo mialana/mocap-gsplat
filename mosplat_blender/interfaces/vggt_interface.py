@@ -16,11 +16,10 @@ from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
-    ImagesMaskTensor,
+    ImagesAlphaTensorLike,
     ImagesTensorLike,
     ModelInferenceMode,
     PointCloudTensors,
-    UnexpectedError,
     VGGTModelOptions,
 )
 
@@ -54,10 +53,10 @@ class VGGTInterface(LogClassMixin):
         self.model: Optional[VGGT] = None
         self.hf_id: Optional[str] = None
         self.model_cache_dir: Optional[Path] = None
-        self.device: torch.device = torch.device(
+        self.model_device: torch.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
-        self.dtype: torch.dtype = torch.float32
+        self.model_dtype: torch.dtype = torch.float32
 
     def initialize_model(
         self,
@@ -73,8 +72,8 @@ class VGGTInterface(LogClassMixin):
             # initialize model from the downloaded local model cache
             self.model = (
                 VGGT.from_pretrained(hf_id, cache_dir=model_cache_dir)
-                .to(device=self.device)
-                .to(dtype=self.dtype)
+                .to(device=self.model_device)
+                .to(dtype=self.model_dtype)
                 .eval()
             )
 
@@ -112,7 +111,7 @@ class VGGTInterface(LogClassMixin):
     def run_inference(
         self,
         images: ImagesTensorLike,
-        images_mask: ImagesMaskTensor,
+        images_alpha: ImagesAlphaTensorLike,
         metadata: FrameTensorMetadata,
         options: VGGTModelOptions,
     ) -> PointCloudTensors:
@@ -125,27 +124,26 @@ class VGGTInterface(LogClassMixin):
         if TYPE_CHECKING:
             from jaxtyping import Bool, Float32, Int32, UInt8
 
-        images_0_1 = to_0_1(images)  # ensure in 0-1 range
+        images_alpha = to_0_1(images_alpha)
+        images = to_0_1(images)  # apply alpha mask
 
-        extrinsic: Float32[torch.Tensor, "B 3 4"]
-        intrinsic: Float32[torch.Tensor, "B 3 3"]
-
-        images_0_1 = crop_tensor(  # crop down
-            images_0_1.to(device=self.device, dtype=self.dtype),
+        images = crop_tensor(  # crop down
+            images.to(device=self.model_device),
             max_size=VGGT_EXPECTED_MAX_SIZE,
             multiple=VGGT_EXPECTED_PIXEL_MULTIPLE,
         )
-        images_mask = crop_tensor(  # crop down
-            images_mask.to(device=self.device, dtype=torch.bool),
+        images_alpha = crop_tensor(  # crop down
+            images_alpha.to(device=self.model_device),
             max_size=VGGT_EXPECTED_MAX_SIZE,
             multiple=VGGT_EXPECTED_PIXEL_MULTIPLE,
         )
+        images = images * images_alpha
 
         with torch.inference_mode():
-            predictions: Dict[str, torch.Tensor] = self.model(images_0_1)
+            predictions: Dict[str, torch.Tensor] = self.model(images)
 
         extri_intri = pose_encoding_to_extri_intri(
-            predictions["pose_enc"], images_0_1.shape[-2:], build_intrinsics=True
+            predictions["pose_enc"], images.shape[-2:], build_intrinsics=True
         )
         assert extri_intri[1] is not None  # specified `build_intrinsics` arg
 
@@ -178,24 +176,21 @@ class VGGTInterface(LogClassMixin):
             B, H, W, 3
         )
         conf_map: Float32[torch.Tensor, "B H W"] = conf_map.reshape(B, H, W)
-        mask: Bool[torch.Tensor, "N"] = images_mask.reshape(-1)
 
         xyz: Float32[torch.Tensor, "N 3"] = world_points.reshape(-1, 3)
         conf: Float32[torch.Tensor, "N"] = conf_map.reshape(-1)
 
         rgb: UInt8[torch.Tensor, "N 3"] = to_0_255(
-            images_0_1.permute(0, 2, 3, 1).reshape(-1, 3)
+            images.permute(0, 2, 3, 1).reshape(-1, 3)
         )
 
-        if conf.numel() > 0:  # `numel` is num elements
-            conf_threshold: Float32[torch.Tensor, "1"] = torch.quantile(
-                conf, options.confidence_percentile / 100.0
-            )
-        else:
-            conf_threshold: Float32[torch.Tensor, "1"] = conf.new_tensor(0.0)
+        alpha: Float32[torch.Tensor, "N"] = images_alpha.reshape(-1)
 
-        conf_mask: Bool[torch.Tensor, "N"] = (conf >= conf_threshold) & (conf > 1e-6)
-        mask &= conf_mask  # AND masks
+        conf_threshold: Float32[torch.Tensor, "1"] = torch.quantile(
+            conf, options.confidence_percentile / 100.0
+        )
+        mask: Bool[torch.Tensor, "N"] = (conf >= conf_threshold) & (conf > 1e-6)
+        mask &= alpha > 0.5  # use alpha as an additional mask
 
         cam_idx: Int32[torch.Tensor, "N"] = torch.repeat_interleave(
             torch.arange(B, device=conf.device, dtype=torch.int32),

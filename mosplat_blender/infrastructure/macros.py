@@ -32,11 +32,10 @@ if TYPE_CHECKING:
 
     from .schemas import (
         FrameTensorMetadata,
-        ImagesMaskTensor,
+        ImagesAlphaTensorLike,
         ImagesTensor_0_1,
         ImagesTensor_0_255,
         ImagesTensorLike,
-        SavedTensorKey,
     )
 
 
@@ -143,7 +142,7 @@ def get_required_function(module: ModuleType, name: str) -> Callable:
     return fn
 
 
-def to_0_1(tensor: ImagesTensorLike) -> ImagesTensor_0_1:
+def to_0_1(tensor: Tensor) -> Tensor:
     import torch
 
     if tensor.dtype == torch.float32:
@@ -156,7 +155,7 @@ def to_0_1(tensor: ImagesTensorLike) -> ImagesTensor_0_1:
     return tensor.to(torch.float32) / 255.0
 
 
-def to_0_255(tensor: ImagesTensorLike) -> ImagesTensor_0_255:
+def to_0_255(tensor: Tensor) -> Tensor:
     import torch
 
     if tensor.dtype == torch.uint8:
@@ -201,7 +200,7 @@ def load_and_verify_tensor_file(
     in_file: Path,
     device_str: str,
     new_metadata: FrameTensorMetadata,
-    keys: List[SavedTensorKey],  # keys to retrieve from the file
+    keys: List[str],  # keys to retrieve from the file
 ) -> Dict[str, Tensor]:
     from safetensors import SafetensorError, safe_open
 
@@ -226,17 +225,23 @@ def load_and_verify_tensor_file(
             except SafetensorError as e:
                 raise UserFacingError from e
 
-        saved_metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
-            file.metadata()
-        )
+        try:
+            saved_metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
+                file.metadata()
+            )
+        except TypeError as e:
+            raise UserFacingError(
+                f"Metadata used to create '{in_file}' does not match the structure of new desired metadata.",
+                e,
+            ) from e
 
     for idx, item in enumerate(new_metadata):
         saved_item = saved_metadata[idx]
         if item != saved_item:
             raise UserAssertionError(
-                f"Metadata used to create '{in_file}' does not match the new desired metadata. To clean up data state, delete the file and re-extract frame data",
-                expected=idx,
-                actual=saved_metadata.frame_idx,
+                f"A field used to create metadata '{in_file}' does not match the corresponding field in new desired metadata.",
+                expected=item,
+                actual=saved_item,
             )
 
     return tensors
@@ -246,7 +251,7 @@ def save_images_tensor(
     out_file: Path,
     metadata: FrameTensorMetadata,
     images: ImagesTensorLike,
-    images_mask: Optional[ImagesMaskTensor],
+    images_alpha: Optional[ImagesAlphaTensorLike],
 ):
     from safetensors.torch import save_file
 
@@ -255,8 +260,9 @@ def save_images_tensor(
     images_0_255 = to_0_255(images)
     tensors = {SavedTensorKey.IMAGES.value: images_0_255}
 
-    if images_mask is not None:
-        tensors |= {SavedTensorKey.IMAGES_MASK.value: images_mask}
+    if images_alpha is not None:
+        images_alpha_0_255 = to_0_255(images_alpha)
+        tensors |= {SavedTensorKey.IMAGES_ALPHA.value: images_alpha_0_255}
 
     save_file(
         tensors,
@@ -272,17 +278,11 @@ def crop_tensor(
     multiple: int,
     mode: str = "bilinear",
     align_corners: bool = False,
-) -> ImagesTensor_0_1:
-    import torch
+) -> Tensor:
     import torch.nn.functional as F
 
     assert len(tensor.shape) == 4
     _, _, H, W = tensor.shape
-
-    is_bool = tensor.dtype == torch.bool
-    if is_bool:
-        mode = "nearest"
-        tensor = tensor.to(torch.float32)  # convert to float for interpolation
 
     # crop to max size
     max_dim = max(H, W)
@@ -306,9 +306,6 @@ def crop_tensor(
     left = (W - crop_W) // 2
 
     tensor = tensor[:, :, top : top + crop_H, left : left + crop_W]
-
-    if is_bool:
-        tensor = tensor.to(torch.bool)
 
     return tensor
 

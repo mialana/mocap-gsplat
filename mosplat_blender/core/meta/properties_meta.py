@@ -1,4 +1,4 @@
-# 2026-02-20 16:27:22.383702
+# 2026-02-20 21:52:56.203215
 # created using 'generate_property_meta_files.py'
 
 
@@ -177,7 +177,9 @@ MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
         id="inference_mode", name="Inference Mode", description=""
     ),
     confidence_percentile=PropertyMeta(
-        id="confidence_percentile", name="Confidence Percentile", description=""
+        id="confidence_percentile",
+        name="Confidence",
+        description="Minimum percentile for model-inferred confidence",
     ),
 )
 

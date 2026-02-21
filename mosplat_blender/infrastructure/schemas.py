@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import os
 from abc import ABC
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from enum import StrEnum, auto
 from pathlib import Path
 from string import capwords
@@ -36,7 +36,7 @@ from .macros import (
 
 if TYPE_CHECKING:
     import torchcodec.decoders
-    from jaxtyping import Bool, Float32, UInt8
+    from jaxtyping import Float32, UInt8
     from torch import Tensor
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
@@ -45,12 +45,18 @@ if TYPE_CHECKING:
     ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "B 3 H W"]
     ImagesTensorLike: TypeAlias = Union[ImagesTensor_0_255, ImagesTensor_0_1]
 
-    ImagesMaskTensor: TypeAlias = Bool[Tensor, "B 1 H W"]
+    ImagesAlphaTensor_0_1: TypeAlias = Float32[Tensor, "B 1 H W"]
+    ImagesAlphaTensor_0_255: TypeAlias = UInt8[Tensor, "B 1 H W"]
+    ImagesAlphaTensorLike: TypeAlias = Union[
+        ImagesAlphaTensor_0_1, ImagesAlphaTensor_0_255
+    ]
 else:
     ImagesTensor_0_1: TypeAlias = Any
     ImagesTensor_0_255: TypeAlias = Any
     ImagesTensorLike: TypeAlias = Any
-    ImagesMaskTensor: TypeAlias = Any
+    ImagesAlphaTensor_0_1: TypeAlias = Any
+    ImagesAlphaTensor_0_255: TypeAlias = Any
+    ImagesAlphaTensorLike: TypeAlias = Any
 
 
 class CustomError(ABC, RuntimeError):
@@ -174,7 +180,7 @@ class LogEntryLevelEnum(StrEnum):
 
 class SavedTensorKey(StrEnum):
     IMAGES = auto()
-    IMAGES_MASK = auto()
+    IMAGES_ALPHA = auto()
 
 
 class SavedTensorFileName(StrEnum):
@@ -285,8 +291,8 @@ class ModelInferenceMode(StrEnum):
 
 @dataclass(frozen=True)
 class VGGTModelOptions:
-    inference_mode: ModelInferenceMode = ModelInferenceMode.POINTMAP
-    confidence_percentile: float = 95.0
+    inference_mode: ModelInferenceMode
+    confidence_percentile: float
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -379,6 +385,10 @@ class PointCloudTensors:
             return cls(**d, _metadata=metadata)
         except (TypeError, ValueError):  # make the error type clear
             raise
+
+    @classmethod
+    def keys(cls) -> List[str]:
+        return [fld.name for fld in fields(cls) if fld.name != "_metadata"]
 
 
 @dataclass(frozen=True)

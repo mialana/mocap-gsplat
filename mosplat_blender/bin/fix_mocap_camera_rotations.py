@@ -28,17 +28,17 @@ from typing import List, Optional, Tuple, TypeAlias
 import torch
 from jaxtyping import Bool, Float32
 
-ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
-ImagesMaskTensorType: TypeAlias = Bool[torch.Tensor, "B 1 H W"]
+ImagesTensor: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
+ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "B 1 H W"]
 
-CamMaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
+CamMaskTensor: TypeAlias = Bool[torch.Tensor, "B"]
 
-CAM_MASK: Optional[CamMaskTensorType] = None
+CAM_MASK: Optional[CamMaskTensor] = None
 
 
 def preprocess(
-    frame_idx: int, media_files: List[Path], images: ImagesTensorType
-) -> Tuple[ImagesTensorType, Optional[ImagesMaskTensorType]]:
+    frame_idx: int, media_files: List[Path], images: ImagesTensor
+) -> Tuple[ImagesTensor, Optional[ImagesAlphaTensor]]:
     """
     This function is called once per frame per media file with the parameter values filled accordingly.
 
@@ -55,7 +55,7 @@ def preprocess(
         tuple: A tuple containing:
         - out_images: A Torch tensor with the same shape and dtype as `images`,
             containing the transformed image data.
-        - images_mask: An Torch tensor or `None` to optionally specify a boolean mask of the relevant / target pixels of the images.
+        - images_alpha: An Torch tensor or `None` to optionally specify a mask of the relevant / target pixel data of the images. The mask tensor should be `torch.float32` data type, and range from 0.0-1.0.
     """
 
     global CAM_MASK
@@ -67,13 +67,13 @@ def preprocess(
     return images, None
 
 
-def _rotate_180(x: ImagesTensorType) -> ImagesTensorType:
+def _rotate_180(x: ImagesTensor) -> ImagesTensor:
     return torch.flip(x, dims=(2, 3))
 
 
 def _create_camera_mask(
     media_filenames: List[Path], device: torch.device
-) -> CamMaskTensorType:
+) -> CamMaskTensor:
     """creates a Torch boolean tensor for masking out cameras whose images need a 180
     degree transformation applied to them."""
     all_cam_indices = torch.tensor(

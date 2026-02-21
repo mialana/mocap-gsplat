@@ -26,7 +26,7 @@ from ..infrastructure.macros import (
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
-    ImagesMaskTensor,
+    ImagesAlphaTensor_0_1,
     ImagesTensor_0_1,
     MediaIOMetadata,
     SavedTensorFileName,
@@ -145,7 +145,7 @@ class Mosplat_OT_run_preprocess_script(
                         new_metadata,
                         keys=[
                             SavedTensorKey.IMAGES,
-                            SavedTensorKey.IMAGES_MASK,
+                            SavedTensorKey.IMAGES_ALPHA,
                         ],
                     )
                     queue.put(
@@ -155,43 +155,39 @@ class Mosplat_OT_run_preprocess_script(
                             None,
                         )
                     )
-                    continue
                 except (OSError, UserAssertionError, UserFacingError):
-                    pass
+                    validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
+                        idx, files, preprocess_script=None, model_options=None
+                    )  # preprocess script did not exist in extraction step
 
-                validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx, files, preprocess_script=None, model_options=None
-                )  # preprocess script did not exist in extraction step
-
-                tensors = load_and_verify_tensor_file(
-                    in_file,
-                    device_str,
-                    validation_metadata,
-                    keys=[SavedTensorKey.IMAGES],
-                )
-                images_0_255 = tensors[SavedTensorKey.IMAGES]
-                images_0_1: ImagesTensor_0_1 = to_0_1(images_0_255)
-
-                output = preprocess_fn(idx, files, images_0_1)
-
-                images, images_mask = _validate_preprocess_script_output(
-                    output, images_0_1
-                )
-                save_images_tensor(out_file, new_metadata, images, images_mask)
-
-                if preview:
-                    save_tensor_stack_png_preview(images, out_file)
-                    save_tensor_stack_png_preview(
-                        images * images_mask, out_file, ".masked"
+                    tensors = load_and_verify_tensor_file(
+                        in_file,
+                        device_str,
+                        validation_metadata,
+                        keys=[SavedTensorKey.IMAGES],
                     )
-                queue.put(("update", f"Finished processing frame '{idx}'", None))
+                    images_0_255 = tensors[SavedTensorKey.IMAGES]
+                    images_0_1: ImagesTensor_0_1 = to_0_1(images_0_255)
+
+                    output = preprocess_fn(idx, files, images_0_1)
+
+                    new_images, images_alpha = _validate_preprocess_script_output(
+                        output, images_0_1
+                    )
+                    save_images_tensor(out_file, new_metadata, new_images, images_alpha)
+
+                    if preview:
+                        save_tensor_stack_png_preview(new_images, out_file)
+                        save_tensor_stack_png_preview(
+                            new_images * images_alpha, out_file, ".masked"
+                        )
+                    queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
                 msg = UserFacingError.make_msg(
                     f"Error ocurred while running preprocess script on frame '{idx}'.",
                     e,
                 )
                 queue.put(("warning", msg, None))
-                continue
 
         frame_range = data.query_frame_range(start, end - 1)  # inclusive
         if not frame_range or len(frame_range) > 1:
@@ -237,63 +233,63 @@ def _retrieve_preprocess_fn(
 
 
 def _validate_preprocess_script_output(
-    returned, input_images: ImagesTensor_0_1
-) -> Tuple[ImagesTensor_0_1, ImagesMaskTensor]:
+    output, input_images: ImagesTensor_0_1
+) -> Tuple[ImagesTensor_0_1, ImagesAlphaTensor_0_1]:
     import torch
 
-    if not isinstance(returned, tuple):
+    if not isinstance(output, tuple):
         raise UserAssertionError(
             f"Return value of preprocess script must be a tuple",
             expected=tuple.__name__,
-            actual=type(returned).__name__,
+            actual=type(output).__name__,
         )
-    if not len(returned) == 2:
+    if not len(output) == 2:
         raise UserAssertionError(
             f"Return value of preprocess script must be a tuple of size 2",
-            expected=len(returned),
+            expected=len(output),
             actual=2,
         )
 
-    returned_images, returned_mask = returned
+    images, images_alpha = output
 
     # validate returned images
-    if not isinstance(returned_images, torch.Tensor):
+    if not isinstance(images, torch.Tensor):
         raise UserAssertionError(
             f"Returned images of preprocess script must be a torch tensor",
             expected=torch.Tensor.__name__,
-            actual=type(returned_images).__name__,
+            actual=type(images).__name__,
         )
-    if not returned_images.dtype == input_images.dtype:
+    if not images.dtype == input_images.dtype:
         raise UserAssertionError(
             f"Data type of images tensor cannot change after preprocess script",
             expected=input_images.dtype,
-            actual=returned_images.dtype,
+            actual=images.dtype,
         )
-    if not returned_images.shape == input_images.shape:
+    if not images.shape == input_images.shape:
         raise UserAssertionError(
             f"Shape of images tensor cannot change after preprocess script",
-            expected=returned_images.shape,
-            actual=returned_images.shape,
+            expected=images.shape,
+            actual=images.shape,
         )
 
-    if returned_mask is None:
-        returned_mask = torch.ones_like(returned_images[:, :1], dtype=torch.bool)
-    if not returned_mask.dtype == torch.bool:
+    if images_alpha is None:
+        images_alpha = torch.ones_like(images[:, :1], dtype=torch.float32)
+    if not images_alpha.dtype == torch.float32:
         raise UserAssertionError(
-            f"Data type of images mask tensor incorrect",
-            expected=torch.bool,
-            actual=returned_images.dtype,
+            f"Data type of images alpha tensor incorrect",
+            expected=torch.float32,
+            actual=images_alpha.dtype,
         )
     B, _, H, W = input_images.shape
     expected_shape = torch.Size((B, 1, H, W))
-    if not returned_mask.shape == expected_shape:
+    if not images_alpha.shape == expected_shape:
         raise UserAssertionError(
-            f"Shape of images mask tensor incorrect",
+            f"Shape of images alpha tensor incorrect",
             expected=expected_shape,
-            actual=returned_images.shape,
+            actual=images_alpha.shape,
         )
 
-    return returned_images, returned_mask
+    return to_0_1(images), to_0_1(images_alpha)
 
 
 def process_entrypoint(*args, **kwargs):
