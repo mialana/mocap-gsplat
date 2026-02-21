@@ -7,16 +7,19 @@ from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
 from ..infrastructure.macros import (
-    is_path_accessible,
+    load_and_verify_tensor_file,
     save_images_tensor,
     save_tensor_stack_png_preview,
 )
 from ..infrastructure.schemas import (
     FrameTensorMetadata,
-    ImagesTensorUInt8,
+    ImagesTensor_0_255,
     MediaIOMetadata,
     ProcessedFrameRange,
     SavedTensorFileName,
+    SavedTensorKey,
+    UserAssertionError,
+    UserFacingError,
 )
 from .base_ot import MosplatOperatorBase
 
@@ -79,7 +82,6 @@ class Mosplat_OT_extract_frame_range(
     @staticmethod
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
-        from safetensors.torch import save_file
         from torchcodec.decoders import VideoDecoder
 
         files, (start, end), exported_file_formatter, preview, data = pwargs
@@ -90,7 +92,7 @@ class Mosplat_OT_extract_frame_range(
             file_ext="safetensors",
         )
 
-        torchcodec_device: str = (
+        device_str: str = (
             "cuda"
             if not sys.platform == "win32" and torch.cuda.is_available()
             else "cpu"  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
@@ -99,7 +101,7 @@ class Mosplat_OT_extract_frame_range(
         decoders: List[VideoDecoder] = []
         try:
             for media_file in files:
-                dec = VideoDecoder(media_file, device=torchcodec_device)
+                dec = VideoDecoder(media_file, device=device_str)
                 decoders.append(dec)
         except ValueError as e:
             # exit early wherever error occurs and put error on queue
@@ -115,23 +117,29 @@ class Mosplat_OT_extract_frame_range(
                 return
 
             out_file = Path(out_file_formatter(frame_idx=idx))
+            new_metadata = FrameTensorMetadata(
+                frame_idx=idx,
+                media_files=files,
+                preprocess_script=None,
+                model_options=None,
+            )
 
-            if is_path_accessible(out_file):
+            try:
+                _ = load_and_verify_tensor_file(
+                    out_file,
+                    device_str,
+                    new_metadata,
+                    keys=[SavedTensorKey.IMAGES],
+                )
                 note = f"Safetensor data for frame '{idx}' already found on disk."
-            else:
+            except (OSError, UserAssertionError, UserFacingError):
                 out_file.parent.mkdir(parents=True, exist_ok=True)
 
                 tensor_list = [dec[cast(Integral, idx)] for dec in decoders]
-                # convert to 0.0-1.0 range
-                tensor: ImagesTensorUInt8 = torch.stack(tensor_list, dim=0)
 
-                new_metadata = FrameTensorMetadata(
-                    frame_idx=idx,
-                    media_files=files,
-                    preprocess_script=None,
-                    model_options=None,
-                )
-                save_images_tensor(out_file, new_metadata, tensor)
+                tensor: ImagesTensor_0_255 = torch.stack(tensor_list, dim=0)
+
+                save_images_tensor(out_file, new_metadata, tensor, None)
 
                 if preview:
                     save_tensor_stack_png_preview(tensor, out_file)

@@ -23,20 +23,22 @@ applied.
 """
 
 from pathlib import Path
-from typing import List, Optional, TypeAlias
+from typing import List, Optional, Tuple, TypeAlias
 
 import torch
 from jaxtyping import Bool, Float32
 
 ImagesTensorType: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
-MaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
+ImagesMaskTensorType: TypeAlias = Bool[torch.Tensor, "B 1 H W"]
 
-_IMAGES_MASK: Optional[MaskTensorType] = None
+CamMaskTensorType: TypeAlias = Bool[torch.Tensor, "B"]
+
+CAM_MASK: Optional[CamMaskTensorType] = None
 
 
 def preprocess(
     frame_idx: int, media_files: List[Path], images: ImagesTensorType
-) -> ImagesTensorType:
+) -> Tuple[ImagesTensorType, Optional[ImagesMaskTensorType]]:
     """
     This function is called once per frame per media file with the parameter values filled accordingly.
 
@@ -50,17 +52,19 @@ def preprocess(
             and the 2nd dimension are color channels. RGB values are normalized to the range 0.0-1.0 and are the data-type `float`. Lastly, H and W are directly the pixel size of the media files in the media directory.
 
     Returns:
-        A Torch tensor array with the same shape and dtype as `images`,
-        containing the transformed image data.
+        tuple: A tuple containing:
+        - out_images: A Torch tensor with the same shape and dtype as `images`,
+            containing the transformed image data.
+        - images_mask: An Torch tensor or `None` to optionally specify a boolean mask of the relevant / target pixels of the images.
     """
 
-    global _IMAGES_MASK
+    global CAM_MASK
 
-    if _IMAGES_MASK is None:
-        _IMAGES_MASK = _create_camera_mask(media_files, images.device)
+    if CAM_MASK is None:
+        CAM_MASK = _create_camera_mask(media_files, images.device)
 
-    images[_IMAGES_MASK] = _rotate_180(images[_IMAGES_MASK])  # rotate by 180 degrees
-    return images
+    images[CAM_MASK] = _rotate_180(images[CAM_MASK])  # rotate by 180 degrees
+    return images, None
 
 
 def _rotate_180(x: ImagesTensorType) -> ImagesTensorType:
@@ -69,7 +73,7 @@ def _rotate_180(x: ImagesTensorType) -> ImagesTensorType:
 
 def _create_camera_mask(
     media_filenames: List[Path], device: torch.device
-) -> MaskTensorType:
+) -> CamMaskTensorType:
     """creates a Torch boolean tensor for masking out cameras whose images need a 180
     degree transformation applied to them."""
     all_cam_indices = torch.tensor(

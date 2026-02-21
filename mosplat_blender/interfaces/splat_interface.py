@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
@@ -42,16 +42,37 @@ class SplatParams:
             }
         )
 
+    @classmethod
+    def from_parameter_dict(
+        cls, param_dict: ParameterDict, *, detach: bool
+    ) -> SplatParams:
+        return (
+            SplatParams(
+                means=param_dict["means"].detach(),
+                scales=param_dict["scales"].detach(),
+                quats_xyzw=norm_quat_xyzw(param_dict["quats"].detach()),
+                opacities=param_dict["opacities"].detach(),
+                sh=param_dict["sh"].detach(),
+            )
+            if detach
+            else SplatParams(
+                means=param_dict["means"],
+                scales=param_dict["scales"],
+                quats_xyzw=norm_quat_xyzw(param_dict["quats"]),
+                opacities=param_dict["opacities"],
+                sh=param_dict["sh"],
+            )
+        )
+
 
 @dataclass
 class TrainConfig:
-    steps: int = 30_000
-    lr: float = 1e-2
+    steps: int = 30000
+    lr: float = 1e-2  # learning rate
     sh_degree: int = 0
     cam_batch: int = 1
-    l1_weight: float = 1.0
-    clamp_scales_min: float = 1e-6
-    renorm_quat_period: int = 1
+
+    save_every: int = 5000
 
 
 def norm_quat_xyzw(q: Tensor) -> Tensor:
@@ -103,7 +124,7 @@ def init_scales_from_confidence(
     return torch.stack([s, s, s], dim=1)
 
 
-def _w2c_3x4_to_view_4x4(extrinsic: Tensor) -> Tensor:
+def w2c_3x4_to_view_4x4(extrinsic: Tensor) -> Tensor:
     """world-to-camera to view by simply adding homogeneous bottom row [0, 0, 0, 1]"""
     import torch
 
@@ -164,21 +185,23 @@ def fuse_points_voxel_hash(
 
     # get weighted average rgb
     rgb = rgb_0_255.to(torch.float32)
-    rgb_acc = torch.zeros((M, 3), device=device, dtype=torch.float32)
-    rgb_acc.scatter_add_(
+    rgb_fused = torch.zeros((M, 3), device=device, dtype=torch.float32)
+    rgb_fused.scatter_add_(
         0, group_id[:, None].expand(-1, 3), rgb * wt[:, None].to(torch.float32)
     )
-    rgb_acc = (
-        (rgb_acc / wt_sum[:, None].to(torch.float32)).clamp(0.0, 255.0).to(torch.uint8)
+    rgb_fused = (
+        (rgb_fused / wt_sum[:, None].to(torch.float32))
+        .clamp(0.0, 255.0)
+        .to(torch.uint8)
     )  # convert back to 'uint8'
 
     # set voxel confidence based on the max confidence of views of voxel
-    conf_out = (
+    conf_fused = (
         torch.zeros((M,), device=device, dtype=conf.dtype)
         .scatter_reduce_(0, group_id, conf, reduce="amax")
         .to(torch.float32)
     )
-    return means, rgb_acc, conf_out
+    return means, rgb_fused, conf_fused
 
 
 def init_splats_from_pointcloud(
@@ -201,14 +224,14 @@ def init_splats_from_pointcloud(
         conf_fused, base_scale=base_scale, scale_mult=scale_mult
     ).to(device)
     quats = norm_quat_xyzw(quat_identity(M, device))
-    opacity = conf_fused.clamp(0.0, 1.0).to(torch.float32)
+    opacities = conf_fused.clamp(0.0, 1.0).to(torch.float32)
     sh = sh_from_rgb_0_255(rgb_fused)
 
     return SplatParams(
         means=means,
         scales=scales,
         quats_xyzw=quats,
-        opacities=opacity,
+        opacities=opacities,
         sh=sh,
     )
 
@@ -234,8 +257,8 @@ def init_from_pointcloud_tensors(
 def save_ply_3dgs_binary(
     out_file: Path,
     params: SplatParams,
-    encode_scale_log: bool = True,
-    encode_opacity_logit: bool = True,
+    encode_log_of_scale: bool = True,  # convert 'scale' as 'log(scale)'
+    encode_opacity_in_logit: bool = True,  # convert 'opacity' 0-1 to unbounded logit space
 ) -> None:
     import numpy as np
     import torch
@@ -248,32 +271,39 @@ def save_ply_3dgs_binary(
     means = params.means.detach().cpu().float()
     scales = params.scales.detach().cpu().float().clamp_min(1e-12)
     quats = params.quats_xyzw.detach().cpu().float()
-    opacity = params.opacities.detach().cpu().float()
+    opacities = params.opacities.detach().cpu().float()
 
-    if encode_scale_log:
+    if encode_log_of_scale:
         scales = scales.log()
 
-    if encode_opacity_logit:
-        x = opacity.clamp(1e-6, 1.0 - 1e-6)
-        opacity = torch.log(x) - torch.log1p(-x)
+    if encode_opacity_in_logit:
+        x = opacities.clamp(1e-6, 1.0 - 1e-6)
+        opacities = torch.log(x) - torch.log1p(-x)
 
     sh = params.sh  # (M, K, 3)
-    M, K, _ = sh.shape
+    N, K, C = sh.shape
 
     # separate DC and rest
     f_dc = sh[:, 0, :]  # (M,3)
-    f_rest = sh[:, 1:, :].reshape(M, -1)  # (M, 3*(K-1))
+    f_rest = sh[:, 1:, :].reshape(N, -1)  # (M, 3*(K-1))
 
-    props = (
+    props = [
         ("x", "float"),
         ("y", "float"),
         ("z", "float"),
         ("nx", "float"),
         ("ny", "float"),
         ("nz", "float"),
-        ("f_dc_0", "float"),
-        ("f_dc_1", "float"),
-        ("f_dc_2", "float"),
+    ]
+
+    for i in range(3):  # DC fields
+        props.append((f"f_dc_{i}", "float"))
+
+    num_rest = f_rest.shape[1]
+    for i in range(num_rest):  # rest of SH fields
+        props.append((f"f_rest_{i}", "float"))
+
+    props += [
         ("opacity", "float"),
         ("scale_0", "float"),
         ("scale_1", "float"),
@@ -282,43 +312,45 @@ def save_ply_3dgs_binary(
         ("rot_1", "float"),
         ("rot_2", "float"),
         ("rot_3", "float"),
-    )
+    ]
 
     header = [
         "ply",
         "format binary_little_endian 1.0",
-        f"element vertex {M}",
+        f"element vertex {N}",
     ]
     header += [f"property {t} {n}" for (n, t) in props]
     header += ["end_header\n"]
-    header_s = "\n".join(header)
+    header_str = "\n".join(header)
 
-    zeros_n = torch.zeros((M, 3), dtype=torch.float32)
+    normals = torch.zeros((N, 3), dtype=torch.float32)  # set normals to zero
 
-    row = torch.cat(
+    body = torch.cat(
         [
             means,
-            zeros_n,
+            normals,
             f_dc,
             f_rest,
-            opacity,
+            opacities,
             scales,
             quats,
         ],
         dim=1,
     ).numpy()
 
-    with open(out_file, "wb") as f:
-        f.write(header_s.encode("ascii"))
-        f.write(row.astype(np.float32).tobytes())
+    with out_file.open(mode="wb") as f:
+        f.write(header_str.encode("ascii"))
+        f.write(body.astype(np.float32).tobytes())
 
 
 def train_3dgs(
     params: SplatParams,
-    images: Tensor,
+    images: Tensor,  # (B,3,H,W) unmasked
+    masks: Tensor,  # (B,1,H,W) 1=valid, 0=ignore
     extrinsic: Tensor,
     intrinsic: Tensor,
     rasterizer: GsplatRasterizer,
+    out_file: Path,
     config: TrainConfig = TrainConfig(),
 ) -> SplatParams:
     import torch
@@ -326,15 +358,7 @@ def train_3dgs(
 
     device = images.device
 
-    param_dict = torch.nn.ParameterDict(
-        {
-            "means": torch.nn.Parameter(params.means.to(device)),
-            "scales": torch.nn.Parameter(params.scales.to(device)),
-            "quats": torch.nn.Parameter(params.quats_xyzw.to(device)),
-            "opacities": torch.nn.Parameter(params.opacities.squeeze(-1).to(device)),
-            "sh": torch.nn.Parameter(params.sh.to(device)),
-        }
-    )
+    param_dict = params.to_parameter_dict(device)
 
     optimizers: Dict[str, torch.optim.Optimizer] = {
         k: torch.optim.Adam([v], lr=float(config.lr)) for k, v in param_dict.items()
@@ -350,6 +374,7 @@ def train_3dgs(
         idx = torch.randint(0, B, (config.cam_batch,), device=device)
 
         tgt = images.index_select(0, idx)
+        msk = masks.index_select(0, idx)
         ex = extrinsic.index_select(0, idx)
         intr = intrinsic.index_select(0, idx)
 
@@ -359,17 +384,10 @@ def train_3dgs(
             dtype=torch.float32,
         )
 
-        splat_params = SplatParams(
-            means=param_dict["means"],
-            scales=param_dict["scales"],
-            quats_xyzw=param_dict["quats"],
-            opacities=param_dict["opacities"].unsqueeze(-1),
-            sh=param_dict["sh"],
-        )
+        pred, _, _, _ = rasterizer.render(params, ex, intr, bg)
 
-        pred, _, _, _ = rasterizer.render(splat_params, ex, intr, bg)
-
-        loss = float(config.l1_weight) * (pred - tgt).abs().mean()
+        diff = (pred - tgt).abs()
+        loss = (diff * msk).sum() / (msk.sum() + 1e-6)
 
         strategy.step_pre_backward(
             param_dict,
@@ -395,13 +413,11 @@ def train_3dgs(
         for opt in optimizers.values():
             opt.step()
 
-    return SplatParams(
-        means=param_dict["means"].detach(),
-        scales=param_dict["scales"].detach(),
-        quats_xyzw=norm_quat_xyzw(param_dict["quats"].detach()),
-        opacities=param_dict["opacities"].detach().unsqueeze(1),
-        sh=param_dict["sh"].detach(),
-    )
+        if step % 1000 == 0:
+            with torch.no_grad():
+                save_ply_3dgs_binary(out_file, params)
+
+    return SplatParams.from_parameter_dict(param_dict, detach=True)
 
 
 class GsplatRasterizer:
@@ -439,7 +455,7 @@ class GsplatRasterizer:
         bg = bg.to(device=device, dtype=torch.float32)
 
         # convert (B,3,4) to (B,4,4)
-        view = _w2c_3x4_to_view_4x4(extrinsic)
+        view = w2c_3x4_to_view_4x4(extrinsic)
 
         # gsplat expects opacities as (..., N)
         opacities = params.opacities.squeeze(-1)

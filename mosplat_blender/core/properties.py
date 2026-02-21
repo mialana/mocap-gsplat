@@ -296,9 +296,7 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
         items=ModelInferenceModeEnumItems,
         default=ModelInferenceMode.POINTMAP.value,
     )
-    confidence_percentile: FloatProperty(name="Confidence Percentile", default=97.5)
-    enable_black_mask: BoolProperty(name="Enable Black Mask", default=True)
-    enable_white_mask: BoolProperty(name="Enable White Mask", default=False)
+    confidence_percentile: FloatProperty(name="Confidence Percentile", default=50)
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase):

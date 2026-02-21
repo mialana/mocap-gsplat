@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
+from ..infrastructure.macros import is_path_accessible
 from ..infrastructure.mixins import CtxPackage
 from ..infrastructure.schemas import SavedTensorFileName, UnexpectedError
 from .base_ot import MosplatOperatorBase
@@ -22,6 +24,10 @@ if TYPE_CHECKING:
 
 MESH_NAME = "pc_mesh"
 PLAYER_NAME = "PointCloudPlaybackManager"
+GN_MODIFIER_NAME = "PointCloudGN"
+GN_TREE_NAME = "PointCloudGNGroup"
+MATERIAL_NAME = "PointCloudMaterial"
+DEFAULT_POINT_RADIUS = 0.15
 
 PLY_FILE_FORMATTER = None
 
@@ -66,9 +72,9 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
         self.setup_material()
 
         # prevent duplicate registration of handler
-        for handler in bpy.app.handlers.frame_change_pre:
-            if handler.__name__ == "on_frame_change":
-                bpy.app.handlers.frame_change_pre.remove(handler)
+        for idx, handler in enumerate(bpy.app.handlers.frame_change_pre):
+            if handler.__name__ == on_frame_change.__name__:
+                bpy.app.handlers.frame_change_pre.pop(idx)
 
         bpy.app.handlers.frame_change_pre.append(on_frame_change)
 
@@ -76,11 +82,12 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
     def ensure_player(self, pkg: CtxPackage):
         import bpy
-        from bpy.types import Mesh
 
         scene = pkg.context.scene
         assert scene
-        obj: Optional[Object] = bpy.data.objects.get(PLAYER_NAME)
+        assert scene.collection
+
+        obj = bpy.data.objects.get(PLAYER_NAME)
         if obj is None:
             mesh: Mesh = bpy.data.meshes.new(MESH_NAME)
             obj = bpy.data.objects.new(PLAYER_NAME, mesh)
@@ -93,18 +100,21 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
     def setup_geometry_nodes(self):
         import bpy
 
-        # Create GN modifier if missing
+        # create geometry node modifier if missing
         mod: Modifier = self._obj.modifiers.get(
-            "PointCloudGN"
-        ) or self._obj.modifiers.new("PointCloudGN", type="NODES")
+            GN_MODIFIER_NAME
+        ) or self._obj.modifiers.new(GN_MODIFIER_NAME, type="NODES")
+        assert isinstance(mod, bpy.types.NodesModifier)
 
-        if hasattr(mod, "node_group") and getattr(mod, "node_group") is None:
+        if mod.node_group is None:
             node_group: NodeTree = bpy.data.node_groups.new(
-                "PointCloudGNGroup", "GeometryNodeTree"
+                GN_TREE_NAME, "GeometryNodeTree"
             )
-            setattr(mod, "node_group", node_group)
+            mod.node_group = node_group
         else:
-            node_group = getattr(mod, "node_group")
+            node_group = mod.node_group
+
+        assert isinstance(node_group, bpy.types.GeometryNodeTree)
 
         nodes: Nodes = node_group.nodes
         links: NodeLinks = node_group.links
@@ -113,14 +123,13 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
         input_node: Node = nodes.new("NodeGroupInput")
         output_node: Node = nodes.new("NodeGroupOutput")
-        mesh_to_points: Node = nodes.new("GeometryNodeMeshToPoints")
-        setattr(mesh_to_points.inputs["Radius"], "default_value", 0.15)
         set_material: Node = nodes.new("GeometryNodeSetMaterial")
 
-        input_node.location = (-400, 0)
-        mesh_to_points.location = (-100, 0)
-        set_material.location = (150, 0)
-        output_node.location = (400, 0)
+        mesh_to_points: Node = nodes.new("GeometryNodeMeshToPoints")
+
+        radius_input = mesh_to_points.inputs["Radius"]
+        assert isinstance(radius_input, bpy.types.NodeSocketFloatDistance)
+        radius_input.default_value = DEFAULT_POINT_RADIUS
 
         assert node_group.interface
 
@@ -134,12 +143,15 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
             )
 
         # create or get material
-        mat: Material = bpy.data.materials.get(
-            "PointCloudMaterial"
-        ) or bpy.data.materials.new("PointCloudMaterial")
+        mat: Material = bpy.data.materials.get(MATERIAL_NAME) or bpy.data.materials.new(
+            MATERIAL_NAME
+        )
         mat.use_nodes = True
 
-        setattr(set_material.inputs["Material"], "default_value", mat)
+        mat_input = set_material.inputs["Material"]
+        assert isinstance(mat_input, bpy.types.NodeSocketMaterial)
+
+        mat_input.default_value = mat
 
         # links
         links.new(input_node.outputs["Geometry"], mesh_to_points.inputs["Mesh"])
@@ -151,9 +163,9 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
     def setup_material(self):
         import bpy
 
-        mat: Material = bpy.data.materials.get(
-            "PointCloudMaterial"
-        ) or bpy.data.materials.new("PointCloudMaterial")
+        mat: Material = bpy.data.materials.get(MATERIAL_NAME) or bpy.data.materials.new(
+            MATERIAL_NAME
+        )
 
         assert mat.node_tree
 
@@ -162,14 +174,11 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
         nodes.clear()
 
         attr: Node = nodes.new("ShaderNodeAttribute")
-        setattr(attr, "attribute_name", "Col")
+        assert isinstance(attr, bpy.types.ShaderNodeAttribute)
+        attr.attribute_name = "Col"
 
         bsdf: Node = nodes.new("ShaderNodeBsdfPrincipled")
         output: Node = nodes.new("ShaderNodeOutputMaterial")
-
-        attr.location = (-400, 0)
-        bsdf.location = (-100, 0)
-        output.location = (200, 0)
 
         links.new(attr.outputs["Color"], bsdf.inputs["Base Color"])
         links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
@@ -179,7 +188,6 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
 def on_frame_change(scene: Scene):
     import bpy
-    from bpy.types import Mesh
 
     obj: Optional[Object] = bpy.data.objects.get(PLAYER_NAME)
     if obj is None:
@@ -189,7 +197,7 @@ def on_frame_change(scene: Scene):
     if mesh is None:
         return
 
-    old_mesh: Mesh = cast(Mesh, obj.data)
+    old_mesh: Mesh = cast(bpy.types.Mesh, obj.data)
     obj.data = mesh
 
     # remove old mesh datablock to prevent RAM memory growth
@@ -197,15 +205,17 @@ def on_frame_change(scene: Scene):
         bpy.data.meshes.remove(old_mesh)
 
 
-def import_ply_mesh_for_frame(curr_frame: int) -> Mesh:
+def import_ply_mesh_for_frame(curr_frame: int) -> Optional[Mesh]:
     import bpy
     import mathutils
-    from bpy.types import Mesh
 
     if not PLY_FILE_FORMATTER:
         raise UnexpectedError(f"Global PLY file formatter string no longer in scope.")
 
     ply_filepath: str = PLY_FILE_FORMATTER(frame_idx=curr_frame)
+
+    if not is_path_accessible(Path(ply_filepath)):
+        return None
 
     before: Set[Object] = set(bpy.data.objects)
 
@@ -216,7 +226,7 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Mesh:
 
     assert created_obj.data
 
-    new_mesh: Mesh = cast(Mesh, created_obj.data.copy())
+    new_mesh: Mesh = cast(bpy.types.Mesh, created_obj.data.copy())
 
     PLY_TRANSFORM_MATRIX = mathutils.Matrix(
         (

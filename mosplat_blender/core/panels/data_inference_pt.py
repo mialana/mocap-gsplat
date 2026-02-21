@@ -29,11 +29,4 @@ class Mosplat_PT_data_inference(MosplatPanelBase):
         prop_box.prop(options, options._meta.inference_mode.id)
         prop_box.prop(options, options._meta.confidence_percentile.id)
 
-        row = prop_box.row()
-        enable_black_col = row.column()
-        enable_black_col.prop(options, options._meta.enable_black_mask.id)
-
-        enable_white_col = row.column()
-        enable_white_col.prop(options, options._meta.enable_white_mask.id)
-
         column.row().operator(OperatorIDEnum.RUN_INFERENCE)

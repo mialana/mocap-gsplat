@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
 
 from ..infrastructure.macros import (
-    load_and_verify_images_tensor,
-    load_and_verify_tensor,
+    load_and_verify_tensor_file,
+    save_images_tensor,
     save_ply_ascii,
     save_ply_binary,
 )
@@ -13,6 +13,7 @@ from ..infrastructure.schemas import (
     FrameTensorMetadata,
     PointCloudTensors,
     SavedTensorFileName,
+    SavedTensorKey,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
@@ -21,6 +22,11 @@ from ..interfaces import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
+
+EXPECTED_TENSOR_KEYS = [
+    SavedTensorKey.IMAGES,
+    SavedTensorKey.IMAGES_MASK,
+]
 
 
 class ThreadKwargs(NamedTuple):
@@ -117,20 +123,22 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             try:
 
                 try:
-                    tensors = load_and_verify_tensor(out_file, device_str, new_metadata)
-                    pc_tensors = PointCloudTensors.from_dict(tensors, new_metadata)
-
-                    write_pointcloud_tensors_to_disk(ply_out_file, format, pc_tensors)
+                    _ = load_and_verify_tensor_file(
+                        in_file,
+                        device_str,
+                        new_metadata,
+                        keys=EXPECTED_TENSOR_KEYS,
+                    )
                     queue.put(
                         (
                             "update",
                             f"Previous point cloud inference data found on disk for frame '{idx}'",
                         )
                     )
-                    continue
-                except (OSError, UserAssertionError):
+                    # continue
+                except OSError:
                     pass
-                except (TypeError, ValueError) as e:
+                except (UserAssertionError, UserFacingError) as e:
                     msg = UserFacingError.make_msg(
                         f"Tensor data loaded from '{out_file}' was corrupted.", e
                     )
@@ -142,22 +150,24 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     preprocess_script=applied_preprocess_script,
                     model_options=None,
                 )  # options did not exist in 'run preprocess script' step
-                images_tensor = load_and_verify_images_tensor(
-                    in_file, device_str, validation_metadata
+                tensors = load_and_verify_tensor_file(
+                    in_file,
+                    device_str,
+                    validation_metadata,
+                    EXPECTED_TENSOR_KEYS,
                 )
-                if images_tensor is None:
-                    raise RuntimeError("Poll-guard failed.")
+                images = tensors[SavedTensorKey.IMAGES]
+                images_mask = tensors[SavedTensorKey.IMAGES_MASK]
 
                 pc_tensors = VGGTInterface().run_inference(
-                    images_tensor, new_metadata, options
+                    images, images_mask, new_metadata, options
                 )
                 save_file(
                     pc_tensors.to_dict(),
                     out_file,
                     metadata=new_metadata.to_dict(),
                 )
-
-                write_pointcloud_tensors_to_disk(ply_out_file, format, pc_tensors)
+                _save_ply(ply_out_file, format, pc_tensors)
 
                 queue.put(("update", f"Ran inference on frame '{idx}'"))
             except Exception as e:
@@ -170,9 +180,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         queue.put(("done", "Inference complete for current frame range."))
 
 
-def write_pointcloud_tensors_to_disk(
-    out_file: Path, format: PlyFileFormat, pc_tensors: PointCloudTensors
-):
+def _save_ply(out_file: Path, format: PlyFileFormat, pc_tensors: PointCloudTensors):
     if format == "ascii":
         save_ply_ascii(out_file, pc_tensors.xyz, pc_tensors.rgb)
     else:

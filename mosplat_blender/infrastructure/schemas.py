@@ -35,19 +35,22 @@ from .macros import (
 )
 
 if TYPE_CHECKING:
-    import torch
     import torchcodec.decoders
-    from jaxtyping import Float32, UInt8
+    from jaxtyping import Bool, Float32, UInt8
+    from torch import Tensor
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
 
-    ImagesTensorF32: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
-    ImagesTensorUInt8: TypeAlias = UInt8[torch.Tensor, "B 3 H W"]
-    ImagesTensorLike: TypeAlias = Union[ImagesTensorUInt8, ImagesTensorF32]
+    ImagesTensor_0_1: TypeAlias = Float32[Tensor, "B 3 H W"]
+    ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "B 3 H W"]
+    ImagesTensorLike: TypeAlias = Union[ImagesTensor_0_255, ImagesTensor_0_1]
+
+    ImagesMaskTensor: TypeAlias = Bool[Tensor, "B 1 H W"]
 else:
-    ImagesTensorF32: TypeAlias = Any
-    ImagesTensorUInt8: TypeAlias = Any
+    ImagesTensor_0_1: TypeAlias = Any
+    ImagesTensor_0_255: TypeAlias = Any
     ImagesTensorLike: TypeAlias = Any
+    ImagesMaskTensor: TypeAlias = Any
 
 
 class CustomError(ABC, RuntimeError):
@@ -169,11 +172,12 @@ class LogEntryLevelEnum(StrEnum):
             return cls["INFO"]
 
 
-class SavedTensorFileName(StrEnum):
-    @staticmethod
-    def _images_tensor_key() -> str:
-        return "images"
+class SavedTensorKey(StrEnum):
+    IMAGES = auto()
+    IMAGES_MASK = auto()
 
+
+class SavedTensorFileName(StrEnum):
     RAW = auto()
     PREPROCESSED = auto()
     MODEL_INFERENCE = auto()
@@ -283,8 +287,6 @@ class ModelInferenceMode(StrEnum):
 class VGGTModelOptions:
     inference_mode: ModelInferenceMode = ModelInferenceMode.POINTMAP
     confidence_percentile: float = 95.0
-    enable_black_mask: bool = True
-    enable_white_mask: bool = False
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -350,31 +352,29 @@ class PointCloudTensors:
     if TYPE_CHECKING:
         from jaxtyping import Float32, Int32, UInt8
 
-    xyz: Float32[torch.Tensor, "N 3"]
-    rgb: UInt8[torch.Tensor, "N 3"]
+    xyz: Float32[Tensor, "N 3"]
+    rgb: UInt8[Tensor, "N 3"]
     # confidence level of each point
-    conf: Float32[torch.Tensor, "N"]
+    conf: Float32[Tensor, "N"]
 
-    extrinsic: Float32[torch.Tensor, "B 3 4"]
-    intrinsic: Float32[torch.Tensor, "B 3 3"]
-    depth: Float32[torch.Tensor, "B H W 1"]
-    depth_conf: Float32[torch.Tensor, "B H W"]
-    pointmap: Optional[Float32[torch.Tensor, "B H W 3"]]
+    extrinsic: Float32[Tensor, "B 3 4"]
+    intrinsic: Float32[Tensor, "B 3 3"]
+    depth: Float32[Tensor, "B H W 1"]
+    depth_conf: Float32[Tensor, "B H W"]
+    pointmap: Optional[Float32[Tensor, "B H W 3"]]
 
     # which camera each point came from
-    cam_idx: Int32[torch.Tensor, "N"]
+    cam_idx: Int32[Tensor, "N"]
 
     _metadata: FrameTensorMetadata
 
-    def to_dict(self) -> Dict[str, torch.Tensor]:
+    def to_dict(self) -> Dict[str, Tensor]:
         d = asdict(self)
         d.pop("_metadata")
         return d
 
     @classmethod
-    def from_dict(
-        cls, d: Dict[str, torch.Tensor], metadata: FrameTensorMetadata
-    ) -> Self:
+    def from_dict(cls, d: Dict[str, Tensor], metadata: FrameTensorMetadata) -> Self:
         try:
             return cls(**d, _metadata=metadata)
         except (TypeError, ValueError):  # make the error type clear

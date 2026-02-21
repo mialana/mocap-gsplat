@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Self, Tuple, TypeAlias
 
 from ..infrastructure.decorators import run_once_per_instance
-from ..infrastructure.macros import crop_tensor, to_0_1
+from ..infrastructure.macros import crop_tensor, to_0_1, to_0_255
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
+    ImagesMaskTensor,
     ImagesTensorLike,
     ModelInferenceMode,
     PointCloudTensors,
@@ -26,6 +27,9 @@ from ..infrastructure.schemas import (
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     import torch
     from vggt.models.vggt import VGGT
+
+VGGT_EXPECTED_MAX_SIZE = 518
+VGGT_EXPECTED_PIXEL_MULTIPLE = 14
 
 
 class VGGTInterface(LogClassMixin):
@@ -108,6 +112,7 @@ class VGGTInterface(LogClassMixin):
     def run_inference(
         self,
         images: ImagesTensorLike,
+        images_mask: ImagesMaskTensor,
         metadata: FrameTensorMetadata,
         options: VGGTModelOptions,
     ) -> PointCloudTensors:
@@ -115,29 +120,34 @@ class VGGTInterface(LogClassMixin):
             raise DeveloperError("Model not initialized.")
 
         import torch
-        from jaxtyping import Float32, Int32, UInt8
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
-        images_f32 = to_0_1(images)  # ensure in 0-1 range
+        if TYPE_CHECKING:
+            from jaxtyping import Bool, Float32, Int32, UInt8
+
+        images_0_1 = to_0_1(images)  # ensure in 0-1 range
 
         extrinsic: Float32[torch.Tensor, "B 3 4"]
         intrinsic: Float32[torch.Tensor, "B 3 3"]
 
-        images_f32 = crop_tensor(  # crop down
-            images_f32.to(device=self.device, dtype=self.dtype),
-            max_size=518,
-            multiple=14,
+        images_0_1 = crop_tensor(  # crop down
+            images_0_1.to(device=self.device, dtype=self.dtype),
+            max_size=VGGT_EXPECTED_MAX_SIZE,
+            multiple=VGGT_EXPECTED_PIXEL_MULTIPLE,
+        )
+        images_mask = crop_tensor(  # crop down
+            images_mask.to(device=self.device, dtype=torch.bool),
+            max_size=VGGT_EXPECTED_MAX_SIZE,
+            multiple=VGGT_EXPECTED_PIXEL_MULTIPLE,
         )
 
         with torch.inference_mode():
-            predictions: Dict[str, torch.Tensor] = self.model(images_f32)
+            predictions: Dict[str, torch.Tensor] = self.model(images_0_1)
 
         extri_intri = pose_encoding_to_extri_intri(
-            predictions["pose_enc"], images_f32.shape[-2:], build_intrinsics=True
+            predictions["pose_enc"], images_0_1.shape[-2:], build_intrinsics=True
         )
-
-        if extri_intri[1] is None:
-            raise UnexpectedError("`build_intrinsics` argument ineffective.")
+        assert extri_intri[1] is not None  # specified `build_intrinsics` arg
 
         extrinsic: Float32[torch.Tensor, "B 3 4"] = extri_intri[0]
         intrinsic: Float32[torch.Tensor, "B 3 3"] = extri_intri[1]
@@ -168,16 +178,13 @@ class VGGTInterface(LogClassMixin):
             B, H, W, 3
         )
         conf_map: Float32[torch.Tensor, "B H W"] = conf_map.reshape(B, H, W)
+        mask: Bool[torch.Tensor, "N"] = images_mask.reshape(-1)
 
         xyz: Float32[torch.Tensor, "N 3"] = world_points.reshape(-1, 3)
         conf: Float32[torch.Tensor, "N"] = conf_map.reshape(-1)
 
-        rgb: UInt8[torch.Tensor, "N 3"] = (
-            images_f32.permute(0, 2, 3, 1)
-            .reshape(-1, 3)
-            .clamp(0, 1)
-            .mul(255)
-            .to(torch.uint8)
+        rgb: UInt8[torch.Tensor, "N 3"] = to_0_255(
+            images_0_1.permute(0, 2, 3, 1).reshape(-1, 3)
         )
 
         if conf.numel() > 0:  # `numel` is num elements
@@ -187,13 +194,8 @@ class VGGTInterface(LogClassMixin):
         else:
             conf_threshold: Float32[torch.Tensor, "1"] = conf.new_tensor(0.0)
 
-        mask: Float32[torch.Tensor, "N"] = (conf >= conf_threshold) & (conf > 1e-5)
-
-        if options.enable_black_mask:
-            mask &= rgb.sum(dim=1) >= 16
-
-        if options.enable_white_mask:
-            mask &= ~((rgb[:, 0] > 240) & (rgb[:, 1] > 240) & (rgb[:, 2] > 240))
+        conf_mask: Bool[torch.Tensor, "N"] = (conf >= conf_threshold) & (conf > 1e-6)
+        mask &= conf_mask  # AND masks
 
         cam_idx: Int32[torch.Tensor, "N"] = torch.repeat_interleave(
             torch.arange(B, device=conf.device, dtype=torch.int32),

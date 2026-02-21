@@ -1,4 +1,4 @@
-# 2026-02-12 19:09:12.354960
+# 2026-02-20 16:27:22.383702
 # created using 'generate_property_meta_files.py'
 
 
@@ -61,8 +61,6 @@ class Mosplat_PG_LogEntryHub_Meta(NamedTuple):
 class Mosplat_PG_VGGTModelOptions_Meta(NamedTuple):
     inference_mode: PropertyMeta
     confidence_percentile: PropertyMeta
-    enable_black_mask: PropertyMeta
-    enable_white_mask: PropertyMeta
 
 
 class Mosplat_PG_Global_Meta(NamedTuple):
@@ -180,12 +178,6 @@ MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
     ),
     confidence_percentile=PropertyMeta(
         id="confidence_percentile", name="Confidence Percentile", description=""
-    ),
-    enable_black_mask=PropertyMeta(
-        id="enable_black_mask", name="Enable Black Mask", description=""
-    ),
-    enable_white_mask=PropertyMeta(
-        id="enable_white_mask", name="Enable White Mask", description=""
     ),
 )
 
