@@ -23,19 +23,20 @@ applied.
 """
 
 from pathlib import Path
-from typing import List, Optional, Tuple, TypeAlias
+from typing import Annotated, List, Optional, Tuple, TypeAlias
 
 import torch
-from jaxtyping import Bool, Float32
+from dltype import BoolTensor, Float32Tensor, dltyped
 
-ImagesTensor: TypeAlias = Float32[torch.Tensor, "S 3 H W"]
-ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "S 1 H W"]
+ImagesTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 H W"]]
+ImagesAlphaTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 1 H W"]]
 
-CamMaskTensor: TypeAlias = Bool[torch.Tensor, "S"]
+CamMaskTensor: TypeAlias = Annotated[torch.Tensor, BoolTensor["S"]]
 
 CAM_MASK: Optional[CamMaskTensor] = None
 
 
+@dltyped()
 def preprocess(
     frame_idx: int, media_files: List[Path], images: ImagesTensor
 ) -> Tuple[ImagesTensor, Optional[ImagesAlphaTensor]]:
@@ -67,10 +68,12 @@ def preprocess(
     return images, None
 
 
+@dltyped()
 def _rotate_180(x: ImagesTensor) -> ImagesTensor:
     return torch.flip(x, dims=(2, 3))
 
 
+@dltyped()
 def _create_camera_mask(
     media_filenames: List[Path], device: torch.device
 ) -> CamMaskTensor:

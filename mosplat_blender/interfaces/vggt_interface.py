@@ -12,13 +12,10 @@ from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple, TypeAlias
 
 from ..infrastructure.constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from ..infrastructure.decorators import run_once_per_instance
-from ..infrastructure.macros import to_0_1, to_0_255, to_channel_as_item
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
     ModelInferenceMode,
-    PointCloudTensors,
-    TensorTypes as TT,
     VGGTModelOptions,
 )
 
@@ -29,13 +26,18 @@ if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     from torch import Tensor
     from vggt.models.vggt import VGGT as VGGTType
 
+    from ..infrastructure.dl_ops import (
+        PointCloudTensors as PointCloudTensorsType,
+        TensorTypes,
+    )
+
     class VGGTPredictions(TypedDict):
         pose_enc: Float32[Tensor, "B S 9"]
         depth: Float32[Tensor, "B S H W 1"]
         depth_conf: Float32[Tensor, "B S H W"]
         world_points: Float32[Tensor, "B S H W 3"]
         world_points_conf: Float32[Tensor, "B S H W"]
-        images: TT.ImagesAlphaTensor_0_1
+        images: TensorTypes.ImagesAlphaTensor_0_1
 
 
 def ensure_tensor_shape_for_vggt(tensor: Tensor):
@@ -125,10 +127,18 @@ class VGGTInterface(LogClassMixin):
 
     def run_inference(
         self,
-        images_0_255: TT.ImagesAlphaTensor_0_255,
-        images_alpha_0_255: TT.ImagesAlphaTensor_0_255,
+        images_0_255: TensorTypes.ImagesAlphaTensor_0_255,
+        images_alpha_0_255: TensorTypes.ImagesAlphaTensor_0_255,
         options: VGGTModelOptions,
-    ) -> PointCloudTensors:
+    ) -> PointCloudTensorsType:
+        from ..infrastructure.dl_ops import (
+            PointCloudTensors,
+            TensorTypes as TT,
+            to_0_1,
+            to_0_255,
+            to_channel_as_item,
+        )
+
         if self.model is None:
             raise DeveloperError("Model not initialized.")
 
@@ -176,7 +186,7 @@ class VGGTInterface(LogClassMixin):
             selected_conf = depth_conf
 
         xyz: TT.XYZTensor = pointmap.reshape(-1, 3)
-        rgb: TT.RGBTensor = to_0_255(to_channel_as_item(images).reshape(-1, 3))
+        rgb: TT.RGB_0_255_Tensor = to_0_255(to_channel_as_item(images).reshape(-1, 3))
         conf: TT.ConfTensor = selected_conf.reshape(-1)
         conf_threshold: Float32[torch.Tensor, ""] = torch.quantile(
             conf, options.confidence_percentile / 100.0
@@ -198,7 +208,7 @@ class VGGTInterface(LogClassMixin):
 
         return PointCloudTensors(
             xyz=xyz,
-            rgb=rgb,
+            rgb_0_255=rgb,
             conf=conf,
             point_cams=point_cams,
             extrinsic=extrinsic,

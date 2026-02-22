@@ -1,14 +1,15 @@
 from pathlib import Path
-from typing import List, Optional, Tuple, TypeAlias
+from typing import Annotated, List, Optional, Tuple, TypeAlias
 
 import torch
-from jaxtyping import Bool, Float32
+from dltype import BoolTensor, Float32Tensor, dltyped
 from torchvision.models.segmentation import FCN_ResNet50_Weights, fcn_resnet50
 
-ImagesTensor: TypeAlias = Float32[torch.Tensor, "S 3 H W"]
-ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "S 1 H W"]
+ImagesTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 H W"]]
+ImagesAlphaTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 1 H W"]]
 
-CamMaskTensor: TypeAlias = Bool[torch.Tensor, "S"]
+CamMaskTensor: TypeAlias = Annotated[torch.Tensor, BoolTensor["S"]]
+
 
 CAM_MASK: Optional[CamMaskTensor] = None
 PERSON_CLASS = 15
@@ -27,6 +28,7 @@ COCO_DATASET_STD = torch.tensor(
 )[None, :, None, None]
 
 
+@dltyped()
 def preprocess(
     frame_idx: int, media_files: List[Path], images: ImagesTensor
 ) -> Tuple[ImagesTensor, Optional[ImagesAlphaTensor]]:
@@ -42,6 +44,7 @@ def preprocess(
     return images, person_mask
 
 
+@dltyped()
 @torch.no_grad()
 def _create_person_class_mask(
     images: ImagesTensor,
@@ -49,7 +52,9 @@ def _create_person_class_mask(
     normalized = normalize_to_coco_dataset(images)
 
     # model has 21 classes in total
-    outputs: Float32[torch.Tensor, "S 21 H W"] = model(normalized)["out"]
+    outputs: Annotated[torch.Tensor, Float32Tensor["S 21 H W"]] = model(normalized)[
+        "out"
+    ]
 
     # per-pixel, get the class which has the highest prediction likeliness
     class_map: ImagesAlphaTensor = outputs.argmax(dim=1, keepdim=True)
@@ -60,14 +65,17 @@ def _create_person_class_mask(
     return (person_mask).to(torch.float32)
 
 
+@dltyped()
 def normalize_to_coco_dataset(images: ImagesTensor) -> ImagesTensor:
     return (images - COCO_DATASET_MEAN) / COCO_DATASET_STD
 
 
+@dltyped()
 def _rotate_180(x: ImagesTensor) -> ImagesTensor:
     return torch.flip(x, dims=(2, 3))
 
 
+@dltyped()
 def _create_camera_mask(
     media_filenames: List[Path], device: torch.device
 ) -> CamMaskTensor:

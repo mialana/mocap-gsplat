@@ -6,13 +6,6 @@ from numbers import Integral
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
-from ..infrastructure.macros import (
-    crop_tensor,
-    load_and_verify_tensor_file,
-    save_images_tensor,
-    save_tensor_stack_png_preview,
-    to_0_1,
-)
 from ..infrastructure.schemas import (
     CropGeometry,
     FrameTensorMetadata,
@@ -20,7 +13,6 @@ from ..infrastructure.schemas import (
     ProcessedFrameRange,
     SavedTensorFileName,
     SavedTensorKey,
-    TensorTypes as TT,
     UserAssertionError,
     UserFacingError,
 )
@@ -93,6 +85,15 @@ class Mosplat_OT_extract_frame_range(
         import torch
         from torchcodec.decoders import VideoDecoder
 
+        from ..infrastructure.dl_ops import (
+            TensorTypes as TT,
+            crop_tensor,
+            load_and_verify_tensor_file,
+            save_images_tensor,
+            save_tensor_stack_png_preview,
+            to_0_1,
+        )
+
         files, (start, end), exported_file_formatter, preview, H, W, data = pwargs
 
         out_file_formatter = partial(
@@ -139,7 +140,9 @@ class Mosplat_OT_extract_frame_range(
                     out_file,
                     device,
                     new_metadata,
-                    keys=[SavedTensorKey.IMAGES],
+                    map={
+                        SavedTensorKey.IMAGES: TT.annotation_of(TT.ImagesTensor_0_255)
+                    },
                 )
                 note = f"Safetensor data for frame '{idx}' already found on disk."
             except (OSError, UserAssertionError, UserFacingError):

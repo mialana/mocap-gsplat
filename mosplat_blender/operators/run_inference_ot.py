@@ -2,18 +2,11 @@ from functools import partial
 from pathlib import Path
 from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
 
-from ..infrastructure.macros import (
-    load_and_verify_tensor_file,
-    save_ply_ascii,
-    save_ply_binary,
-)
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
-    PointCloudTensors,
     SavedTensorFileName,
     SavedTensorKey,
-    TensorTypes as TT,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
@@ -79,9 +72,17 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
     @staticmethod
     def _operator_thread(queue, cancel_event, *, twargs):
+
         import torch
         from safetensors.torch import save_file
 
+        from ..infrastructure.dl_ops import (
+            PointCloudTensors,
+            TensorTypes as TT,
+            load_and_verify_tensor_file,
+            save_ply_ascii,
+            save_ply_binary,
+        )
         from ..interfaces.vggt_interface import VGGTInterface
 
         INTERFACE = VGGTInterface()
@@ -103,11 +104,13 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             file_ext="ply",
         )
 
-        image_tensor_keys: List[str] = [
-            SavedTensorKey.IMAGES,
-            SavedTensorKey.IMAGES_ALPHA,
-        ]
-        pointcloud_tensor_keys: List[str] = PointCloudTensors.keys()
+        image_tensor_map = {
+            SavedTensorKey.IMAGES.value: TT.annotation_of(TT.ImagesTensor_0_255),
+            SavedTensorKey.IMAGES_ALPHA.value: TT.annotation_of(
+                TT.ImagesAlphaTensor_0_255
+            ),
+        }
+        pointcloud_tensor_map = PointCloudTensors.map()
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -133,7 +136,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                         tensor_out_file,
                         device,
                         new_metadata,
-                        keys=pointcloud_tensor_keys,
+                        map=pointcloud_tensor_map,
                     )
                     queue.put(
                         (
@@ -152,7 +155,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                         tensor_in_file,
                         device,
                         validation_metadata,
-                        keys=image_tensor_keys,
+                        map=image_tensor_map,
                     )
                     images: TT.ImagesTensor_0_255 = tensors[SavedTensorKey.IMAGES]
                     images_alpha: TT.ImagesAlphaTensor_0_255 = tensors[
@@ -168,9 +171,13 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     )
                     # save PLY file to disk
                     if format == "ascii":
-                        save_ply_ascii(ply_out_file, pc_tensors.xyz, pc_tensors.rgb)
+                        save_ply_ascii(
+                            ply_out_file, pc_tensors.xyz, pc_tensors.rgb_0_255
+                        )
                     else:
-                        save_ply_binary(ply_out_file, pc_tensors.xyz, pc_tensors.rgb)
+                        save_ply_binary(
+                            ply_out_file, pc_tensors.xyz, pc_tensors.rgb_0_255
+                        )
 
                     queue.put(("update", f"Ran inference on frame '{idx}'"))
             except Exception as e:

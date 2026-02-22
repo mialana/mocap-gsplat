@@ -10,12 +10,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, NamedTuple, Self, Tuple
 
-from ..infrastructure.macros import to_0_1, to_channel_as_item, to_channel_as_primary
-from ..infrastructure.schemas import (
+from ..infrastructure.dl_ops import (
     PointCloudTensors,
-    SplatTrainingConfig,
     TensorTypes as TT,
+    to_0_1,
+    to_channel_as_item,
+    to_channel_as_primary,
 )
+from ..infrastructure.schemas import SplatTrainingConfig
 
 if TYPE_CHECKING:
     from jaxtyping import Bool, Float32, Int64
@@ -246,7 +248,7 @@ class SplatModel:
         pc_tensors.to(device)  # convert to device
         means, rgb_fused, conf_fused = fuse_points_by_voxel(
             pc_tensors.xyz,
-            to_0_1(pc_tensors.rgb),
+            to_0_1(pc_tensors.rgb_0_255),
             pc_tensors.conf,
             voxel_size=voxel_size,
         )

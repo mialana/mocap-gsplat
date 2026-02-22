@@ -8,13 +8,12 @@ from __future__ import annotations
 import json
 import os
 from abc import ABC
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum, auto
 from pathlib import Path
 from string import capwords
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -29,8 +28,6 @@ from typing import (
     cast,
 )
 
-from dltype import dltyped_dataclass
-
 from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from .macros import (
     append_if_not_equals,
@@ -39,8 +36,7 @@ from .macros import (
 )
 
 if TYPE_CHECKING:
-    import torchcodec.decoders
-    from torch import Device, Tensor
+    from torchcodec.decoders import VideoStreamMetadata
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
 
@@ -403,88 +399,6 @@ class FrameTensorMetadata(NamedTuple):
             raise OSError(str(e)) from e
 
 
-class TensorTypes:
-    import torch
-    from dltype import Float32Tensor, Int32Tensor, TensorTypeBase, UInt8Tensor
-
-    ImagesTensor_0_1: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 H W"]]
-    ImagesTensor_0_255: TypeAlias = Annotated[torch.Tensor, UInt8Tensor["S 3 H W"]]
-
-    ImagesAlphaTensor_0_1: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 1 H W"]]
-    ImagesAlphaTensor_0_255: TypeAlias = Annotated[torch.Tensor, UInt8Tensor["S 1 H W"]]
-
-    VoxelTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor[None]]
-
-    XYZTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["N 3"]]
-    RGBTensor: TypeAlias = Annotated[torch.Tensor, UInt8Tensor["N 3"]]
-    ConfTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["N"]]
-    PointCamsTensor: TypeAlias = Annotated[torch.Tensor, Int32Tensor["N"]]
-
-    ExtrinsicTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 4"]]
-    IntrinsicTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 3"]]
-
-    DepthTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W 1"]]
-    DepthConfTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W"]]
-    PointmapTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W 3"]]
-    PointmapConfTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W"]]
-
-    class UInt8Float32Tensor(TensorTypeBase):
-        def check(self, tensor, tensor_name="anonymous"):
-            import torch
-            from dltype import DLTypeDtypeError
-
-            super().check(tensor, tensor_name)
-
-            if tensor.dtype not in (torch.uint8, torch.float32):
-                raise DLTypeDtypeError(
-                    tensor_name=tensor_name,
-                    expected=(torch.uint8, torch.float32),
-                    received=(tensor.dtype,),
-                )
-
-    ImagesTensorLike: TypeAlias = Annotated[torch.Tensor, UInt8Float32Tensor["S 3 H W"]]
-    ImagesAlphaTensorLike: TypeAlias = Annotated[
-        torch.Tensor, UInt8Float32Tensor["S 1 H W"]
-    ]
-
-
-@dltyped_dataclass()
-@dataclass(frozen=True, slots=True)
-class PointCloudTensors:
-    xyz: TensorTypes.XYZTensor
-    rgb: TensorTypes.RGBTensor
-    conf: TensorTypes.ConfTensor  # confidence level of each point
-    point_cams: TensorTypes.PointCamsTensor  # which camera each point came from
-
-    extrinsic: TensorTypes.ExtrinsicTensor
-    intrinsic: TensorTypes.IntrinsicTensor
-
-    depth: TensorTypes.DepthTensor
-    depth_conf: TensorTypes.DepthConfTensor
-    pointmap: TensorTypes.PointmapTensor
-    pointmap_conf: TensorTypes.PointmapConfTensor
-
-    def to_dict(self) -> Dict[str, Tensor]:
-        d = asdict(self)
-        return d
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Tensor]) -> Self:
-        try:
-            return cls(**d)
-        except (TypeError, ValueError):  # make the error type clear
-            raise
-
-    @classmethod
-    def keys(cls) -> List[str]:
-        return [fld.name for fld in fields(cls)]
-
-    def to(self, device: Device):
-        for fld in fields(self):
-            tensor: Tensor = getattr(self, fld.name)
-            tensor.to(device)
-
-
 @dataclass(frozen=True)
 class AppliedPreprocessScript:
     file_path: str
@@ -580,7 +494,7 @@ class MediaFileStatus:
             or self.file_size == -1
         )
 
-    def from_torchcodec(self, metadata: torchcodec.decoders.VideoStreamMetadata):
+    def from_torchcodec(self, metadata: VideoStreamMetadata):
         stat = Path(self.filepath).stat()
 
         frame_count = metadata.num_frames

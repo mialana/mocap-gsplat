@@ -4,16 +4,12 @@ import multiprocessing as mp
 from functools import partial
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
+from typing import TYPE_CHECKING, Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
 from ..infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from ..infrastructure.macros import (
     get_required_function,
     import_module_from_path_dynamic,
-    load_and_verify_tensor_file,
-    save_images_tensor,
-    save_tensor_stack_png_preview,
-    to_0_1,
 )
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
@@ -21,12 +17,14 @@ from ..infrastructure.schemas import (
     MediaIOMetadata,
     SavedTensorFileName,
     SavedTensorKey,
-    TensorTypes as TT,
     UnexpectedError,
     UserAssertionError,
     UserFacingError,
 )
 from .base_ot import MosplatOperatorBase
+
+if TYPE_CHECKING:
+    from ..infrastructure.dl_ops import TensorTypes
 
 QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 
@@ -94,6 +92,14 @@ class Mosplat_OT_run_preprocess_script(
     def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
 
+        from ..infrastructure.dl_ops import (
+            TensorTypes as TT,
+            load_and_verify_tensor_file,
+            save_images_tensor,
+            save_tensor_stack_png_preview,
+            to_0_1,
+        )
+
         script, files, (start, end), exported_file_formatter, preview, data = pwargs
 
         in_file_formatter = partial(
@@ -134,10 +140,14 @@ class Mosplat_OT_run_preprocess_script(
                         out_file,
                         device,
                         new_metadata,
-                        keys=[
-                            SavedTensorKey.IMAGES,
-                            SavedTensorKey.IMAGES_ALPHA,
-                        ],
+                        map={
+                            SavedTensorKey.IMAGES.value: TT.annotation_of(
+                                TT.ImagesTensor_0_255
+                            ),
+                            SavedTensorKey.IMAGES_ALPHA.value: TT.annotation_of(
+                                TT.ImagesAlphaTensor_0_255
+                            ),
+                        },
                     )
                     queue.put(
                         (
@@ -155,7 +165,11 @@ class Mosplat_OT_run_preprocess_script(
                         in_file,
                         device,
                         validation_metadata,
-                        keys=[SavedTensorKey.IMAGES],
+                        map={
+                            SavedTensorKey.IMAGES.value: TT.annotation_of(
+                                TT.ImagesTensor_0_255
+                            )
+                        },
                     )
                     saved_images_0_255 = tensors[SavedTensorKey.IMAGES]
                     saved_images_0_1: TT.ImagesTensor_0_1 = to_0_1(saved_images_0_255)
@@ -227,9 +241,11 @@ def _retrieve_preprocess_fn(
 
 
 def _validate_preprocess_script_output(
-    output, input_images: TT.ImagesTensor_0_1
-) -> Tuple[TT.ImagesTensor_0_1, TT.ImagesAlphaTensor_0_1]:
+    output, input_images: TensorTypes.ImagesTensor_0_1
+) -> Tuple[TensorTypes.ImagesTensor_0_1, TensorTypes.ImagesAlphaTensor_0_1]:
     import torch
+
+    from ..infrastructure.dl_ops import to_0_1
 
     if not isinstance(output, tuple):
         raise UserAssertionError(
