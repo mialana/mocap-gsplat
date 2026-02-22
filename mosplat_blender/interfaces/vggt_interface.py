@@ -8,11 +8,11 @@ import gc
 import multiprocessing as mp
 import multiprocessing.synchronize as mp_sync
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Self, Tuple, TypeAlias
+from typing import TYPE_CHECKING, ClassVar, Optional, Self, Tuple, TypeAlias
 
 from ..infrastructure.constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from ..infrastructure.decorators import run_once_per_instance
-from ..infrastructure.macros import to_0_1, to_0_255
+from ..infrastructure.macros import to_0_1, to_0_255, to_channel_as_item
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
@@ -24,8 +24,19 @@ from ..infrastructure.schemas import (
 )
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
+    from typing import TypedDict
+
+    from jaxtyping import Bool, Float32, Int32, UInt8
     from torch import Tensor
-    from vggt.models.vggt import VGGT
+    from vggt.models.vggt import VGGT as VGGTType
+
+    class VGGTPredictions(TypedDict):
+        pose_enc: Float32[Tensor, "B S 9"]
+        depth: Float32[Tensor, "B S H W 1"]
+        depth_conf: Float32[Tensor, "B S H W"]
+        world_points: Float32[Tensor, "B S H W 3"]
+        world_points_conf: Float32[Tensor, "B S H W"]
+        images: TT.ImagesAlphaTensor_0_1
 
 
 def ensure_tensor_shape_for_vggt(tensor: Tensor):
@@ -55,7 +66,7 @@ class VGGTInterface(LogClassMixin):
     def __init__(self):
         import torch
 
-        self.model: Optional[VGGT] = None
+        self.model: Optional[VGGTType] = None
         self.hf_id: Optional[str] = None
         self.model_cache_dir: Optional[Path] = None
         self.model_device: torch.device = torch.device(
@@ -115,9 +126,8 @@ class VGGTInterface(LogClassMixin):
 
     def run_inference(
         self,
-        images: TT.ImagesTensorLike,
-        images_alpha: TT.ImagesAlphaTensorLike,
-        metadata: FrameTensorMetadata,
+        images_0_255: TT.ImagesAlphaTensor_0_255,
+        images_alpha_0_255: TT.ImagesAlphaTensor_0_255,
         options: VGGTModelOptions,
     ) -> PointCloudTensors:
         if self.model is None:
@@ -126,94 +136,78 @@ class VGGTInterface(LogClassMixin):
         import torch
         from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
-        if TYPE_CHECKING:
-            from jaxtyping import Bool, Float32, Int32, UInt8
+        ensure_tensor_shape_for_vggt(images_0_255)
+        ensure_tensor_shape_for_vggt(images_alpha_0_255)
 
-        images_alpha = to_0_1(images_alpha)
-        images = to_0_1(images)
+        images = to_0_1(images_0_255)
+        images_alpha = to_0_1(images_alpha_0_255)
 
-        images = images * images_alpha  # apply alpha tensor
+        images.mul_(images_alpha)  # apply alpha tensor
 
         with torch.inference_mode():
-            predictions: Dict[str, torch.Tensor] = self.model(images)
+            predictions: VGGTPredictions = self.model(images)
 
         extri_intri = pose_encoding_to_extri_intri(
             predictions["pose_enc"], images.shape[-2:], build_intrinsics=True
         )
         assert extri_intri[1] is not None  # specified `build_intrinsics` arg
 
-        extrinsic: Float32[torch.Tensor, "B 3 4"] = extri_intri[0]
-        intrinsic: Float32[torch.Tensor, "B 3 3"] = extri_intri[1]
+        extri: Float32[torch.Tensor, "S 3 4"] = extri_intri[0]
+        intri: Float32[torch.Tensor, "S 3 3"] = extri_intri[1]
 
-        predictions["extrinsic"] = extrinsic
-        predictions["intrinsic"] = intrinsic
+        B, S, H, W, _ = predictions[
+            "world_points"
+        ].shape  # batch, scene, height, width, positions
+        S = B * S  # we are not using batch dimension, so flatten first two dimensions
 
-        depth: Float32[torch.Tensor, "1 B H W 1"] = predictions["depth"]
-        depth_conf: Float32[torch.Tensor, "1 B H W"] = predictions["depth_conf"]
-        pointmap: Float32[torch.Tensor, "1 B H W 3"] = predictions["world_points"]
-        pointmap_conf: Float32[torch.Tensor, "1 B H W"] = predictions[
-            "world_points_conf"
-        ]
+        extrinsic: TT.ExtrinsicTensor = extri.reshape(S, 3, 4)
+        intrinsic: TT.IntrinsicTensor = intri.reshape(S, 3, 3)
 
-        world_points: Float32[torch.Tensor, "1 B H W 3"]
-        conf_map: Float32[torch.Tensor, "1 B H W"]
-        if options.inference_mode == ModelInferenceMode.POINTMAP:
-            world_points = pointmap
-            conf_map = pointmap_conf
-        else:
-            world_points = predictions["world_points"]
-            conf_map = depth_conf
-
-        S, B, H, W, _ = world_points.shape  # Scene, Batch, Height, Width, Positions
-        B = S * B  # flatten first two dimensions
-
-        world_points: Float32[torch.Tensor, "B H W 3"] = world_points.reshape(
-            B, H, W, 3
+        depth: TT.DepthTensor = predictions["depth"].reshape(S, H, W, 1)
+        depth_conf: TT.DepthConfTensor = predictions["depth"].reshape(S, H, W)
+        pointmap: TT.PointmapTensor = predictions["world_points"].reshape(S, H, W, 3)
+        pointmap_conf: TT.PointmapConfTensor = predictions["world_points_conf"].reshape(
+            S, H, W
         )
-        conf_map: Float32[torch.Tensor, "B H W"] = conf_map.reshape(B, H, W)
 
-        xyz: Float32[torch.Tensor, "N 3"] = world_points.reshape(-1, 3)
-        conf: Float32[torch.Tensor, "N"] = conf_map.reshape(-1)
+        selected_conf: Float32[torch.Tensor, "S H W"]
+        if options.inference_mode == ModelInferenceMode.POINTMAP:
+            selected_conf = pointmap_conf
+        else:
+            selected_conf = depth_conf
 
-        rgb: UInt8[torch.Tensor, "N 3"] = to_0_255(
-            images.permute(0, 2, 3, 1).reshape(-1, 3)
+        xyz: TT.XYZTensor = pointmap.reshape(-1, 3)
+        rgb: TT.RGBTensor = to_0_255(to_channel_as_item(images).reshape(-1, 3))
+        conf: TT.ConfTensor = selected_conf.reshape(-1)
+        conf_threshold: Float32[torch.Tensor, ""] = torch.quantile(
+            conf, options.confidence_percentile / 100.0
+        )
+        point_cams: Int32[torch.Tensor, "N"] = torch.repeat_interleave(
+            torch.arange(S, device=conf.device, dtype=torch.int32),
+            H * W,
         )
 
         alpha: Float32[torch.Tensor, "N"] = images_alpha.reshape(-1)
 
-        conf_threshold: Float32[torch.Tensor, "1"] = torch.quantile(
-            conf, options.confidence_percentile / 100.0
-        )
         mask: Bool[torch.Tensor, "N"] = (conf >= conf_threshold) & (conf > 1e-6)
         mask &= alpha > 0.5  # use alpha as an additional mask
 
-        cam_idx: Int32[torch.Tensor, "N"] = torch.repeat_interleave(
-            torch.arange(B, device=conf.device, dtype=torch.int32),
-            H * W,
-        )
-
-        xyz = xyz[mask].cpu()
-        rgb = rgb[mask].cpu()
-        conf = conf[mask].cpu()
-        cam_idx = cam_idx[mask].cpu()
-
-        extrinsic = extrinsic.reshape(B, 3, 4).cpu()
-        intrinsic = intrinsic.reshape(B, 3, 3).cpu()
-        depth = depth.reshape(B, H, W, 1).cpu()
-        depth_conf = depth_conf.reshape(B, H, W).cpu()
-        pointmap = pointmap.reshape(B, H, W, 3).cpu()
+        xyz = xyz[mask]
+        rgb = rgb[mask]
+        conf = conf[mask]
+        point_cams = point_cams[mask]
 
         return PointCloudTensors(
             xyz=xyz,
             rgb=rgb,
             conf=conf,
+            point_cams=point_cams,
             extrinsic=extrinsic,
             intrinsic=intrinsic,
             depth=depth,
             depth_conf=depth_conf,
             pointmap=pointmap,
-            cam_idx=cam_idx,
-            _metadata=metadata,
+            pointmap_conf=pointmap_conf,
         )
 
     def cleanup(self):

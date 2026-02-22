@@ -12,7 +12,6 @@ from ..infrastructure.macros import (
     save_images_tensor,
     save_tensor_stack_png_preview,
     to_0_1,
-    to_0_255,
 )
 from ..infrastructure.schemas import (
     CropGeometry,
@@ -33,8 +32,8 @@ class ProcessKwargs(NamedTuple):
     frame_range: Tuple[int, int]
     exported_file_formatter: str
     create_preview_images: bool
-    median_width: int
     median_height: int
+    median_width: int
     data: MediaIOMetadata
 
 
@@ -69,8 +68,8 @@ class Mosplat_OT_extract_frame_range(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                median_width=int(accessor.median_width),
                 median_height=int(accessor.median_height),
+                median_width=int(accessor.median_width),
                 create_preview_images=bool(pkg.prefs.create_preview_images),
                 data=self.data,
             ),
@@ -94,7 +93,7 @@ class Mosplat_OT_extract_frame_range(
         import torch
         from torchcodec.decoders import VideoDecoder
 
-        files, (start, end), exported_file_formatter, preview, W, H, data = pwargs
+        files, (start, end), exported_file_formatter, preview, H, W, data = pwargs
 
         out_file_formatter = partial(
             exported_file_formatter.format,
@@ -102,15 +101,15 @@ class Mosplat_OT_extract_frame_range(
             file_ext="safetensors",
         )
 
-        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
-        torchcodec_device_str: str = (
-            "cpu" if sys.platform == "win32" else device_str
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        torchcodec_device = (
+            torch.device("cpu") if sys.platform == "win32" else device
         )  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
 
         decoders: List[VideoDecoder] = []
         try:
             for media_file in files:
-                dec = VideoDecoder(media_file, device=torchcodec_device_str)
+                dec = VideoDecoder(media_file, device=torchcodec_device)
                 decoders.append(dec)
         except ValueError as e:
             # exit early wherever error occurs and put error on queue
@@ -138,7 +137,7 @@ class Mosplat_OT_extract_frame_range(
             try:
                 _ = load_and_verify_tensor_file(
                     out_file,
-                    device_str,
+                    device,
                     new_metadata,
                     keys=[SavedTensorKey.IMAGES],
                 )
@@ -146,20 +145,16 @@ class Mosplat_OT_extract_frame_range(
             except (OSError, UserAssertionError, UserFacingError):
                 out_file.parent.mkdir(parents=True, exist_ok=True)
 
-                tensor_list = [
-                    dec[cast(Integral, idx)].to(device_str) for dec in decoders
-                ]
+                tensor_list = [dec[cast(Integral, idx)].to(device) for dec in decoders]
 
-                tensor_0_255: TT.ImagesTensor_0_255 = torch.stack(tensor_list, dim=0)
+                tensor_0_1: TT.ImagesTensor_0_1 = crop_tensor(
+                    to_0_1(torch.stack(tensor_list, dim=0)), crop_geom
+                )  # crop tensors as soon as possible
 
-                tensor_0_1: TT.ImagesTensor_0_1 = to_0_1(tensor_0_255)
-                tensor_0_1 = crop_tensor(tensor_0_1, crop_geom)  # crop float tensor
-                tensor_0_255 = to_0_255(tensor_0_1)
-
-                save_images_tensor(out_file, new_metadata, tensor_0_255, None)
+                save_images_tensor(out_file, new_metadata, tensor_0_1, None)
 
                 if preview:
-                    save_tensor_stack_png_preview(tensor_0_255, out_file)
+                    save_tensor_stack_png_preview(tensor_0_1, out_file)
 
                 note = f"Saved safetensor '{out_file}' to disk."
 

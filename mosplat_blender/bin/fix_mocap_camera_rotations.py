@@ -28,10 +28,10 @@ from typing import List, Optional, Tuple, TypeAlias
 import torch
 from jaxtyping import Bool, Float32
 
-ImagesTensor: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
-ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "B 1 H W"]
+ImagesTensor: TypeAlias = Float32[torch.Tensor, "S 3 H W"]
+ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "S 1 H W"]
 
-CamMaskTensor: TypeAlias = Bool[torch.Tensor, "B"]
+CamMaskTensor: TypeAlias = Bool[torch.Tensor, "S"]
 
 CAM_MASK: Optional[CamMaskTensor] = None
 
@@ -47,9 +47,9 @@ def preprocess(
         media_files: List of source media identifiers corresponding
             to images[i] (e.g. ["stream00.mp4", "stream01.mp4", ...]).
             Will have length of B (batch) dimension of `images` tensor.
-        images: Raw image data as a torch tensor of shape (B, 3, H, W),
-            where B (batch) is the number of media streams / cameras,
-            and the 2nd dimension are color channels. RGB values are normalized to the range 0.0-1.0 and are the data-type `float`. Lastly, H and W are directly the pixel size of the media files in the media directory.
+        images: Raw image data as a torch tensor of shape (S, 3, H, W),
+            where S (scene) is the number of media streams / cameras capturing each frame,
+            and the 2nd dimension is color channels. RGB values are normalized to the range 0.0-1.0 and are the data-type `float32`. Lastly, H and W are directly the pixel size of the media files in the media directory.
 
     Returns:
         tuple: A tuple containing:

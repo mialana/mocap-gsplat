@@ -28,7 +28,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from jaxtyping import Float32, UInt8
-    from torch import Tensor
+    from torch import Device, Tensor
 
     # type-check only imports to avoid circular imports
     from .schemas import CropGeometry, FrameTensorMetadata, TensorTypes as TT
@@ -163,8 +163,18 @@ def to_0_255(tensor: Tensor) -> Tensor:
     return (tensor.clamp(0, 1).mul_(255.0)).round().to(torch.uint8)
 
 
+def to_channel_as_primary(tensor: Tensor) -> Tensor:
+    assert len(tensor.shape) == 4
+    return tensor.permute(0, 3, 1, 2)
+
+
+def to_channel_as_item(tensor: Tensor) -> Tensor:
+    assert len(tensor.shape) == 4
+    return tensor.permute(0, 2, 3, 1)
+
+
 def save_tensor_stack_png_preview(
-    tensor: TT.ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
+    tensor: TT.ImagesTensor_0_1, tensor_out_file: Path, suffix: str = ""
 ):
     from torchvision.utils import save_image
 
@@ -177,23 +187,33 @@ def save_tensor_stack_png_preview(
     save_image(tensor_0_1, preview_png_file, nrow=4)
 
 
-def save_tensor_stack_separate_png_previews(
-    tensor: TT.ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
+def save_images_tensor(
+    out_file: Path,
+    metadata: FrameTensorMetadata,
+    images_0_1: TT.ImagesAlphaTensor_0_1,
+    images_alpha_0_1: Optional[TT.ImagesAlphaTensor_0_1],
 ):
-    from torchvision.utils import save_image
+    from safetensors.torch import save_file
 
-    tensor_0_1 = to_0_1(tensor)
+    from .schemas import SavedTensorKey
 
-    for idx, img in enumerate(tensor_0_1):
-        preview_png_file: Path = (
-            tensor_out_file.parent / f"{tensor_out_file.stem}{suffix}.{idx:04d}.png"
-        )
-        save_image(img, preview_png_file)
+    images = to_0_255(images_0_1)
+    out_tensors = {SavedTensorKey.IMAGES.value: images}
+
+    if images_alpha_0_1 is not None:
+        images_alpha = to_0_255(images_alpha_0_1)
+        out_tensors |= {SavedTensorKey.IMAGES_ALPHA.value: images_alpha}
+
+    save_file(
+        out_tensors,
+        filename=out_file,
+        metadata=metadata.to_dict(),
+    )
 
 
 def load_and_verify_tensor_file(
     in_file: Path,
-    device_str: str,
+    device: Device,
     new_metadata: FrameTensorMetadata,
     keys: List[str],  # keys to retrieve from the file
 ) -> Dict[str, Tensor]:
@@ -212,7 +232,7 @@ def load_and_verify_tensor_file(
         raise OSError from e
 
     tensors: Dict[str, Tensor] = {}
-    with safe_open(in_file, framework="pt", device=device_str) as f:
+    with safe_open(in_file, framework="pt", device=str(device)) as f:
         file: safe_open = f
         for key in keys:
             try:
@@ -240,30 +260,6 @@ def load_and_verify_tensor_file(
             )
 
     return tensors
-
-
-def save_images_tensor(
-    out_file: Path,
-    metadata: FrameTensorMetadata,
-    images: TT.ImagesTensorLike,
-    images_alpha: Optional[TT.ImagesAlphaTensorLike],
-):
-    from safetensors.torch import save_file
-
-    from .schemas import SavedTensorKey
-
-    images_0_255 = to_0_255(images)
-    tensors = {SavedTensorKey.IMAGES.value: images_0_255}
-
-    if images_alpha is not None:
-        images_alpha_0_255 = to_0_255(images_alpha)
-        tensors |= {SavedTensorKey.IMAGES_ALPHA.value: images_alpha_0_255}
-
-    save_file(
-        tensors,
-        filename=out_file,
-        metadata=metadata.to_dict(),
-    )
 
 
 def crop_tensor(
@@ -299,13 +295,9 @@ def crop_tensor(
     return tensor
 
 
-def save_ply_ascii(
-    out_file: Path, xyz: Float32[Tensor, "N 3"], rgb: UInt8[Tensor, "N 3"]
-):
-    rgb_0_255 = to_0_255(rgb)
-
-    assert xyz.shape[0] == rgb.shape[0]
-    assert xyz.shape[1] == 3 and rgb.shape[1] == 3
+def save_ply_ascii(out_file: Path, xyz: TT.XYZTensor, rgb_0_255: TT.RGBTensor):
+    assert xyz.shape[0] == rgb_0_255.shape[0]
+    assert xyz.shape[1] == 3 and rgb_0_255.shape[1] == 3
 
     xyz = xyz.cpu()
     rgb_0_255 = rgb_0_255.cpu()

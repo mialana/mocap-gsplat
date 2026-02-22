@@ -5,10 +5,10 @@ import torch
 from jaxtyping import Bool, Float32
 from torchvision.models.segmentation import FCN_ResNet50_Weights, fcn_resnet50
 
-ImagesTensor: TypeAlias = Float32[torch.Tensor, "B 3 H W"]
-ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "B 1 H W"]
+ImagesTensor: TypeAlias = Float32[torch.Tensor, "S 3 H W"]
+ImagesAlphaTensor: TypeAlias = Float32[torch.Tensor, "S 1 H W"]
 
-CamMaskTensor: TypeAlias = Bool[torch.Tensor, "B"]
+CamMaskTensor: TypeAlias = Bool[torch.Tensor, "S"]
 
 CAM_MASK: Optional[CamMaskTensor] = None
 PERSON_CLASS = 15
@@ -49,7 +49,7 @@ def _create_person_class_mask(
     normalized = normalize_to_coco_dataset(images)
 
     # model has 21 classes in total
-    outputs: Float32[torch.Tensor, "B 21 H W"] = model(normalized)["out"]
+    outputs: Float32[torch.Tensor, "S 21 H W"] = model(normalized)["out"]
 
     # per-pixel, get the class which has the highest prediction likeliness
     class_map: ImagesAlphaTensor = outputs.argmax(dim=1, keepdim=True)

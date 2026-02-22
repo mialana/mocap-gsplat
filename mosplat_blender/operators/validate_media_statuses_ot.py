@@ -56,11 +56,11 @@ class Mosplat_OT_validate_media_statuses(
 
         files, data = pwargs
 
-        torchcodec_device: str = (
+        torchcodec_device = torch.device(
             "cuda"
             if not sys.platform == "win32" and torch.cuda.is_available()
-            else "cpu"  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
-        )
+            else "cpu"
+        )  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
 
         status_lookup, accumulator = data.status_accumulator()
 

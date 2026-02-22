@@ -4,15 +4,7 @@ import multiprocessing as mp
 from functools import partial
 from pathlib import Path
 from types import ModuleType
-from typing import (
-    Callable,
-    List,
-    NamedTuple,
-    Optional,
-    Tuple,
-    TypeAlias,
-    assert_never,
-)
+from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
 from ..infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from ..infrastructure.macros import (
@@ -119,7 +111,7 @@ class Mosplat_OT_run_preprocess_script(
         if not preprocess_fn:
             return
 
-        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
 
@@ -140,7 +132,7 @@ class Mosplat_OT_run_preprocess_script(
                 try:
                     _ = load_and_verify_tensor_file(
                         out_file,
-                        device_str,
+                        device,
                         new_metadata,
                         keys=[
                             SavedTensorKey.IMAGES,
@@ -161,24 +153,27 @@ class Mosplat_OT_run_preprocess_script(
 
                     tensors = load_and_verify_tensor_file(
                         in_file,
-                        device_str,
+                        device,
                         validation_metadata,
                         keys=[SavedTensorKey.IMAGES],
                     )
-                    images_0_255 = tensors[SavedTensorKey.IMAGES]
-                    images_0_1: TT.ImagesTensor_0_1 = to_0_1(images_0_255)
+                    saved_images_0_255 = tensors[SavedTensorKey.IMAGES]
+                    saved_images_0_1: TT.ImagesTensor_0_1 = to_0_1(saved_images_0_255)
 
-                    output = preprocess_fn(idx, files, images_0_1)
+                    output = preprocess_fn(idx, files, saved_images_0_1)
 
-                    new_images, images_alpha = _validate_preprocess_script_output(
-                        output, images_0_1
+                    images_0_1, images_alpha_0_1 = _validate_preprocess_script_output(
+                        output, saved_images_0_1
                     )
-                    save_images_tensor(out_file, new_metadata, new_images, images_alpha)
+
+                    save_images_tensor(
+                        out_file, new_metadata, images_0_1, images_alpha_0_1
+                    )
 
                     if preview:
-                        save_tensor_stack_png_preview(new_images, out_file)
+                        save_tensor_stack_png_preview(images_0_1, out_file)
                         save_tensor_stack_png_preview(
-                            new_images * images_alpha, out_file, ".masked"
+                            images_0_1 * images_alpha_0_1, out_file, ".masked"
                         )
                     queue.put(("update", f"Finished processing frame '{idx}'", None))
             except Exception as e:
@@ -279,8 +274,8 @@ def _validate_preprocess_script_output(
             expected=torch.float32,
             actual=images_alpha.dtype,
         )
-    B, _, H, W = input_images.shape
-    expected_shape = torch.Size((B, 1, H, W))
+    S, _, H, W = input_images.shape
+    expected_shape = torch.Size((S, 1, H, W))
     if not images_alpha.shape == expected_shape:
         raise UserAssertionError(
             f"Shape of images alpha tensor incorrect",

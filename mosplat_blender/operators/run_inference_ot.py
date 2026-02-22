@@ -18,7 +18,6 @@ from ..infrastructure.schemas import (
     UserFacingError,
     VGGTModelOptions,
 )
-from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
@@ -36,6 +35,8 @@ class ThreadKwargs(NamedTuple):
 class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs]):
     @classmethod
     def _contexted_poll(cls, pkg):
+        from ..interfaces.vggt_interface import VGGTInterface
+
         if VGGTInterface().model is None:
             cls._poll_error_msg_list.append("Model must be initialized.")
         if not pkg.props.was_frame_range_extracted:
@@ -81,6 +82,10 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         import torch
         from safetensors.torch import save_file
 
+        from ..interfaces.vggt_interface import VGGTInterface
+
+        INTERFACE = VGGTInterface()
+
         script, files, (start, end), exported_file_formatter, format, options = twargs
         in_file_formatter = partial(
             exported_file_formatter.format,
@@ -104,7 +109,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         ]
         pointcloud_tensor_keys: List[str] = PointCloudTensors.keys()
 
-        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
 
@@ -126,7 +131,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 try:
                     _ = load_and_verify_tensor_file(
                         tensor_out_file,
-                        device_str,
+                        device,
                         new_metadata,
                         keys=pointcloud_tensor_keys,
                     )
@@ -145,7 +150,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     )  # options did not exist in 'run preprocess script' step
                     tensors = load_and_verify_tensor_file(
                         tensor_in_file,
-                        device_str,
+                        device,
                         validation_metadata,
                         keys=image_tensor_keys,
                     )
@@ -154,9 +159,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                         SavedTensorKey.IMAGES_ALPHA
                     ]
 
-                    pc_tensors = VGGTInterface().run_inference(
-                        images, images_alpha, new_metadata, options
-                    )
+                    pc_tensors = INTERFACE.run_inference(images, images_alpha, options)
                     # save point cloud tensors to disk
                     save_file(
                         pc_tensors.to_dict(),

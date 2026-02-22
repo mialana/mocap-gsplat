@@ -38,7 +38,7 @@ from .macros import (
 if TYPE_CHECKING:
     import torchcodec.decoders
     from jaxtyping import Float32, Int32, UInt8
-    from torch import Tensor
+    from torch import Device, Tensor
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
 
@@ -325,6 +325,19 @@ class ModelInferenceMode(StrEnum):
 
 
 @dataclass(frozen=True)
+class SplatTrainingConfig:
+    steps: int = 30000
+    lr: float = 1e-2  # learning rate (`EPS` is too slow)
+    sh_degree: int = 0
+    batch_size: int = 1  # cameras per frame
+
+    alpha_weight: float = 0.1  # weight of alpha in loss computation
+    depth_weight: float = 0.01  # weight of depth in loss computation
+
+    save_ply_interval: int = 5000  # i.e. every x steps
+
+
+@dataclass(frozen=True)
 class VGGTModelOptions:
     inference_mode: ModelInferenceMode
     confidence_percentile: float
@@ -391,23 +404,26 @@ class FrameTensorMetadata(NamedTuple):
 if TYPE_CHECKING:
 
     class TensorTypes:
-        ImagesTensor_0_1: TypeAlias = Float32[Tensor, "B 3 H W"]
-        ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "B 3 H W"]
-        ImagesTensorLike: TypeAlias = Union[ImagesTensor_0_255, ImagesTensor_0_1]
+        ImagesTensor_0_1: TypeAlias = Float32[Tensor, "S 3 H W"]
+        ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "S 3 H W"]
 
-        ImagesAlphaTensor_0_1: TypeAlias = Float32[Tensor, "B 1 H W"]
-        ImagesAlphaTensor_0_255: TypeAlias = UInt8[Tensor, "B 1 H W"]
-        ImagesAlphaTensorLike: TypeAlias = Union[
-            ImagesAlphaTensor_0_1, ImagesAlphaTensor_0_255
-        ]
+        ImagesAlphaTensor_0_1: TypeAlias = Float32[Tensor, "S 1 H W"]
+        ImagesAlphaTensor_0_255: TypeAlias = UInt8[Tensor, "S 1 H W"]
+
+        VoxelTensor: TypeAlias = Float32[Tensor, ""]
 
         XYZTensor: TypeAlias = Float32[Tensor, "N 3"]
-        RGBTensor_0_1: TypeAlias = Float32[Tensor, "N 3"]
-        RGBTensor_0_255: TypeAlias = UInt8[Tensor, "N 3"]
-        RGBTensorLike: TypeAlias = Union[RGBTensor_0_1, RGBTensor_0_255]
-
+        RGBTensor: TypeAlias = UInt8[Tensor, "N 3"]
         ConfTensor: TypeAlias = Float32[Tensor, "N"]
-        ExtrinsicTensor: TypeAlias = Float32[Tensor, "B 3 4"]
+        PointCamsTensor: TypeAlias = Int32[Tensor, "N"]
+
+        ExtrinsicTensor: TypeAlias = Float32[Tensor, "S 3 4"]
+        IntrinsicTensor: TypeAlias = Float32[Tensor, "S 3 3"]
+
+        DepthTensor: TypeAlias = Float32[Tensor, "S H W 1"]
+        DepthConfTensor: TypeAlias = Float32[Tensor, "S H W"]
+        PointmapTensor: TypeAlias = Float32[Tensor, "S H W 3"]
+        PointmapConfTensor: TypeAlias = Float32[Tensor, "S H W"]
 
 else:
     TensorTypes: TypeAlias = object
@@ -415,33 +431,38 @@ else:
 
 @dataclass(frozen=True)
 class PointCloudTensors:
-    xyz: Float32[Tensor, "N 3"]
-    rgb: TensorTypes.RGBTensor_0_255
+    xyz: TensorTypes.XYZTensor
+    rgb: TensorTypes.RGBTensor
     conf: TensorTypes.ConfTensor  # confidence level of each point
-    extrinsic: Float32[Tensor, "B 3 4"]
-    intrinsic: Float32[Tensor, "B 3 3"]
-    depth: Float32[Tensor, "B H W 1"]
-    depth_conf: Float32[Tensor, "B H W"]
-    pointmap: Optional[Float32[Tensor, "B H W 3"]]
-    cam_idx: Int32[Tensor, "N"]  # which camera each point came from
+    point_cams: TensorTypes.PointCamsTensor  # which camera each point came from
 
-    _metadata: FrameTensorMetadata
+    extrinsic: TensorTypes.ExtrinsicTensor
+    intrinsic: TensorTypes.IntrinsicTensor
+
+    depth: TensorTypes.DepthTensor
+    depth_conf: TensorTypes.DepthConfTensor
+    pointmap: TensorTypes.PointmapTensor
+    pointmap_conf: TensorTypes.PointmapConfTensor
 
     def to_dict(self) -> Dict[str, Tensor]:
         d = asdict(self)
-        d.pop("_metadata")
         return d
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Tensor], metadata: FrameTensorMetadata) -> Self:
+    def from_dict(cls, d: Dict[str, Tensor]) -> Self:
         try:
-            return cls(**d, _metadata=metadata)
+            return cls(**d)
         except (TypeError, ValueError):  # make the error type clear
             raise
 
     @classmethod
     def keys(cls) -> List[str]:
-        return [fld.name for fld in fields(cls) if fld.name != "_metadata"]
+        return [fld.name for fld in fields(cls)]
+
+    def to(self, device: Device):
+        for fld in fields(self):
+            tensor: Tensor = getattr(self, fld.name)
+            tensor.to(device)
 
 
 @dataclass(frozen=True)
