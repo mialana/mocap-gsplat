@@ -21,6 +21,7 @@ coloredlogs
 python-dotenv
 psutil
 jaxtyping
+dltype
 
 gsplat
 

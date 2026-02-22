@@ -255,7 +255,7 @@ def _validate_preprocess_script_output(
         )
     if not images.dtype == input_images.dtype:
         raise UserAssertionError(
-            f"Data type of images tensor cannot change after preprocess script",
+            f"Datatype of images tensor cannot change after preprocess script",
             expected=input_images.dtype,
             actual=images.dtype,
         )
@@ -270,7 +270,7 @@ def _validate_preprocess_script_output(
         images_alpha = torch.ones_like(images[:, :1], dtype=torch.float32)
     if not images_alpha.dtype == torch.float32:
         raise UserAssertionError(
-            f"Data type of images alpha tensor incorrect",
+            f"Datatype of images alpha tensor incorrect",
             expected=torch.float32,
             actual=images_alpha.dtype,
         )

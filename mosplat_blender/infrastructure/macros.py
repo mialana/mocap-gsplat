@@ -373,3 +373,10 @@ def save_ply_binary(
         vertices["blue"] = rgb_np[:, 2]
 
         f.write(vertices.tobytes())
+
+
+def failed_decorator_import_factory(*args, **kwargs):
+    def decorator(obj):
+        return obj
+
+    return decorator

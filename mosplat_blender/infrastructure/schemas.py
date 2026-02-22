@@ -14,6 +14,7 @@ from pathlib import Path
 from string import capwords
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -28,6 +29,8 @@ from typing import (
     cast,
 )
 
+from dltype import dltyped_dataclass
+
 from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from .macros import (
     append_if_not_equals,
@@ -37,7 +40,6 @@ from .macros import (
 
 if TYPE_CHECKING:
     import torchcodec.decoders
-    from jaxtyping import Float32, Int32, UInt8
     from torch import Device, Tensor
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
@@ -401,35 +403,53 @@ class FrameTensorMetadata(NamedTuple):
             raise OSError(str(e)) from e
 
 
-if TYPE_CHECKING:
+class TensorTypes:
+    import torch
+    from dltype import Float32Tensor, Int32Tensor, TensorTypeBase, UInt8Tensor
 
-    class TensorTypes:
-        ImagesTensor_0_1: TypeAlias = Float32[Tensor, "S 3 H W"]
-        ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "S 3 H W"]
+    ImagesTensor_0_1: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 H W"]]
+    ImagesTensor_0_255: TypeAlias = Annotated[torch.Tensor, UInt8Tensor["S 3 H W"]]
 
-        ImagesAlphaTensor_0_1: TypeAlias = Float32[Tensor, "S 1 H W"]
-        ImagesAlphaTensor_0_255: TypeAlias = UInt8[Tensor, "S 1 H W"]
+    ImagesAlphaTensor_0_1: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 1 H W"]]
+    ImagesAlphaTensor_0_255: TypeAlias = Annotated[torch.Tensor, UInt8Tensor["S 1 H W"]]
 
-        VoxelTensor: TypeAlias = Float32[Tensor, ""]
+    VoxelTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor[None]]
 
-        XYZTensor: TypeAlias = Float32[Tensor, "N 3"]
-        RGBTensor: TypeAlias = UInt8[Tensor, "N 3"]
-        ConfTensor: TypeAlias = Float32[Tensor, "N"]
-        PointCamsTensor: TypeAlias = Int32[Tensor, "N"]
+    XYZTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["N 3"]]
+    RGBTensor: TypeAlias = Annotated[torch.Tensor, UInt8Tensor["N 3"]]
+    ConfTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["N"]]
+    PointCamsTensor: TypeAlias = Annotated[torch.Tensor, Int32Tensor["N"]]
 
-        ExtrinsicTensor: TypeAlias = Float32[Tensor, "S 3 4"]
-        IntrinsicTensor: TypeAlias = Float32[Tensor, "S 3 3"]
+    ExtrinsicTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 4"]]
+    IntrinsicTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 3"]]
 
-        DepthTensor: TypeAlias = Float32[Tensor, "S H W 1"]
-        DepthConfTensor: TypeAlias = Float32[Tensor, "S H W"]
-        PointmapTensor: TypeAlias = Float32[Tensor, "S H W 3"]
-        PointmapConfTensor: TypeAlias = Float32[Tensor, "S H W"]
+    DepthTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W 1"]]
+    DepthConfTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W"]]
+    PointmapTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W 3"]]
+    PointmapConfTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S H W"]]
 
-else:
-    TensorTypes: TypeAlias = object
+    class UInt8Float32Tensor(TensorTypeBase):
+        def check(self, tensor, tensor_name="anonymous"):
+            import torch
+            from dltype import DLTypeDtypeError
+
+            super().check(tensor, tensor_name)
+
+            if tensor.dtype not in (torch.uint8, torch.float32):
+                raise DLTypeDtypeError(
+                    tensor_name=tensor_name,
+                    expected=(torch.uint8, torch.float32),
+                    received=(tensor.dtype,),
+                )
+
+    ImagesTensorLike: TypeAlias = Annotated[torch.Tensor, UInt8Float32Tensor["S 3 H W"]]
+    ImagesAlphaTensorLike: TypeAlias = Annotated[
+        torch.Tensor, UInt8Float32Tensor["S 1 H W"]
+    ]
 
 
-@dataclass(frozen=True)
+@dltyped_dataclass()
+@dataclass(frozen=True, slots=True)
 class PointCloudTensors:
     xyz: TensorTypes.XYZTensor
     rgb: TensorTypes.RGBTensor

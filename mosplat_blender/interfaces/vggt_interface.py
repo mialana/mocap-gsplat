@@ -16,7 +16,6 @@ from ..infrastructure.macros import to_0_1, to_0_255, to_channel_as_item
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
-    FrameTensorMetadata,
     ModelInferenceMode,
     PointCloudTensors,
     TensorTypes as TT,
@@ -26,7 +25,7 @@ from ..infrastructure.schemas import (
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
     from typing import TypedDict
 
-    from jaxtyping import Bool, Float32, Int32, UInt8
+    from jaxtyping import Bool, Float32, Int32
     from torch import Tensor
     from vggt.models.vggt import VGGT as VGGTType
 

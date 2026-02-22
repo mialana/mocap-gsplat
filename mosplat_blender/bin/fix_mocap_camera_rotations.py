@@ -49,7 +49,7 @@ def preprocess(
             Will have length of B (batch) dimension of `images` tensor.
         images: Raw image data as a torch tensor of shape (S, 3, H, W),
             where S (scene) is the number of media streams / cameras capturing each frame,
-            and the 2nd dimension is color channels. RGB values are normalized to the range 0.0-1.0 and are the data-type `float32`. Lastly, H and W are directly the pixel size of the media files in the media directory.
+            and the 2nd dimension is color channels. RGB values are normalized to the range 0.0-1.0 and are the datatype `float32`. Lastly, H and W are directly the pixel size of the media files in the media directory.
 
     Returns:
         tuple: A tuple containing:

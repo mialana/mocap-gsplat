@@ -17,7 +17,7 @@ _MISSING_: Any = object()  # sentinel variable
 
 _TIMER_INTERVAL_: Final[float] = 0.1
 _TIMEOUT_LAZY_: Final[float] = 10.0  # timeout can occur lazily
-_TIMEOUT_IMMEDIATE_: Final[float] = 1.0  # timeout should occur more or less immediately
+_TIMEOUT_IMMEDIATE_: Final[float] = 0.5  # timeout should occur more or less immediately
 
 # for pretty logs!
 COLORED_FORMATTER_FIELD_STYLES = {
