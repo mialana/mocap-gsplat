@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from .infrastructure.schemas import AddonMeta, EnvVariableEnum
-from .interfaces import LoggingInterface
+from .interfaces.logging_interface import LoggingInterface
 
 ADDON_REGISTRATION_ID: Optional[str] = None
 SUBPROC_IMPORT_ROOT_DIR: Optional[str] = None

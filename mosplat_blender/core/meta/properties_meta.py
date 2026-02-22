@@ -1,4 +1,4 @@
-# 2026-02-20 21:52:56.203215
+# 2026-02-21 23:45:28.575041
 # created using 'generate_property_meta_files.py'
 
 
@@ -192,7 +192,7 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
     frame_range=PropertyMeta(
         id="frame_range",
         name="Frame Range",
-        description="Start and end frame of data to be processed.",
+        description="Start and end (exclusive) frame of data to be processed.",
     ),
     was_frame_range_extracted=PropertyMeta(
         id="was_frame_range_extracted",

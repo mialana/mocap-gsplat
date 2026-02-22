@@ -28,6 +28,7 @@ from typing import (
     cast,
 )
 
+from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from .macros import (
     append_if_not_equals,
     int_median,
@@ -36,27 +37,10 @@ from .macros import (
 
 if TYPE_CHECKING:
     import torchcodec.decoders
-    from jaxtyping import Float32, UInt8
+    from jaxtyping import Float32, Int32, UInt8
     from torch import Tensor
 
     from ..core.properties import Mosplat_PG_MediaIOMetadata
-
-    ImagesTensor_0_1: TypeAlias = Float32[Tensor, "B 3 H W"]
-    ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "B 3 H W"]
-    ImagesTensorLike: TypeAlias = Union[ImagesTensor_0_255, ImagesTensor_0_1]
-
-    ImagesAlphaTensor_0_1: TypeAlias = Float32[Tensor, "B 1 H W"]
-    ImagesAlphaTensor_0_255: TypeAlias = UInt8[Tensor, "B 1 H W"]
-    ImagesAlphaTensorLike: TypeAlias = Union[
-        ImagesAlphaTensor_0_1, ImagesAlphaTensor_0_255
-    ]
-else:
-    ImagesTensor_0_1: TypeAlias = Any
-    ImagesTensor_0_255: TypeAlias = Any
-    ImagesTensorLike: TypeAlias = Any
-    ImagesAlphaTensor_0_1: TypeAlias = Any
-    ImagesAlphaTensor_0_255: TypeAlias = Any
-    ImagesAlphaTensorLike: TypeAlias = Any
 
 
 class CustomError(ABC, RuntimeError):
@@ -276,6 +260,57 @@ class PropertyMeta(NamedTuple):
     description: str
 
 
+class CropGeometry(NamedTuple):
+    orig_H: int
+    orig_W: int
+    new_H: int
+    new_W: int
+    crop_H: int
+    crop_W: int
+    top: int
+    left: int
+    max_size: int
+    multiple: int
+
+    @classmethod
+    def from_image_dims(
+        cls,
+        *,
+        H: int,
+        W: int,
+        max_size: int = VGGT_MAX_IMAGE_SIZE,
+        multiple: int = VGGT_IMAGE_DIMS_FACTOR,
+    ) -> Self:
+        max_dim = max(H, W)
+
+        if max_dim > max_size:
+            scale = max_size / max_dim
+            new_H = int(round(H * scale))
+            new_W = int(round(W * scale))
+        else:
+            new_H = H
+            new_W = W
+
+        crop_H = (new_H // multiple) * multiple
+        crop_W = (new_W // multiple) * multiple
+
+        top = (new_H - crop_H) // 2
+        left = (new_W - crop_W) // 2
+
+        return cls(
+            orig_H=H,
+            orig_W=W,
+            new_H=new_H,
+            new_W=new_W,
+            crop_H=crop_H,
+            crop_W=crop_W,
+            top=top,
+            left=left,
+            max_size=max_size,
+            multiple=multiple,
+        )
+
+
 class ModelInferenceMode(StrEnum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
@@ -353,24 +388,42 @@ class FrameTensorMetadata(NamedTuple):
             raise OSError(str(e)) from e
 
 
+if TYPE_CHECKING:
+
+    class TensorTypes:
+        ImagesTensor_0_1: TypeAlias = Float32[Tensor, "B 3 H W"]
+        ImagesTensor_0_255: TypeAlias = UInt8[Tensor, "B 3 H W"]
+        ImagesTensorLike: TypeAlias = Union[ImagesTensor_0_255, ImagesTensor_0_1]
+
+        ImagesAlphaTensor_0_1: TypeAlias = Float32[Tensor, "B 1 H W"]
+        ImagesAlphaTensor_0_255: TypeAlias = UInt8[Tensor, "B 1 H W"]
+        ImagesAlphaTensorLike: TypeAlias = Union[
+            ImagesAlphaTensor_0_1, ImagesAlphaTensor_0_255
+        ]
+
+        XYZTensor: TypeAlias = Float32[Tensor, "N 3"]
+        RGBTensor_0_1: TypeAlias = Float32[Tensor, "N 3"]
+        RGBTensor_0_255: TypeAlias = UInt8[Tensor, "N 3"]
+        RGBTensorLike: TypeAlias = Union[RGBTensor_0_1, RGBTensor_0_255]
+
+        ConfTensor: TypeAlias = Float32[Tensor, "N"]
+        ExtrinsicTensor: TypeAlias = Float32[Tensor, "B 3 4"]
+
+else:
+    TensorTypes: TypeAlias = object
+
+
 @dataclass(frozen=True)
 class PointCloudTensors:
-    if TYPE_CHECKING:
-        from jaxtyping import Float32, Int32, UInt8
-
     xyz: Float32[Tensor, "N 3"]
-    rgb: UInt8[Tensor, "N 3"]
-    # confidence level of each point
-    conf: Float32[Tensor, "N"]
-
+    rgb: TensorTypes.RGBTensor_0_255
+    conf: TensorTypes.ConfTensor  # confidence level of each point
     extrinsic: Float32[Tensor, "B 3 4"]
     intrinsic: Float32[Tensor, "B 3 3"]
     depth: Float32[Tensor, "B H W 1"]
     depth_conf: Float32[Tensor, "B H W"]
     pointmap: Optional[Float32[Tensor, "B H W 3"]]
-
-    # which camera each point came from
-    cam_idx: Int32[Tensor, "N"]
+    cam_idx: Int32[Tensor, "N"]  # which camera each point came from
 
     _metadata: FrameTensorMetadata
 

@@ -21,7 +21,8 @@ from ..infrastructure.schemas import (
     UnexpectedError,
     UserFacingError,
 )
-from ..interfaces import LoggingInterface, VGGTInterface
+from ..interfaces.logging_interface import LoggingInterface
+from ..interfaces.vggt_interface import VGGTInterface
 from .checks import check_media_extensions_set
 from .meta.preferences_meta import MOSPLAT_AP_GLOBAL_META, Mosplat_AP_Global_Meta
 

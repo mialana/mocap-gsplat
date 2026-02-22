@@ -62,7 +62,7 @@ class LogClassMixin:
 
     @classmethod
     def _create_logger_for_class(cls, label: Optional[str] = None):
-        from ..interfaces import LoggingInterface
+        from ..interfaces.logging_interface import LoggingInterface
 
         cls.class_logger = LoggingInterface.configure_logger_instance(
             f"{cls.__module__}.logclass{label if label else cls.__name__}"

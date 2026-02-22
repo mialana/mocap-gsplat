@@ -7,17 +7,21 @@ from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
 from ..infrastructure.macros import (
+    crop_tensor,
     load_and_verify_tensor_file,
     save_images_tensor,
     save_tensor_stack_png_preview,
+    to_0_1,
+    to_0_255,
 )
 from ..infrastructure.schemas import (
+    CropGeometry,
     FrameTensorMetadata,
-    ImagesTensor_0_255,
     MediaIOMetadata,
     ProcessedFrameRange,
     SavedTensorFileName,
     SavedTensorKey,
+    TensorTypes as TT,
     UserAssertionError,
     UserFacingError,
 )
@@ -29,6 +33,8 @@ class ProcessKwargs(NamedTuple):
     frame_range: Tuple[int, int]
     exported_file_formatter: str
     create_preview_images: bool
+    median_width: int
+    median_height: int
     data: MediaIOMetadata
 
 
@@ -55,12 +61,16 @@ class Mosplat_OT_extract_frame_range(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
+        accessor = pkg.props.metadata_accessor
+
         self.launch_subprocess(
             pkg.context,
             pwargs=ProcessKwargs(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
+                median_width=int(accessor.median_width),
+                median_height=int(accessor.median_height),
                 create_preview_images=bool(pkg.prefs.create_preview_images),
                 data=self.data,
             ),
@@ -84,7 +94,7 @@ class Mosplat_OT_extract_frame_range(
         import torch
         from torchcodec.decoders import VideoDecoder
 
-        files, (start, end), exported_file_formatter, preview, data = pwargs
+        files, (start, end), exported_file_formatter, preview, W, H, data = pwargs
 
         out_file_formatter = partial(
             exported_file_formatter.format,
@@ -92,16 +102,15 @@ class Mosplat_OT_extract_frame_range(
             file_ext="safetensors",
         )
 
-        device_str: str = (
-            "cuda"
-            if not sys.platform == "win32" and torch.cuda.is_available()
-            else "cpu"  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
-        )
+        device_str: str = "cuda" if torch.cuda.is_available() else "cpu"
+        torchcodec_device_str: str = (
+            "cpu" if sys.platform == "win32" else device_str
+        )  # torchcodec does not ship cuda-enabled wheels through PyPI on Windows
 
         decoders: List[VideoDecoder] = []
         try:
             for media_file in files:
-                dec = VideoDecoder(media_file, device=device_str)
+                dec = VideoDecoder(media_file, device=torchcodec_device_str)
                 decoders.append(dec)
         except ValueError as e:
             # exit early wherever error occurs and put error on queue
@@ -111,6 +120,8 @@ class Mosplat_OT_extract_frame_range(
         # create a new frame range with both limits at start
         new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
         data.add_frame_range(new_frame_range)
+
+        crop_geom = CropGeometry.from_image_dims(H=H, W=W)
 
         for idx in range(start, end):
             if cancel_event.is_set():
@@ -135,14 +146,20 @@ class Mosplat_OT_extract_frame_range(
             except (OSError, UserAssertionError, UserFacingError):
                 out_file.parent.mkdir(parents=True, exist_ok=True)
 
-                tensor_list = [dec[cast(Integral, idx)] for dec in decoders]
+                tensor_list = [
+                    dec[cast(Integral, idx)].to(device_str) for dec in decoders
+                ]
 
-                tensor: ImagesTensor_0_255 = torch.stack(tensor_list, dim=0)
+                tensor_0_255: TT.ImagesTensor_0_255 = torch.stack(tensor_list, dim=0)
 
-                save_images_tensor(out_file, new_metadata, tensor, None)
+                tensor_0_1: TT.ImagesTensor_0_1 = to_0_1(tensor_0_255)
+                tensor_0_1 = crop_tensor(tensor_0_1, crop_geom)  # crop float tensor
+                tensor_0_255 = to_0_255(tensor_0_1)
+
+                save_images_tensor(out_file, new_metadata, tensor_0_255, None)
 
                 if preview:
-                    save_tensor_stack_png_preview(tensor, out_file)
+                    save_tensor_stack_png_preview(tensor_0_255, out_file)
 
                 note = f"Saved safetensor '{out_file}' to disk."
 
@@ -154,7 +171,13 @@ class Mosplat_OT_extract_frame_range(
 
         data.add_frame_range(new_frame_range)
 
-        queue.put(("done", f"Frames '{start}-{end}' extracted.", None))
+        queue.put(
+            (
+                "done",
+                f"Frames '{start}-{end}' extracted and images were processed to width of '{crop_geom.new_W}' and height of '{crop_geom.new_H}'.",
+                None,
+            )
+        )
 
 
 def process_entrypoint(*args, **kwargs):

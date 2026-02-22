@@ -66,8 +66,8 @@ else:
     load_metadata_property_group_from_json = lambda c: c
 
 if TYPE_CHECKING:
-    from bpy.stub_internal.rna_enums import OperatorReturnItems as OpResult
     from bpy.stub_internal.rna_enums import (
+        OperatorReturnItems as OpResult,
         OperatorTypeFlagItems,
     )
     from bpy.types import Context, Event, WindowManager

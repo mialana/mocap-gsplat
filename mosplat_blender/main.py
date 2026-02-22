@@ -14,7 +14,8 @@ from .infrastructure.schemas import (
     DeveloperError,
     UnexpectedError,
 )
-from .interfaces import LoggingInterface, VGGTInterface
+from .interfaces.logging_interface import LoggingInterface
+from .interfaces.vggt_interface import VGGTInterface
 from .operators import MosplatOperatorBase, operator_factory
 
 logger = LoggingInterface.configure_logger_instance(__name__)

@@ -11,6 +11,7 @@ authors = [
 profile = "black"
 src_paths = ["mosplat_blender"]
 known_first_party = ["mosplat_blender"]
+combine_as_imports = true
 
 known_blender = ["bpy", "bmesh", "mathutils"]
 

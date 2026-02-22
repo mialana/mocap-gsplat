@@ -30,13 +30,8 @@ if TYPE_CHECKING:
     from jaxtyping import Float32, UInt8
     from torch import Tensor
 
-    from .schemas import (
-        FrameTensorMetadata,
-        ImagesAlphaTensorLike,
-        ImagesTensor_0_1,
-        ImagesTensor_0_255,
-        ImagesTensorLike,
-    )
+    # type-check only imports to avoid circular imports
+    from .schemas import CropGeometry, FrameTensorMetadata, TensorTypes as TT
 
 
 T = TypeVar("T")
@@ -152,7 +147,7 @@ def to_0_1(tensor: Tensor) -> Tensor:
         tensor.dtype == torch.uint8
     ), "Given tensor should only ever be of type float32 or uint8"
 
-    return tensor.to(torch.float32) / 255.0
+    return tensor.to(torch.float32).div_(255.0)
 
 
 def to_0_255(tensor: Tensor) -> Tensor:
@@ -165,11 +160,11 @@ def to_0_255(tensor: Tensor) -> Tensor:
         tensor.dtype == torch.float32
     ), "Given tensor should only ever be of type float32 or uint8"
 
-    return (tensor.clamp(0, 1) * 255.0).round().to(torch.uint8)
+    return (tensor.clamp(0, 1).mul_(255.0)).round().to(torch.uint8)
 
 
 def save_tensor_stack_png_preview(
-    tensor: ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
+    tensor: TT.ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
 ):
     from torchvision.utils import save_image
 
@@ -183,7 +178,7 @@ def save_tensor_stack_png_preview(
 
 
 def save_tensor_stack_separate_png_previews(
-    tensor: ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
+    tensor: TT.ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
 ):
     from torchvision.utils import save_image
 
@@ -250,8 +245,8 @@ def load_and_verify_tensor_file(
 def save_images_tensor(
     out_file: Path,
     metadata: FrameTensorMetadata,
-    images: ImagesTensorLike,
-    images_alpha: Optional[ImagesAlphaTensorLike],
+    images: TT.ImagesTensorLike,
+    images_alpha: Optional[TT.ImagesAlphaTensorLike],
 ):
     from safetensors.torch import save_file
 
@@ -272,10 +267,9 @@ def save_images_tensor(
 
 
 def crop_tensor(
-    tensor: Tensor,
+    tensor: Tensor,  # limited by torch `interpolate`, i.e. floating-point data types
+    crop_geom: CropGeometry,
     *,
-    max_size: int,
-    multiple: int,
     mode: str = "bilinear",
     align_corners: bool = False,
 ) -> Tensor:
@@ -283,29 +277,24 @@ def crop_tensor(
 
     assert len(tensor.shape) == 4
     _, _, H, W = tensor.shape
+    assert H == crop_geom.orig_H and W == crop_geom.orig_W
 
     # crop to max size
-    max_dim = max(H, W)
-    if max_dim > max_size:
-        scale = max_size / max_dim
-        new_H = int(round(H * scale))
-        new_W = int(round(W * scale))
-
+    max_dim: int = max(crop_geom.orig_H, crop_geom.orig_W)
+    if max_dim > crop_geom.max_size:
         tensor = F.interpolate(
             tensor,
-            size=(new_H, new_W),
+            size=(crop_geom.new_H, crop_geom.new_W),
             mode=mode,
             align_corners=align_corners if mode in ("bilinear", "bicubic") else None,
         )
-        H, W = new_H, new_W
 
-    crop_H = (H // multiple) * multiple
-    crop_W = (W // multiple) * multiple
-
-    top = (H - crop_H) // 2
-    left = (W - crop_W) // 2
-
-    tensor = tensor[:, :, top : top + crop_H, left : left + crop_W]
+    tensor = tensor[
+        :,
+        :,
+        crop_geom.top : crop_geom.top + crop_geom.crop_H,
+        crop_geom.left : crop_geom.left + crop_geom.crop_W,
+    ]
 
     return tensor
 

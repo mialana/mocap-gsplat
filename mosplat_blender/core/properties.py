@@ -318,13 +318,13 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
 
     frame_range: IntVectorProperty(
         name="Frame Range",
-        description="Start and end frame of data to be processed.",
+        description="Start and end (exclusive) frame of data to be processed.",
         size=2,
         default=(0, 60),
         min=0,
         options={"SKIP_SAVE"},
         update=update_frame_range,
-    )
+    )  # access frame range through `frame_range_inclusive` for consistency
 
     was_frame_range_extracted: BoolProperty(
         name="Was Frame Range Extracted",

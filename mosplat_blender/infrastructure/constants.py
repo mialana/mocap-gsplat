@@ -63,3 +63,6 @@ PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
 DOWNLOAD_HF_WITH_PROGRESS_SCRIPT: Final[Path] = (
     Path(__file__).resolve().parents[1] / "lib" / "download_hf_with_progress.py"
 )
+
+VGGT_MAX_IMAGE_SIZE = 518  # expected max size of input images to VGGT model
+VGGT_IMAGE_DIMS_FACTOR = 14  # expected divisible factor of both height & width

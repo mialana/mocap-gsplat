@@ -1,11 +1,4 @@
 """
-this `__init__.py` also acts as an import hub.
-is is simply because "interfaces" is too long of a word for my liking? possibly
+this `__init__.py` is empty and does not / should not act as import hub.
+this ensures that non-std lib imports can stay more and less contained and lazy-imported
 """
-
-from .logging_interface import LoggingInterface
-from .vggt_interface import VGGTInterface
-from .worker_interface import (
-    SubprocessWorkerInterface,
-    ThreadWorkerInterface,
-)

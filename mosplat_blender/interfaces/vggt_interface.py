@@ -10,25 +10,30 @@ import multiprocessing.synchronize as mp_sync
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Self, Tuple, TypeAlias
 
+from ..infrastructure.constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from ..infrastructure.decorators import run_once_per_instance
-from ..infrastructure.macros import crop_tensor, to_0_1, to_0_255
+from ..infrastructure.macros import to_0_1, to_0_255
 from ..infrastructure.mixins import LogClassMixin
 from ..infrastructure.schemas import (
     DeveloperError,
     FrameTensorMetadata,
-    ImagesAlphaTensorLike,
-    ImagesTensorLike,
     ModelInferenceMode,
     PointCloudTensors,
+    TensorTypes as TT,
     VGGTModelOptions,
 )
 
 if TYPE_CHECKING:  # allows lazy import of risky modules like vggt
-    import torch
+    from torch import Tensor
     from vggt.models.vggt import VGGT
 
-VGGT_EXPECTED_MAX_SIZE = 518
-VGGT_EXPECTED_PIXEL_MULTIPLE = 14
+
+def ensure_tensor_shape_for_vggt(tensor: Tensor):
+    """ensure tensors are the correct shape for VGGT model"""
+    assert len(tensor.shape) == 4
+    _, _, H, W = tensor.shape
+    assert H <= VGGT_MAX_IMAGE_SIZE and W <= VGGT_MAX_IMAGE_SIZE
+    assert H % VGGT_IMAGE_DIMS_FACTOR == 0 and W % VGGT_IMAGE_DIMS_FACTOR == 0
 
 
 class VGGTInterface(LogClassMixin):
@@ -110,8 +115,8 @@ class VGGTInterface(LogClassMixin):
 
     def run_inference(
         self,
-        images: ImagesTensorLike,
-        images_alpha: ImagesAlphaTensorLike,
+        images: TT.ImagesTensorLike,
+        images_alpha: TT.ImagesAlphaTensorLike,
         metadata: FrameTensorMetadata,
         options: VGGTModelOptions,
     ) -> PointCloudTensors:
@@ -125,19 +130,9 @@ class VGGTInterface(LogClassMixin):
             from jaxtyping import Bool, Float32, Int32, UInt8
 
         images_alpha = to_0_1(images_alpha)
-        images = to_0_1(images)  # apply alpha mask
+        images = to_0_1(images)
 
-        images = crop_tensor(  # crop down
-            images.to(device=self.model_device),
-            max_size=VGGT_EXPECTED_MAX_SIZE,
-            multiple=VGGT_EXPECTED_PIXEL_MULTIPLE,
-        )
-        images_alpha = crop_tensor(  # crop down
-            images_alpha.to(device=self.model_device),
-            max_size=VGGT_EXPECTED_MAX_SIZE,
-            multiple=VGGT_EXPECTED_PIXEL_MULTIPLE,
-        )
-        images = images * images_alpha
+        images = images * images_alpha  # apply alpha tensor
 
         with torch.inference_mode():
             predictions: Dict[str, torch.Tensor] = self.model(images)

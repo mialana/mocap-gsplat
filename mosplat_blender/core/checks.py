@@ -17,7 +17,7 @@ from ..infrastructure.schemas import (
     UnexpectedError,
     UserFacingError,
 )
-from ..interfaces import LoggingInterface
+from ..interfaces.logging_interface import LoggingInterface
 
 if TYPE_CHECKING:
     from bpy.types import Preferences, Scene, WindowManager

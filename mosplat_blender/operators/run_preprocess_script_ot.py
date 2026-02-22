@@ -26,11 +26,10 @@ from ..infrastructure.macros import (
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
-    ImagesAlphaTensor_0_1,
-    ImagesTensor_0_1,
     MediaIOMetadata,
     SavedTensorFileName,
     SavedTensorKey,
+    TensorTypes as TT,
     UnexpectedError,
     UserAssertionError,
     UserFacingError,
@@ -167,7 +166,7 @@ class Mosplat_OT_run_preprocess_script(
                         keys=[SavedTensorKey.IMAGES],
                     )
                     images_0_255 = tensors[SavedTensorKey.IMAGES]
-                    images_0_1: ImagesTensor_0_1 = to_0_1(images_0_255)
+                    images_0_1: TT.ImagesTensor_0_1 = to_0_1(images_0_255)
 
                     output = preprocess_fn(idx, files, images_0_1)
 
@@ -233,8 +232,8 @@ def _retrieve_preprocess_fn(
 
 
 def _validate_preprocess_script_output(
-    output, input_images: ImagesTensor_0_1
-) -> Tuple[ImagesTensor_0_1, ImagesAlphaTensor_0_1]:
+    output, input_images: TT.ImagesTensor_0_1
+) -> Tuple[TT.ImagesTensor_0_1, TT.ImagesAlphaTensor_0_1]:
     import torch
 
     if not isinstance(output, tuple):

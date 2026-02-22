@@ -13,11 +13,12 @@ from ..infrastructure.schemas import (
     PointCloudTensors,
     SavedTensorFileName,
     SavedTensorKey,
+    TensorTypes as TT,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
 )
-from ..interfaces import VGGTInterface
+from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
@@ -111,8 +112,8 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             if cancel_event.is_set():
                 return
 
-            in_file = Path(in_file_formatter(frame_idx=idx))
-            out_file = Path(out_file_formatter(frame_idx=idx))
+            tensor_in_file = Path(in_file_formatter(frame_idx=idx))
+            tensor_out_file = Path(out_file_formatter(frame_idx=idx))
             ply_out_file = Path(ply_file_formatter(frame_idx=idx))
 
             new_metadata: FrameTensorMetadata = FrameTensorMetadata(
@@ -124,7 +125,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
                 try:
                     _ = load_and_verify_tensor_file(
-                        out_file,
+                        tensor_out_file,
                         device_str,
                         new_metadata,
                         keys=pointcloud_tensor_keys,
@@ -143,22 +144,26 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                         model_options=None,
                     )  # options did not exist in 'run preprocess script' step
                     tensors = load_and_verify_tensor_file(
-                        in_file,
+                        tensor_in_file,
                         device_str,
                         validation_metadata,
                         keys=image_tensor_keys,
                     )
-                    images = tensors[SavedTensorKey.IMAGES]
-                    images_alpha = tensors[SavedTensorKey.IMAGES_ALPHA]
+                    images: TT.ImagesTensor_0_255 = tensors[SavedTensorKey.IMAGES]
+                    images_alpha: TT.ImagesAlphaTensor_0_255 = tensors[
+                        SavedTensorKey.IMAGES_ALPHA
+                    ]
 
                     pc_tensors = VGGTInterface().run_inference(
                         images, images_alpha, new_metadata, options
                     )
+                    # save point cloud tensors to disk
                     save_file(
                         pc_tensors.to_dict(),
-                        out_file,
+                        tensor_out_file,
                         metadata=new_metadata.to_dict(),
                     )
+                    # save PLY file to disk
                     if format == "ascii":
                         save_ply_ascii(ply_out_file, pc_tensors.xyz, pc_tensors.rgb)
                     else:
@@ -172,7 +177,3 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 queue.put(("warning", msg))
 
         queue.put(("done", "Inference complete for current frame range."))
-
-
-def process_entrypoint(*args, **kwargs):
-    Mosplat_OT_run_inference._operator_subprocess(*args, **kwargs)

@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from ..infrastructure.schemas import UnexpectedError
-from ..interfaces import VGGTInterface
+from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 
