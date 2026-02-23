@@ -8,7 +8,7 @@ import gc
 import multiprocessing as mp
 import multiprocessing.synchronize as mp_sync
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, ClassVar, Optional, Self
+from typing import TYPE_CHECKING, Annotated as Anno, ClassVar, Optional, Self
 
 from ..infrastructure.decorators import run_once_per_instance
 from ..infrastructure.mixins import LogClassMixin
@@ -141,8 +141,8 @@ class VGGTInterface(LogClassMixin):
         )
         assert extri_intri[1] is not None  # specified `build_intrinsics` arg
 
-        extri: Annotated[torch.Tensor, dltype.Float32Tensor["B S 3 4"]] = extri_intri[0]
-        intri: Annotated[torch.Tensor, dltype.Float32Tensor["B S 3 3"]] = extri_intri[1]
+        extri: Anno[torch.Tensor, dltype.Float32Tensor["B S 3 4"]] = extri_intri[0]
+        intri: Anno[torch.Tensor, dltype.Float32Tensor["B S 3 3"]] = extri_intri[1]
 
         # batch, scene, height, width, positions
         B, S, H, W, _ = predictions.world_points.shape
@@ -162,7 +162,7 @@ class VGGTInterface(LogClassMixin):
             predictions.world_points_conf.reshape(S, H, W)
         )
 
-        selected_conf: Annotated[torch.Tensor, dltype.Float32Tensor["S H W"]]
+        selected_conf: Anno[torch.Tensor, dltype.Float32Tensor["S H W"]]
         if options.inference_mode == ModelInferenceMode.POINTMAP:
             selected_conf = pointmap_conf
         else:
@@ -173,23 +173,23 @@ class VGGTInterface(LogClassMixin):
             to_channel_as_item(images_0_1).reshape(-1, 3)
         )
         conf: TensorTypes.ConfTensor = selected_conf.reshape(-1)
-        conf_threshold: Annotated[torch.Tensor, dltype.Float32Tensor[None]] = (
-            torch.quantile(conf, options.confidence_percentile / 100.0)
+        conf_threshold: Anno[torch.Tensor, dltype.Float32Tensor[None]] = torch.quantile(
+            conf, options.confidence_percentile / 100.0
         )
-        point_cams: Annotated[torch.Tensor, dltype.Int32Tensor["N"]] = (
+        point_cams: Anno[torch.Tensor, dltype.Int32Tensor["N"]] = (
             torch.repeat_interleave(
                 torch.arange(S, device=conf.device, dtype=torch.int32),
                 H * W,
             )
         )
 
-        alpha: Annotated[torch.Tensor, dltype.Float32Tensor["N"]] = (
-            images_alpha_0_1.reshape(-1)
+        alpha: Anno[torch.Tensor, dltype.Float32Tensor["N"]] = images_alpha_0_1.reshape(
+            -1
         )
 
-        mask: Annotated[torch.Tensor, dltype.BoolTensor["N"]] = (
-            conf >= conf_threshold
-        ) & (conf > 1e-6)
+        mask: Anno[torch.Tensor, dltype.BoolTensor["N"]] = (conf >= conf_threshold) & (
+            conf > 1e-6
+        )
         mask &= alpha > 0.5  # use alpha as an additional mask
 
         xyz = xyz[mask]

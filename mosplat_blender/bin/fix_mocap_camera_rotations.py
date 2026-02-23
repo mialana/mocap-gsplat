@@ -23,15 +23,15 @@ applied.
 """
 
 from pathlib import Path
-from typing import Annotated, List, Optional, Tuple, TypeAlias
+from typing import Annotated as Anno, List, Optional, Tuple, TypeAlias
 
 import torch
 from dltype import BoolTensor, Float32Tensor, dltyped
 
-ImagesTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 H W"]]
-ImagesAlphaTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 1 H W"]]
+ImagesTensor: TypeAlias = Anno[torch.Tensor, Float32Tensor["S 3 H W"]]
+ImagesAlphaTensor: TypeAlias = Anno[torch.Tensor, Float32Tensor["S 1 H W"]]
 
-CamMaskTensor: TypeAlias = Annotated[torch.Tensor, BoolTensor["S"]]
+CamMaskTensor: TypeAlias = Anno[torch.Tensor, BoolTensor["S"]]
 
 CAM_MASK: Optional[CamMaskTensor] = None
 

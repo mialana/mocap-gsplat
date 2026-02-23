@@ -1,14 +1,14 @@
 from pathlib import Path
-from typing import Annotated, List, Optional, Tuple, TypeAlias
+from typing import Annotated as Anno, List, Optional, Tuple, TypeAlias
 
 import torch
 from dltype import BoolTensor, Float32Tensor, dltyped
 from torchvision.models.segmentation import FCN_ResNet50_Weights, fcn_resnet50
 
-ImagesTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 3 H W"]]
-ImagesAlphaTensor: TypeAlias = Annotated[torch.Tensor, Float32Tensor["S 1 H W"]]
+ImagesTensor: TypeAlias = Anno[torch.Tensor, Float32Tensor["S 3 H W"]]
+ImagesAlphaTensor: TypeAlias = Anno[torch.Tensor, Float32Tensor["S 1 H W"]]
 
-CamMaskTensor: TypeAlias = Annotated[torch.Tensor, BoolTensor["S"]]
+CamMaskTensor: TypeAlias = Anno[torch.Tensor, BoolTensor["S"]]
 
 
 CAM_MASK: Optional[CamMaskTensor] = None
@@ -52,9 +52,7 @@ def _create_person_class_mask(
     normalized = normalize_to_coco_dataset(images)
 
     # model has 21 classes in total
-    outputs: Annotated[torch.Tensor, Float32Tensor["S 21 H W"]] = model(normalized)[
-        "out"
-    ]
+    outputs: Anno[torch.Tensor, Float32Tensor["S 21 H W"]] = model(normalized)["out"]
 
     # per-pixel, get the class which has the highest prediction likeliness
     class_map: ImagesAlphaTensor = outputs.argmax(dim=1, keepdim=True)

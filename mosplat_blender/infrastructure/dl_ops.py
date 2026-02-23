@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import (
-    Annotated,
+    Annotated as Anno,
     Any,
     Dict,
-    List,
     NamedTuple,
     Optional,
     Self,
@@ -47,45 +46,37 @@ class UInt8Float32Tensor(dltype.TensorTypeBase):
 
 
 class TensorTypes:
-    ImagesTensor_0_1: TypeAlias = Annotated[
-        torch.Tensor, dltype.Float32Tensor["S 3 H W"]
-    ]
-    ImagesTensor_0_255: TypeAlias = Annotated[
-        torch.Tensor, dltype.UInt8Tensor["S 3 H W"]
-    ]
+    ImagesTensor_0_1: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S 3 H W"]]
+    ImagesTensor_0_255: TypeAlias = Anno[torch.Tensor, dltype.UInt8Tensor["S 3 H W"]]
 
-    ImagesAlphaTensor_0_1: TypeAlias = Annotated[
+    ImagesAlphaTensor_0_1: TypeAlias = Anno[
         torch.Tensor, dltype.Float32Tensor["S 1 H W"]
     ]
-    ImagesAlphaTensor_0_255: TypeAlias = Annotated[
+    ImagesAlphaTensor_0_255: TypeAlias = Anno[
         torch.Tensor, dltype.UInt8Tensor["S 1 H W"]
     ]
 
-    VoxelTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor[None]]
+    VoxelTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor[None]]
 
-    XYZTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["N 3"]]
-    RGB_0_255_Tensor: TypeAlias = Annotated[torch.Tensor, dltype.UInt8Tensor["N 3"]]
-    ConfTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["N"]]
-    PointCamsTensor: TypeAlias = Annotated[torch.Tensor, dltype.Int32Tensor["N"]]
+    XYZTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["N 3"]]
+    RGB_0_255_Tensor: TypeAlias = Anno[torch.Tensor, dltype.UInt8Tensor["N 3"]]
+    ConfTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["N"]]
+    PointCamsTensor: TypeAlias = Anno[torch.Tensor, dltype.Int32Tensor["N"]]
 
-    ExtrinsicTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["S 3 4"]]
-    IntrinsicTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["S 3 3"]]
+    ExtrinsicTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S 3 4"]]
+    IntrinsicTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S 3 3"]]
 
-    DepthTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["S H W 1"]]
-    DepthConfTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["S H W"]]
-    PointmapTensor: TypeAlias = Annotated[torch.Tensor, dltype.Float32Tensor["S H W 3"]]
-    PointmapConfTensor: TypeAlias = Annotated[
-        torch.Tensor, dltype.Float32Tensor["S H W"]
-    ]
+    DepthTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S H W 1"]]
+    DepthConfTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S H W"]]
+    PointmapTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S H W 3"]]
+    PointmapConfTensor: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S H W"]]
 
-    ImagesTensorLike: TypeAlias = Annotated[torch.Tensor, UInt8Float32Tensor["S 3 H W"]]
-    ImagesAlphaTensorLike: TypeAlias = Annotated[
-        torch.Tensor, UInt8Float32Tensor["S 1 H W"]
-    ]
-    SceneTensorLike: TypeAlias = Annotated[torch.Tensor, UInt8Float32Tensor["S C H W"]]
+    ImagesTensorLike: TypeAlias = Anno[torch.Tensor, UInt8Float32Tensor["S 3 H W"]]
+    ImagesAlphaTensorLike: TypeAlias = Anno[torch.Tensor, UInt8Float32Tensor["S 1 H W"]]
+    SceneTensorLike: TypeAlias = Anno[torch.Tensor, UInt8Float32Tensor["S C H W"]]
 
     @staticmethod
-    def annotation_of(annotated: Annotated) -> dltype.TensorTypeBase:
+    def annotation_of(annotated: Anno) -> dltype.TensorTypeBase:
         origin, specifier = get_args(annotated)
         return specifier
 
@@ -129,11 +120,11 @@ class PointCloudTensors:
 
 
 class VGGTPredictions(NamedTuple):
-    pose_enc: Annotated[torch.Tensor, dltype.Float32Tensor["B S 9"]]
-    depth: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W 1"]]
-    depth_conf: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W"]]
-    world_points: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W 3"]]
-    world_points_conf: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W"]]
+    pose_enc: Anno[torch.Tensor, dltype.Float32Tensor["B S 9"]]
+    depth: Anno[torch.Tensor, dltype.Float32Tensor["B S H W 1"]]
+    depth_conf: Anno[torch.Tensor, dltype.Float32Tensor["B S H W"]]
+    world_points: Anno[torch.Tensor, dltype.Float32Tensor["B S H W 3"]]
+    world_points_conf: Anno[torch.Tensor, dltype.Float32Tensor["B S H W"]]
     images: TensorTypes.ImagesAlphaTensor_0_1
 
     @classmethod
@@ -145,8 +136,8 @@ class VGGTPredictions(NamedTuple):
 
 @dltype.dltyped()
 def to_0_1(
-    tensor: Annotated[torch.Tensor, UInt8Float32Tensor["*dims"]],
-) -> Annotated[torch.Tensor, dltype.Float32Tensor["*dims"]]:
+    tensor: Anno[torch.Tensor, UInt8Float32Tensor["*dims"]],
+) -> Anno[torch.Tensor, dltype.Float32Tensor["*dims"]]:
     if tensor.dtype == torch.float32:
         return tensor
 
@@ -159,8 +150,8 @@ def to_0_1(
 
 @dltype.dltyped()
 def to_0_255(
-    tensor: Annotated[torch.Tensor, UInt8Float32Tensor["*dims"]],
-) -> Annotated[torch.Tensor, dltype.UInt8Tensor["*dims"]]:
+    tensor: Anno[torch.Tensor, UInt8Float32Tensor["*dims"]],
+) -> Anno[torch.Tensor, dltype.UInt8Tensor["*dims"]]:
     if tensor.dtype == torch.uint8:
         return tensor
 
@@ -173,15 +164,15 @@ def to_0_255(
 
 @dltype.dltyped()
 def to_channel_as_primary(
-    tensor: Annotated[torch.Tensor, dltype.TensorTypeBase["S H W C"]],
-) -> Annotated[torch.Tensor, dltype.TensorTypeBase["S C H W"]]:
+    tensor: Anno[torch.Tensor, dltype.TensorTypeBase["S H W C"]],
+) -> Anno[torch.Tensor, dltype.TensorTypeBase["S C H W"]]:
     return tensor.permute(0, 3, 1, 2)
 
 
 @dltype.dltyped()
 def to_channel_as_item(
-    tensor: Annotated[torch.Tensor, dltype.TensorTypeBase["S C H W"]],
-) -> Annotated[torch.Tensor, dltype.TensorTypeBase["S H W C"]]:
+    tensor: Anno[torch.Tensor, dltype.TensorTypeBase["S C H W"]],
+) -> Anno[torch.Tensor, dltype.TensorTypeBase["S H W C"]]:
     return tensor.permute(0, 2, 3, 1)
 
 
@@ -279,12 +270,12 @@ def load_and_verify_tensor_file(
 
 @dltype.dltyped()
 def crop_tensor(
-    tensor: Annotated[torch.Tensor, dltype.FloatTensor["B C H W"]],
+    tensor: Anno[torch.Tensor, dltype.FloatTensor["B C H W"]],
     crop_geom: CropGeometry,
     *,
     mode: str = "bilinear",
     align_corners: bool = False,
-) -> Annotated[torch.Tensor, dltype.FloatTensor["B C H_cropped W_cropped"]]:
+) -> Anno[torch.Tensor, dltype.FloatTensor["B C H_cropped W_cropped"]]:
     import torch.nn.functional as F
 
     _, _, H, W = tensor.shape
