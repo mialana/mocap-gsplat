@@ -126,6 +126,28 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         default=120,
     )
 
+    ply_file_format: EnumProperty(
+        name="PLY File Format",
+        description="Format of outputted point cloud files after running model inference",
+        items=[
+            ("ascii", "ASCII", "Human-readable format"),
+            ("binary", "Binary", "Smaller file sizes"),
+        ],
+        default="binary",
+    )
+
+    create_preview_images: BoolProperty(
+        name="Create Preview Images",
+        description="Create preview images for 1. after raw frame extraction and 2. after running preprocess script. The images will be in the same directory as the binary processed data. Note that writing to disk is difficult to optimize and will cause a non-arbitrary increase in operation time.",
+        default=True,
+    )
+
+    force_all_operations: BoolProperty(
+        name="Force All Operations",
+        description="Force all operations to execute, overwriting pre-existing data found on disk.",
+        default=False,
+    )
+
     json_log_filename_format: StringProperty(
         name="JSON Logging Filename Format",
         description="strftime-compatible filename pattern",
@@ -173,28 +195,6 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         description="ID of VGGT pre-trained model on Hugging Face",
         default="facebook/VGGT-1B",
         update=update_model_preferences,
-    )
-
-    create_preview_images: BoolProperty(
-        name="Create Preview Images",
-        description="Create preview images for 1. after raw frame extraction and 2. after running preprocess script. The images will be in the same directory as the binary processed data. Note that writing to disk is difficult to optimize and will cause a non-arbitrary increase in operation time.",
-        default=True,
-    )
-
-    force_all_operations: BoolProperty(
-        name="Force All Operations",
-        description="Force all operations to execute, overwriting pre-existing data found on disk.",
-        default=False,
-    )
-
-    ply_file_format: EnumProperty(
-        name="PLY File Format",
-        description="Format of outputted point cloud files after running model inference",
-        items=[
-            ("ascii", "ASCII", "Human-readable format"),
-            ("binary", "Binary", "Smaller file sizes"),
-        ],
-        default="binary",
     )
 
     @property
@@ -249,8 +249,9 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         data_proc_box.prop(self, meta.preprocess_media_script_file.id)
         data_proc_box.prop(self, meta.media_extensions.id)
         data_proc_box.prop(self, meta.max_frame_range.id)
-        data_proc_box.prop(self, meta.create_preview_images.id)
         data_proc_box.prop(self, meta.ply_file_format.id)
+        data_proc_box.prop(self, meta.create_preview_images.id)
+        data_proc_box.prop(self, meta.force_all_operations.id)
 
         layout.separator()
 

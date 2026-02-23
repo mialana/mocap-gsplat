@@ -78,8 +78,6 @@ ModelInferenceModeEnumItems: Final[List[BlenderEnumItem]] = [
     member.to_blender_enum_item() for member in ModelInferenceMode
 ]
 
-FrameRangeTuple: TypeAlias = Tuple[int, int]
-
 
 def update_frame_range(self: Mosplat_PG_Global, context: Context):
     prefs = check_addonpreferences(context.preferences)
@@ -92,13 +90,13 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
 
     self.was_frame_range_preprocessed = False
     if self.was_frame_range_extracted:
-        try:
+        try:  # check if any existing ranges have the same applied preprocess script
             curr_script = AppliedPreprocessScript.from_file_path(
                 prefs.preprocess_media_script_file_
             )
             matching_ranges = list(
                 filter(lambda r: r.applied_preprocess_script == curr_script, ranges)
-            )  # check if any existing ranges have the same applied preprocess script
+            )
             self.was_frame_range_preprocessed = len(matching_ranges) > 0
         except UserFacingError as e:
             pass
@@ -117,22 +115,19 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
     if scene:
         scene.frame_start = start
         scene.frame_end = end - 1
+        OperatorIDEnum.run(OperatorIDEnum.FIT_TIMELINE)
 
-    try:
-        OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINT_CLOUD_PREVIEW, "INVOKE_DEFAULT")
-    except RuntimeError as e:
-        self.logger.error(str(e))
-        return
+    OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINT_CLOUD_PREVIEW, "INVOKE_DEFAULT")
 
     self.logger.info(f"Frame range updated to '{start}-{end}'.")
 
 
 def update_media_directory(self: Mosplat_PG_Global, context: Context):
-    try:
-        OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
-    except RuntimeError as e:
-        self.logger.error(str(e))
-        return
+    OperatorIDEnum.run(OperatorIDEnum.VALIDATE_FILE_STATUSES, "INVOKE_DEFAULT")
+
+    prefs = check_addonpreferences(context.preferences)
+    num_media_files = len(self.media_files(prefs))
+    self.config_accessor.scene_size = num_media_files
 
     self.logger.info(f"'{self._meta.media_directory.name}' updated.")
 
@@ -353,6 +348,10 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
     ) -> SupportsCollectionProperty[Mosplat_PG_ProcessedFrameRange]:
         return self.processed_frame_ranges
 
+    @property
+    def median_HW(self) -> Tuple[int, int]:
+        return int(self.median_height), int(self.median_width)
+
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
@@ -452,7 +451,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         return check_media_directory(self)
 
     @property
-    def frame_range_(self) -> FrameRangeTuple:
+    def frame_range_(self) -> Tuple[int, int]:
         return tuple(self.frame_range)
 
     def media_data_output_dir_(self, prefs: Mosplat_AP_Global) -> Path:

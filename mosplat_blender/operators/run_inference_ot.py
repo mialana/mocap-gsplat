@@ -1,12 +1,11 @@
-from functools import partial
 from pathlib import Path
 from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
 
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
+    ExportedFileName,
+    ExportedTensorKey,
     FrameTensorMetadata,
-    SavedTensorFileName,
-    SavedTensorKey,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
@@ -86,57 +85,32 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         from ..infrastructure.dl_ops import (
             PointCloudTensors,
             TensorTypes as TensorTypes,
-            load_and_validate_tensor_file,
+            load_safetensors,
             save_ply_ascii,
             save_ply_binary,
         )
 
         INTERFACE = VGGTInterface()
 
-        (
-            script,
-            files,
-            (start, end),
-            exported_file_formatter,
-            ply_format,
-            force,
-            options,
-        ) = twargs
+        script_path, files, (start, end), formatter, ply_format, force, options = twargs
 
-        pre_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.PREPROCESSED,
-            file_ext="safetensors",
+        pre_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.PREPROCESSED
         )
-        pct_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.POINT_CLOUD_TENSORS,
-            file_ext="safetensors",
+        pct_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.POINT_CLOUD_TENSORS
         )
-        ply_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.POINT_CLOUD,
-            file_ext="ply",
+        ply_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.POINT_CLOUD, "ply"
         )
 
-        pre_tensor_map = {
-            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesTensor_0_255
-            ),
-            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesAlphaTensor_0_255
-            ),
-        }
-        pct_tensor_map = PointCloudTensors.map()
+        pre_anno_map = TensorTypes.preprocessed_annotation_map()
+        pct_anno_map = PointCloudTensors.annotation_map()
 
-        applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
+        script = AppliedPreprocessScript.from_file_path(script_path)
 
-        pre_metadata: FrameTensorMetadata = FrameTensorMetadata(
-            -1, files, applied_preprocess_script, None
-        )  # options did not exist in 'run preprocess script' step
-        pct_metadata: FrameTensorMetadata = FrameTensorMetadata(
-            -1, files, applied_preprocess_script, options
-        )
+        pre_metadata = FrameTensorMetadata(-1, files, script, None)
+        pct_metadata = FrameTensorMetadata(-1, files, script, options)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -151,48 +125,38 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             pre_metadata.frame_idx = idx
             pct_metadata.frame_idx = idx
 
-            try:
-                if not force:
-                    try:  # try locating prior data on disk
-                        _ = load_and_validate_tensor_file(
-                            pct_out_file, device, pct_metadata, map=pct_tensor_map
-                        )
-                        queue.put(
-                            (
-                                "update",
-                                f"Previous point cloud inference data found on disk for frame '{idx}'",
-                            )
-                        )
-                        continue  # skip this frame
-                    except (OSError, UserAssertionError, UserFacingError) as e:
-                        pass  # data on disk is not valid
+            if not force:
+                try:  # try locating prior data on disk
+                    _ = load_safetensors(
+                        pct_out_file, device, pct_metadata, pct_anno_map
+                    )
+                    msg = f"Previous inference data found on disk for frame '{idx}'/"
+                    queue.put(("update", msg))
+                    continue  # skip this frame
+                except (OSError, UserAssertionError, UserFacingError) as e:
+                    pass  # data on disk is not valid
 
-                pre_tensors = load_and_validate_tensor_file(
-                    pre_in_file, device, pre_metadata, map=pre_tensor_map
-                )
-                images: TensorTypes.ImagesTensor_0_255 = pre_tensors[
-                    SavedTensorKey.IMAGES
-                ]
-                images_alpha: TensorTypes.ImagesAlphaTensor_0_255 = pre_tensors[
-                    SavedTensorKey.IMAGES_ALPHA
-                ]
+            pre_tensors = load_safetensors(
+                pre_in_file, device, pre_metadata, pre_anno_map
+            )
+            images: TensorTypes.ImagesTensor_0_255 = pre_tensors[
+                ExportedTensorKey.IMAGES
+            ]
+            images_alpha: TensorTypes.ImagesAlphaTensor_0_255 = pre_tensors[
+                ExportedTensorKey.IMAGES_ALPHA
+            ]
 
-                pct: PointCloudTensors = INTERFACE.run_inference(
-                    images, images_alpha, options
-                )
-                # save point cloud tensors to disk
-                save_file(pct.to_dict(), pct_out_file, metadata=pct_metadata.to_dict())
-                # save PLY file to disk
-                if ply_format == "ascii":
-                    save_ply_ascii(ply_out_file, pct.xyz, pct.rgb_0_255)
-                else:
-                    save_ply_binary(ply_out_file, pct.xyz, pct.rgb_0_255)
+            pct: PointCloudTensors = INTERFACE.run_inference(
+                images, images_alpha, options
+            )
+            # save point cloud tensors to disk
+            save_file(pct.to_dict(), pct_out_file, metadata=pct_metadata.to_dict())
+            # save PLY file to disk
+            if ply_format == "ascii":
+                save_ply_ascii(ply_out_file, pct.xyz, pct.rgb_0_255)
+            else:
+                save_ply_binary(ply_out_file, pct.xyz, pct.rgb_0_255)
 
-                queue.put(("update", f"Ran inference on frame '{idx}'"))
-            except Exception as e:
-                msg = UserFacingError.make_msg(
-                    f"Error ocurred while running inference on frame '{idx}'.", e
-                )
-                queue.put(("warning", msg))
+            queue.put(("update", f"Ran inference on frame '{idx}'"))
 
         queue.put(("done", "Inference complete for current frame range."))

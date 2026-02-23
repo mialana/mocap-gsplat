@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from functools import partial
 from pathlib import Path
 from types import ModuleType
 from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
@@ -13,10 +12,10 @@ from ..infrastructure.macros import (
 )
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
+    ExportedFileName,
+    ExportedTensorKey,
     FrameTensorMetadata,
     MediaIOMetadata,
-    SavedTensorFileName,
-    SavedTensorKey,
     UnexpectedError,
     UserAssertionError,
     UserFacingError,
@@ -96,107 +95,75 @@ class Mosplat_OT_run_preprocess_script(
 
         from ..infrastructure.dl_ops import (
             TensorTypes as TensorTypes,
-            load_and_validate_tensor_file,
-            save_images_png_preview_stacked,
-            save_images_tensor,
+            load_safetensors,
+            save_images_png_preview,
+            save_images_safetensors,
             to_0_1,
             validate_preprocess_script_output,
         )
 
-        script, files, (start, end), exported_file_formatter, preview, force, data = (
-            pwargs
+        script_path, files, (start, end), formatter, preview, force, data = pwargs
+
+        raw_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.RAW
+        )
+        pre_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.PREPROCESSED
         )
 
-        raw_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.RAW,
-            file_ext="safetensors",
-        )
-        pre_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.PREPROCESSED,
-            file_ext="safetensors",
-        )
-
-        preprocess_fn = _retrieve_preprocess_fn(queue, script)
+        preprocess_fn = _retrieve_preprocess_fn(queue, script_path)
         if not preprocess_fn:
             return
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
+        script = AppliedPreprocessScript.from_file_path(script_path)
 
-        raw_metadata: FrameTensorMetadata = FrameTensorMetadata(
-            -1, files, None, None
-        )  # preprocess script did not exist in extraction step
-        pre_metadata: FrameTensorMetadata = FrameTensorMetadata(
-            -1, files, applied_preprocess_script, None
-        )
+        raw_metadata = FrameTensorMetadata(-1, files, None, None)
+        pre_metadata = FrameTensorMetadata(-1, files, script, None)
 
-        raw_tensor_map = {
-            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesTensor_0_255
-            )
-        }
-        pre_tensor_map = raw_tensor_map | {
-            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesAlphaTensor_0_255
-            )
-        }
+        raw_anno_map = TensorTypes.raw_annotation_map()
+        pre_anno_map = TensorTypes.preprocessed_annotation_map()
 
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
-            try:
-                in_file = Path(raw_file_formatter(frame_idx=idx))
-                out_file = Path(pre_file_formatter(frame_idx=idx))
+            in_file = Path(raw_file_formatter(frame_idx=idx))
+            out_file = Path(pre_file_formatter(frame_idx=idx))
 
-                raw_metadata.frame_idx = idx
-                pre_metadata.frame_idx = idx
+            raw_metadata.frame_idx = idx
+            pre_metadata.frame_idx = idx
 
-                if not force:
-                    try:  # try locating prior data on disk
-                        _ = load_and_validate_tensor_file(
-                            out_file, device, pre_metadata, map=pre_tensor_map
-                        )
-                        queue.put(
-                            (
-                                "update",
-                                f"Previous preprocessed data found on disk for frame '{idx}'",
-                                None,
-                            )
-                        )
-                        continue  # skip this frame
-                    except (OSError, UserAssertionError, UserFacingError):
-                        pass  # data on disk is not valid
+            if not force:
+                try:  # try locating prior data on disk
+                    _ = load_safetensors(out_file, device, pre_metadata, pre_anno_map)
+                    msg = f"Frame '{idx}' has previously been preprocessed."
+                    queue.put(("update", msg, None))
+                    continue  # skip this frame
+                except (OSError, UserAssertionError, UserFacingError):
+                    pass  # data on disk is not valid
 
-                raw_tensors = load_and_validate_tensor_file(
-                    in_file, device, raw_metadata, map=raw_tensor_map
+            raw_tensors = load_safetensors(in_file, device, raw_metadata, raw_anno_map)
+            raw_images_0_1: TensorTypes.ImagesTensor_0_1 = to_0_1(
+                raw_tensors[ExportedTensorKey.IMAGES]
+            )
+
+            output = preprocess_fn(idx, files, raw_images_0_1)
+
+            images_0_1, images_alpha_0_1 = validate_preprocess_script_output(
+                output, raw_images_0_1
+            )
+
+            save_images_safetensors(
+                out_file, pre_metadata, images_0_1, images_alpha_0_1
+            )
+
+            if preview:
+                save_images_png_preview(images_0_1, out_file)
+                save_images_png_preview(
+                    images_0_1 * images_alpha_0_1, out_file, ".masked"
                 )
-                raw_images_0_1: TensorTypes.ImagesTensor_0_1 = to_0_1(
-                    raw_tensors[SavedTensorKey.IMAGES]
-                )
-
-                output = preprocess_fn(idx, files, raw_images_0_1)
-
-                images_0_1, images_alpha_0_1 = validate_preprocess_script_output(
-                    output, raw_images_0_1
-                )
-
-                save_images_tensor(out_file, pre_metadata, images_0_1, images_alpha_0_1)
-
-                if preview:
-                    save_images_png_preview_stacked(images_0_1, out_file)
-                    save_images_png_preview_stacked(
-                        images_0_1 * images_alpha_0_1, out_file, ".masked"
-                    )
-                queue.put(("update", f"Finished processing frame '{idx}'", None))
-            except Exception as e:
-                msg = UserFacingError.make_msg(
-                    f"Error ocurred while running preprocess script on frame '{idx}'.",
-                    e,
-                )
-                queue.put(("warning", msg, None))
+            queue.put(("update", f"Finished processing frame '{idx}'", None))
 
         frame_range = data.query_frame_range(start, end - 1)  # inclusive
         if not frame_range or len(frame_range) > 1:
@@ -204,8 +171,8 @@ class Mosplat_OT_run_preprocess_script(
             queue.put(("error", msg, None))
             return
         else:
-            frame_range[0].applied_preprocess_script = applied_preprocess_script
-            queue.put(("done", f"Ran '{script}' on frames '{start}-{end}'", data))
+            frame_range[0].applied_preprocess_script = script
+            queue.put(("done", f"Ran '{script_path}' on frames '{start}-{end}'", data))
 
 
 def _retrieve_preprocess_fn(

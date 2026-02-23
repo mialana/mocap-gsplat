@@ -43,6 +43,7 @@ class OperatorIDEnum(StrEnum):
 
     INITIALIZE_MODEL = auto()
     OPEN_ADDON_PREFERENCES = auto()
+    FIT_TIMELINE = auto()
     VALIDATE_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()

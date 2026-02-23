@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
 from ..infrastructure.macros import is_path_accessible
 from ..infrastructure.mixins import CtxPackage
-from ..infrastructure.schemas import SavedTensorFileName, UnexpectedError
+from ..infrastructure.schemas import ExportedFileName, UnexpectedError
 from .base_ot import MosplatOperatorBase
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 
         PLY_FILE_FORMATTER = partial(
             self._exported_file_formatter.format,
-            file_name=SavedTensorFileName.POINT_CLOUD,
+            file_name=ExportedFileName.POINT_CLOUD,
             file_ext="ply",
         )
 

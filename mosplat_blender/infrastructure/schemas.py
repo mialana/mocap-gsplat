@@ -10,6 +10,7 @@ import os
 from abc import ABC
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum, auto
+from functools import partial
 from pathlib import Path
 from string import capwords
 from typing import (
@@ -21,6 +22,7 @@ from typing import (
     List,
     NamedTuple,
     Optional,
+    Protocol,
     Self,
     Tuple,
     TypeAlias,
@@ -160,17 +162,32 @@ class LogEntryLevelEnum(StrEnum):
             return cls["INFO"]
 
 
-class SavedTensorKey(StrEnum):
+class ExportedTensorKey(StrEnum):
     IMAGES = auto()
     IMAGES_ALPHA = auto()
 
 
-class SavedTensorFileName(StrEnum):
+class ExportedFileFormatterPartial(Protocol):
+    def __call__(self, frame_idx: int) -> str: ...
+
+
+class ExportedFileName(StrEnum):
     RAW = auto()
     PREPROCESSED = auto()
     POINT_CLOUD_TENSORS = auto()
     POINT_CLOUD = auto()
     SPLAT = auto()
+
+    @classmethod
+    def to_formatter(
+        cls,
+        exported_file_formatter: str,
+        file_name: Self,
+        file_ext: str = "safetensors",
+    ) -> ExportedFileFormatterPartial:
+        return partial(
+            exported_file_formatter.format, file_name=file_name, file_ext=file_ext
+        )
 
 
 class AddonMeta:
@@ -321,10 +338,10 @@ class FrameTensorMetadata:
     model_options: Optional[VGGTModelOptions]
 
     def to_dict(self) -> Dict[str, str]:
-        d: Dict[str, str] = asdict(self)
-        d.setdefault(
-            "media_files", json.dumps([str(file) for file in self.media_files])
-        )
+        d = {
+            "frame_idx": str(self.frame_idx),  # `safetensors` wants all strings
+            "media_files": json.dumps([str(file) for file in self.media_files]),
+        }
 
         if self.preprocess_script:
             d |= {"preprocess_script": json.dumps(self.preprocess_script.to_dict())}
@@ -355,6 +372,17 @@ class FrameTensorMetadata:
             )
         except (KeyError, json.JSONDecodeError) as e:
             raise OSError(str(e)) from e
+
+    def compare(self, other: Self):
+        other_as_dict: Dict = asdict(other)
+        for name, item in asdict(self).items():
+            saved_item = other_as_dict[name]
+            if item != saved_item:
+                raise UserAssertionError(
+                    f"'{name}' field does not match.",
+                    expected=item,
+                    actual=saved_item,
+                )
 
 
 @dataclass(frozen=True)

@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import sys
-from functools import partial
 from numbers import Integral
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
 from ..infrastructure.schemas import (
     CropGeometry,
+    ExportedFileName,
     FrameTensorMetadata,
     MediaIOMetadata,
     ProcessedFrameRange,
-    SavedTensorFileName,
-    SavedTensorKey,
     UserAssertionError,
     UserFacingError,
 )
@@ -24,8 +22,7 @@ class ProcessKwargs(NamedTuple):
     frame_range: Tuple[int, int]
     exported_file_formatter: str
     create_preview_images: bool
-    median_height: int
-    median_width: int
+    median_HW: Tuple[int, int]
     force: bool
     data: MediaIOMetadata
 
@@ -53,7 +50,7 @@ class Mosplat_OT_extract_frame_range(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        media_io = pkg.props.media_io_accessor
+        props = pkg.props
         prefs = pkg.prefs
 
         self.launch_subprocess(
@@ -62,8 +59,7 @@ class Mosplat_OT_extract_frame_range(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                median_height=int(media_io.median_height),
-                median_width=int(media_io.median_width),
+                median_HW=props.media_io_accessor.median_HW,
                 create_preview_images=bool(prefs.create_preview_images),
                 force=bool(prefs.force_all_operations),
                 data=self.data,
@@ -91,20 +87,16 @@ class Mosplat_OT_extract_frame_range(
         from ..infrastructure.dl_ops import (
             TensorTypes as TensorTypes,
             crop_tensor,
-            load_and_validate_tensor_file,
-            save_images_png_preview_stacked,
-            save_images_tensor,
+            load_safetensors,
+            save_images_png_preview,
+            save_images_safetensors,
             to_0_1,
         )
 
-        files, (start, end), exported_file_formatter, preview, H, W, force, data = (
-            pwargs
-        )
+        files, (start, end), formatter, preview, (H, W), force, data = pwargs
 
-        raw_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.RAW,
-            file_ext="safetensors",
+        raw_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.RAW
         )
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -128,13 +120,9 @@ class Mosplat_OT_extract_frame_range(
 
         crop_geom = CropGeometry.from_image_dims(H=H, W=W)
 
-        raw_metadata = FrameTensorMetadata(-1, files, None, None)
+        metadata = FrameTensorMetadata(-1, files, None, None)
 
-        raw_tensor_map = {
-            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesTensor_0_255
-            )
-        }
+        raw_anno_map = TensorTypes.raw_annotation_map()
 
         def post_frame_extration(idx: int, msg: str):
             new_frame_range.end_frame = idx
@@ -145,13 +133,11 @@ class Mosplat_OT_extract_frame_range(
                 return
 
             out_file = Path(raw_file_formatter(frame_idx=idx))
-            raw_metadata.frame_idx = idx
+            metadata.frame_idx = idx
 
             if not force:
                 try:  # try locating prior data on disk
-                    _ = load_and_validate_tensor_file(
-                        out_file, device, raw_metadata, map=raw_tensor_map
-                    )
+                    _ = load_safetensors(out_file, device, metadata, raw_anno_map)
                     msg = f"Safetensor data for frame '{idx}' already found on disk."
                     post_frame_extration(idx, msg)
                     continue  # skip this frame
@@ -160,16 +146,16 @@ class Mosplat_OT_extract_frame_range(
 
             out_file.parent.mkdir(parents=True, exist_ok=True)
 
-            tensor_list = [dec[cast(Integral, idx)].to(device) for dec in decoders]
+            images_list = [dec[cast(Integral, idx)].to(device) for dec in decoders]
 
-            tensor_0_1: TensorTypes.ImagesTensor_0_1 = crop_tensor(
-                to_0_1(torch.stack(tensor_list, dim=0)), crop_geom
+            images_0_1: TensorTypes.ImagesTensor_0_1 = crop_tensor(
+                to_0_1(torch.stack(images_list, dim=0)), crop_geom
             )  # crop tensors as soon as possible
 
-            save_images_tensor(out_file, raw_metadata, tensor_0_1, None)
+            save_images_safetensors(out_file, metadata, images_0_1, None)
 
             if preview:
-                save_images_png_preview_stacked(tensor_0_1, out_file)
+                save_images_png_preview(images_0_1, out_file)
 
             msg = f"Saved safetensor '{out_file}' to disk."
             post_frame_extration(idx, msg)
@@ -179,10 +165,11 @@ class Mosplat_OT_extract_frame_range(
 
         data.add_frame_range(new_frame_range)
 
+        msg = f"Frames '{start}-{end}' extracted. Images were processed to height of '{crop_geom.new_H}' and width of '{crop_geom.new_W}'."
         queue.put(
             (
                 "done",
-                f"Frames '{start}-{end}' extracted and images were processed to width of '{crop_geom.new_W}' and height of '{crop_geom.new_H}'.",
+                msg,
                 None,
             )
         )

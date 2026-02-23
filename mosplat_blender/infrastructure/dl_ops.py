@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
+from types import SimpleNamespace
 from typing import (
     Annotated as Anno,
     Any,
@@ -24,8 +25,8 @@ from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from .macros import try_access_path
 from .schemas import (
     CropGeometry,
+    ExportedTensorKey,
     FrameTensorMetadata,
-    SavedTensorKey,
     UserAssertionError,
 )
 
@@ -45,7 +46,7 @@ class UInt8Float32Tensor(dltype.TensorTypeBase):
             )
 
 
-class TensorTypes:
+class TensorTypes(SimpleNamespace):
     ImagesTensor_0_1: TypeAlias = Anno[torch.Tensor, dltype.Float32Tensor["S 3 H W"]]
     ImagesTensor_0_255: TypeAlias = Anno[torch.Tensor, dltype.UInt8Tensor["S 3 H W"]]
 
@@ -80,6 +81,21 @@ class TensorTypes:
         origin, specifier = get_args(annotated)
         return specifier
 
+    @classmethod
+    def raw_annotation_map(cls):
+        return {
+            ExportedTensorKey.IMAGES.value: cls.annotation_of(cls.ImagesTensor_0_255)
+        }
+
+    @classmethod
+    def preprocessed_annotation_map(cls):
+        return {
+            ExportedTensorKey.IMAGES.value: cls.annotation_of(cls.ImagesTensor_0_255),
+            ExportedTensorKey.IMAGES_ALPHA.value: cls.annotation_of(
+                cls.ImagesAlphaTensor_0_255
+            ),
+        }
+
 
 @dltype.dltyped_dataclass()
 @dataclass(frozen=True, slots=True)
@@ -109,7 +125,7 @@ class PointCloudTensors:
             raise
 
     @classmethod
-    def map(cls) -> Dict[str, dltype.TensorTypeBase]:
+    def annotation_map(cls) -> Dict[str, dltype.TensorTypeBase]:
         field_hints = get_type_hints(cls, include_extras=True)
         return {name: get_args(hint)[1] for name, hint in field_hints.items()}
 
@@ -177,7 +193,7 @@ def to_channel_as_item(
 
 
 @dltype.dltyped()
-def save_images_png_preview_stacked(
+def save_images_png_preview(
     images: TensorTypes.ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
 ):
     from torchvision.utils import save_image
@@ -192,20 +208,20 @@ def save_images_png_preview_stacked(
 
 
 @dltype.dltyped()
-def save_images_tensor(
+def save_images_safetensors(
     out_file: Path,
     metadata: FrameTensorMetadata,
     images: TensorTypes.ImagesTensorLike,
-    images_alpha: Optional[TensorTypes.ImagesAlphaTensorLike],
+    images_alpha: Optional[Anno[torch.Tensor, UInt8Float32Tensor["S 1 H W"]]],
 ):
     from safetensors.torch import save_file
 
     images_0_255 = to_0_255(images)
-    out_tensors = {SavedTensorKey.IMAGES.value: images_0_255}
+    out_tensors = {ExportedTensorKey.IMAGES.value: images_0_255}
 
     if images_alpha is not None:
         images_alpha_0_255 = to_0_255(images_alpha)
-        out_tensors |= {SavedTensorKey.IMAGES_ALPHA.value: images_alpha_0_255}
+        out_tensors |= {ExportedTensorKey.IMAGES_ALPHA.value: images_alpha_0_255}
 
     save_file(
         out_tensors,
@@ -214,11 +230,11 @@ def save_images_tensor(
     )
 
 
-def load_and_validate_tensor_file(
+def load_safetensors(
     in_file: Path,
     device: torch.device,
-    new_metadata: FrameTensorMetadata,
-    map: Dict[str, dltype.TensorTypeBase],  # keys to type annotations
+    expected_metadata: FrameTensorMetadata,
+    annotation_map: Dict[str, dltype.TensorTypeBase],  # keys to type annotations
 ) -> Dict[str, torch.Tensor]:
     from safetensors import SafetensorError, safe_open
 
@@ -237,7 +253,7 @@ def load_and_validate_tensor_file(
     tensors: Dict[str, torch.Tensor] = {}
     with safe_open(in_file, framework="pt", device=str(device)) as f:
         file: safe_open = f
-        for key, annotation in map.items():
+        for key, annotation in annotation_map.items():
             try:
                 tensor = file.get_tensor(key)
                 annotation.check(tensor, key)
@@ -247,7 +263,7 @@ def load_and_validate_tensor_file(
                 raise UserFacingError from e
 
         try:
-            saved_metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
+            metadata: FrameTensorMetadata = FrameTensorMetadata.from_dict(
                 file.metadata()
             )
         except TypeError as e:
@@ -256,14 +272,7 @@ def load_and_validate_tensor_file(
                 e,
             ) from e
 
-    for idx, item in enumerate(new_metadata):
-        saved_item = saved_metadata[idx]
-        if item != saved_item:
-            raise UserAssertionError(
-                f"A field used to create metadata '{in_file}' does not match the corresponding field in new desired metadata.",
-                expected=item,
-                actual=saved_item,
-            )
+    expected_metadata.compare(metadata)  # raises `UserAssertionError` on failure
 
     return tensors
 

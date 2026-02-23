@@ -1,12 +1,11 @@
-from functools import partial
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
+    ExportedFileName,
+    ExportedTensorKey,
     FrameTensorMetadata,
-    SavedTensorFileName,
-    SavedTensorKey,
     SplatTrainingConfig,
     UserAssertionError,
     UserFacingError,
@@ -21,8 +20,7 @@ class ProcessKwargs(NamedTuple):
     media_files: List[Path]
     frame_range: Tuple[int, int]
     exported_file_formatter: str
-    median_height: int
-    median_width: int
+    median_HW: Tuple[int, int]
     model_options: VGGTModelOptions
     training_config: SplatTrainingConfig
 
@@ -60,7 +58,7 @@ class Mosplat_OT_train_gaussian_splats(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        media_io = pkg.props.media_io_accessor
+        props = pkg.props
 
         self.launch_subprocess(
             pkg.context,
@@ -69,10 +67,9 @@ class Mosplat_OT_train_gaussian_splats(
                 media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                median_height=int(media_io.median_height),
-                median_width=int(media_io.median_width),
-                model_options=pkg.props.options_accessor.to_dataclass(),
-                training_config=pkg.props.config_accessor.to_dataclass(),
+                median_HW=props.media_io_accessor.median_HW,
+                model_options=props.options_accessor.to_dataclass(),
+                training_config=props.config_accessor.to_dataclass(),
             ),
         )
 
@@ -85,7 +82,7 @@ class Mosplat_OT_train_gaussian_splats(
         from ..infrastructure.dl_ops import (
             PointCloudTensors,
             TensorTypes as TensorTypes,
-            load_and_validate_tensor_file,
+            load_safetensors,
         )
         from ..interfaces.splat_interface import (
             GsplatRasterizer,
@@ -94,45 +91,26 @@ class Mosplat_OT_train_gaussian_splats(
             train_3dgs,
         )
 
-        script, files, (start, end), exported_file_formatter, H, W, options, config = (
-            pwargs
+        script_path, files, (start, end), formatter, (H, W), options, config = pwargs
+        pre_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.PREPROCESSED
         )
-        images_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.PREPROCESSED,
-            file_ext="safetensors",
+        pct_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.POINT_CLOUD_TENSORS
         )
-        pct_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.POINT_CLOUD_TENSORS,
-            file_ext="safetensors",
-        )
-        ply_file_formatter = partial(
-            exported_file_formatter.format,
-            file_name=SavedTensorFileName.SPLAT,
-            file_ext="ply",
+        ply_file_formatter = ExportedFileName.to_formatter(
+            formatter, ExportedFileName.SPLAT, "ply"
         )
 
-        pre_tensor_map = {
-            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesTensor_0_255
-            ),
-            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
-                TensorTypes.ImagesAlphaTensor_0_255
-            ),
-        }
-        pct_map = PointCloudTensors.map()
+        pre_anno_map = TensorTypes.preprocessed_annotation_map()
+        pct_anno_map = PointCloudTensors.annotation_map()
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
+        script = AppliedPreprocessScript.from_file_path(script_path)
 
-        pre_metadata: FrameTensorMetadata = FrameTensorMetadata(
-            -1, files, applied_preprocess_script, None
-        )  # options did not exist in 'run preprocess script' step
-        pct_metadata: FrameTensorMetadata = FrameTensorMetadata(
-            -1, files, applied_preprocess_script, options
-        )
+        pre_metadata = FrameTensorMetadata(-1, files, script, None)
+        pct_metadata = FrameTensorMetadata(-1, files, script, options)
 
         rasterizer = GsplatRasterizer(device, (H, W), sh_degree=config.sh_degree)
 
@@ -140,7 +118,7 @@ class Mosplat_OT_train_gaussian_splats(
             if cancel_event.is_set():
                 return
 
-            pre_in_file = Path(images_file_formatter(frame_idx=idx))
+            pre_in_file = Path(pre_file_formatter(frame_idx=idx))
             pct_in_file = Path(pct_file_formatter(frame_idx=idx))
             ply_out_file = Path(ply_file_formatter(frame_idx=idx))
 
@@ -148,47 +126,42 @@ class Mosplat_OT_train_gaussian_splats(
             pct_metadata.frame_idx = idx
 
             try:
-                try:
-                    pct_dict = load_and_validate_tensor_file(
-                        pct_in_file, device, pct_metadata, map=pct_map
-                    )
-                    pct: PointCloudTensors = PointCloudTensors.from_dict(pct_dict)
-
-                    pre_tensors = load_and_validate_tensor_file(
-                        pre_in_file, device, pre_metadata, map=pre_tensor_map
-                    )
-                    images: TensorTypes.ImagesTensor_0_255 = pre_tensors[
-                        SavedTensorKey.IMAGES
-                    ]
-                    images_alpha: TensorTypes.ImagesAlphaTensor_0_255 = pre_tensors[
-                        SavedTensorKey.IMAGES_ALPHA
-                    ]
-                except (OSError, UserAssertionError, UserFacingError) as e:
-                    msg = UserFacingError.make_msg(
-                        f"Could not load saved data from disk for frame '{idx}'. Re-run preprocess step and inference step to clean up data state.",
-                        e,
-                    )
-                    queue.put(("error", msg))
-                    return  # exit early here
-
-                voxel_size, base_scale = scalars_from_xyz(pct.xyz)
-                model = SplatModel.init_from_pointcloud_tensors(
-                    pct,
-                    device,
-                    voxel_size=voxel_size,
-                    base_scale=base_scale,
-                    sh_degree=config.sh_degree,
+                pct_dict = load_safetensors(
+                    pct_in_file, device, pct_metadata, pct_anno_map
                 )
+                pct: PointCloudTensors = PointCloudTensors.from_dict(pct_dict)
 
-                train_3dgs(
-                    model, rasterizer, pct, images, images_alpha, ply_out_file, config
+                pre_tensors = load_safetensors(
+                    pre_in_file, device, pre_metadata, pre_anno_map
                 )
-
-            except Exception as e:
+                images: TensorTypes.ImagesTensor_0_255 = pre_tensors[
+                    ExportedTensorKey.IMAGES
+                ]
+                images_alpha: TensorTypes.ImagesAlphaTensor_0_255 = pre_tensors[
+                    ExportedTensorKey.IMAGES_ALPHA
+                ]
+            except (OSError, UserAssertionError, UserFacingError) as e:
                 msg = UserFacingError.make_msg(
-                    f"Error ocurred while training gaussian splats on frame '{idx}'.", e
+                    f"Could not load saved data from disk for frame '{idx}'. Re-run preprocess step and inference step to clean up data state.",
+                    e,
                 )
-                queue.put(("warning", msg))
+                queue.put(("error", msg))
+                return  # exit early here
+
+            voxel_size, base_scale = scalars_from_xyz(pct.xyz)
+            model = SplatModel.init_from_pointcloud_tensors(
+                pct,
+                device,
+                voxel_size=voxel_size,
+                base_scale=base_scale,
+                sh_degree=config.sh_degree,
+            )
+
+            train_3dgs(
+                model, rasterizer, pct, images, images_alpha, ply_out_file, config
+            )
+            msg = f"'{ply_out_file}' exported from trained 3DGS data for frame '{idx}'."
+            queue.put(("update", msg))
 
         queue.put(("done", "Training complete for current frame range."))
 

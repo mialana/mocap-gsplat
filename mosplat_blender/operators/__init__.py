@@ -3,28 +3,16 @@ from typing import Dict, List, Tuple, Type
 from ..infrastructure.identifiers import OperatorIDEnum
 from ..infrastructure.mixins import PreregristrationFn
 from ..infrastructure.schemas import AddonMeta
-from .base_ot import (
-    MosplatOperatorBase,
-    MosplatOperatorMetadata,
-)
-from .extract_frame_range_ot import (
-    Mosplat_OT_extract_frame_range,
-)
+from .base_ot import MosplatOperatorBase, MosplatOperatorMetadata
+from .extract_frame_range_ot import Mosplat_OT_extract_frame_range
+from .fit_timeline_ot import Mosplat_OT_fit_timeline
 from .initialize_model_ot import Mosplat_OT_initialize_model
-from .install_pointcloud_preview_ot import (
-    Mosplat_OT_install_point_cloud_preview,
-)
-from .open_addon_preferences_ot import (
-    Mosplat_OT_open_addon_preferences,
-)
+from .install_pointcloud_preview_ot import Mosplat_OT_install_point_cloud_preview
+from .open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
 from .run_inference_ot import Mosplat_OT_run_inference
-from .run_preprocess_script_ot import (
-    Mosplat_OT_run_preprocess_script,
-)
+from .run_preprocess_script_ot import Mosplat_OT_run_preprocess_script
 from .train_gaussian_splats_ot import Mosplat_OT_train_gaussian_splats
-from .validate_media_statuses_ot import (
-    Mosplat_OT_validate_media_statuses,
-)
+from .validate_media_statuses_ot import Mosplat_OT_validate_media_statuses
 
 operator_registry: Dict[
     Type[MosplatOperatorBase],
@@ -37,6 +25,11 @@ operator_registry: Dict[
     Mosplat_OT_open_addon_preferences: MosplatOperatorMetadata(
         bl_idname=OperatorIDEnum.OPEN_ADDON_PREFERENCES,
         bl_description=f"Quick navigation to '{AddonMeta().human_readable_name}' saved addon preferences.",
+        bl_options={"REGISTER", "MACRO"},
+    ),
+    Mosplat_OT_fit_timeline: MosplatOperatorMetadata(
+        bl_idname=OperatorIDEnum.FIT_TIMELINE,
+        bl_description=f"Fit timeline to scene frame range.",
         bl_options={"REGISTER", "MACRO"},
     ),
     Mosplat_OT_validate_media_statuses: MosplatOperatorMetadata(
