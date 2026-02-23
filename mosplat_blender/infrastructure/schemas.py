@@ -168,8 +168,9 @@ class SavedTensorKey(StrEnum):
 class SavedTensorFileName(StrEnum):
     RAW = auto()
     PREPROCESSED = auto()
-    MODEL_INFERENCE = auto()
-    POINTCLOUD = auto()
+    POINT_CLOUD_TENSORS = auto()
+    POINT_CLOUD = auto()
+    SPLAT = auto()
 
 
 class AddonMeta:
@@ -252,6 +253,9 @@ class AddonMeta:
         return f"{static_prefix}{module.removeprefix(runtime_prefix)}"
 
 
+VGGTInitQueueTuple: TypeAlias = Tuple[str, str, int, int]
+
+
 class PropertyMeta(NamedTuple):
     id: str
     name: str
@@ -309,6 +313,26 @@ class CropGeometry(NamedTuple):
         )
 
 
+@dataclass(frozen=True)
+class SplatTrainingConfig:
+    steps: int = 30_000
+    lr: float = 1e-2  # learning rate (`EPS` is too slow)
+    sh_degree: int = 0
+    batch_size: int = 1  # cameras per frame
+
+    alpha_weight: float = 0.1  # weight of alpha in loss computation
+    depth_weight: float = 0.01  # weight of depth in loss computation
+
+    save_ply_interval: int = 5000  # i.e. every x steps
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> Self:
+        return cls(**d)
+
+
 class ModelInferenceMode(StrEnum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
@@ -320,22 +344,6 @@ class ModelInferenceMode(StrEnum):
 
     POINTMAP = auto()
     DEPTH_CAM = auto()
-
-
-@dataclass(frozen=True)
-class SplatTrainingConfig:
-    steps: int = 30000
-    lr: float = 1e-2  # learning rate (`EPS` is too slow)
-    sh_degree: int = 0
-    batch_size: int = 1  # cameras per frame
-
-    alpha_weight: float = 0.1  # weight of alpha in loss computation
-    depth_weight: float = 0.01  # weight of depth in loss computation
-
-    save_ply_interval: int = 5000  # i.e. every x steps
-
-
-VGGTInitQueueTuple: TypeAlias = Tuple[str, str, int, int]
 
 
 @dataclass(frozen=True)
@@ -357,20 +365,19 @@ class VGGTModelOptions:
         return cls(**new_dict)
 
 
-class FrameTensorMetadata(NamedTuple):
+@dataclass
+class FrameTensorMetadata:
     frame_idx: int
     media_files: List[Path]
     preprocess_script: Optional[AppliedPreprocessScript]
     model_options: Optional[VGGTModelOptions]
 
     def to_dict(self) -> Dict[str, str]:
-        d: Dict[str, str] = {
-            "frame_idx": str(self.frame_idx),
-            "media_files": json.dumps([str(file) for file in self.media_files]),
-            "model_options": (
-                json.dumps(self.model_options.to_dict()) if self.model_options else ""
-            ),
-        }
+        d: Dict[str, str] = asdict(self)
+        d.setdefault(
+            "media_files", json.dumps([str(file) for file in self.media_files])
+        )
+
         if self.preprocess_script:
             d |= {"preprocess_script": json.dumps(self.preprocess_script.to_dict())}
         if self.model_options:

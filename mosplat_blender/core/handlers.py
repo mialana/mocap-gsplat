@@ -52,7 +52,7 @@ def load_metadata_property_group_from_json(
     prefs = prefs or check_addonpreferences(context.preferences)
 
     data, msg = load_metadata_dataclass_from_json(props, prefs)
-    props.metadata_accessor.from_dataclass(data)  # transfer data to property group
+    props.media_io_accessor.from_dataclass(data)  # transfer data to property group
     return data, msg
 
 
@@ -86,7 +86,7 @@ def handle_save_to_json(scene: Scene):
     props = check_propertygroup(scene)
     prefs = check_addonpreferences(context.preferences)
 
-    props.metadata_accessor.to_JSON(props.media_io_metadata_filepath(prefs))
+    props.media_io_accessor.to_JSON(props.media_io_metadata_filepath(prefs))
 
 
 @persistent

@@ -70,7 +70,7 @@ def w2c_3x4_to_view_4x4(
 
 @dltype.dltyped()
 def sh_from_rgb(
-    rgb: Anno[torch.Tensor, UInt8Float32Tensor["M 3"]], sh_degree: int = 0
+    rgb: Anno[torch.Tensor, UInt8Float32Tensor["M 3"]], sh_degree
 ) -> Anno[torch.Tensor, dltype.Float32Tensor["M K 3"]]:
     """derive spherical harmonics from RGB values, where only the DC (Direct Current) is filled in"""
 
@@ -260,19 +260,17 @@ class SplatModel(torch.nn.Module):
     @classmethod
     def init_from_pointcloud_tensors(
         cls,
-        pc_tensors: PointCloudTensors,
+        pct: PointCloudTensors,
         device: torch.device,
         *,
         voxel_size: TT.VoxelTensor,
         base_scale: float,
+        sh_degree: int = 0,
         scale_mult: float = 1.0,
     ) -> Self:
-        pc_tensors.to(device)  # convert to device
+        pct.to(device)  # convert to device
         means, rgb_fused, conf_fused = fuse_points_by_voxel(
-            pc_tensors.xyz,
-            to_0_1(pc_tensors.rgb_0_255),
-            pc_tensors.conf,
-            voxel_size=voxel_size,
+            pct.xyz, to_0_1(pct.rgb_0_255), pct.conf, voxel_size=voxel_size
         )
         M = means.shape[0]
 
@@ -283,7 +281,7 @@ class SplatModel(torch.nn.Module):
         opacities: Anno[torch.Tensor, dltype.Float32Tensor["M 1"]] = conf_fused.clamp(
             0.0, 1.0
         )
-        sh = sh_from_rgb(rgb_fused)
+        sh = sh_from_rgb(rgb_fused, sh_degree)
 
         return cls(
             device, means=means, scales=scales, quats=quats, opacities=opacities, sh=sh
@@ -302,12 +300,13 @@ class GsplatRasterizer:
     def __init__(
         self,
         device: torch.device,
-        image_size: Tuple[int, int],
-        sh_degree: int,
+        image_HW: Tuple[int, int],
+        *,
+        sh_degree: int = 0,
         znear: float = 0.01,
         zfar: float = 1000.0,
     ):
-        self.H, self.W = image_size
+        self.H, self.W = image_HW
         self.device = device
         self.sh_degree = sh_degree
         self.znear = znear
@@ -443,15 +442,7 @@ def save_ply_3dgs_binary(
 
     body = (
         torch.cat(
-            [
-                means,
-                normals,
-                f_dc,
-                f_rest,
-                opacities,
-                scales,
-                quats,
-            ],
+            [means, normals, f_dc, f_rest, opacities, scales, quats],
             dim=1,
         )
         .cpu()  # convert to cpu first
@@ -467,22 +458,21 @@ def save_ply_3dgs_binary(
 def train_3dgs(
     model: SplatModel,
     rasterizer: GsplatRasterizer,
-    pc_tensors: PointCloudTensors,
-    *,
+    pct: PointCloudTensors,
     images: TT.ImagesTensorLike,
     images_alpha: TT.ImagesAlphaTensorLike,
-    out_file: Path,
-    config: SplatTrainingConfig = SplatTrainingConfig(),
+    ply_out_file: Path,
+    config: SplatTrainingConfig,
 ) -> SplatModel:
     from gsplat import DefaultStrategy
 
     device = rasterizer.device
 
-    pc_tensors.to(device)
-    extrinsic = pc_tensors.extrinsic
-    intrinsic = pc_tensors.intrinsic
-    depth = pc_tensors.depth
-    depth_conf = pc_tensors.depth_conf
+    pct.to(device)
+    extrinsic = pct.extrinsic
+    intrinsic = pct.intrinsic
+    depth = pct.depth
+    depth_conf = pct.depth_conf
     depth_conf_unsqueezed = depth_conf.unsqueeze(1)
 
     images_0_1 = to_0_1(images)
@@ -533,26 +523,14 @@ def train_3dgs(
             + config.depth_weight * depth_loss
         )
 
-        strategy.step_pre_backward(
-            model.params,
-            optimizers,
-            strategy_state,
-            step,
-            {},
-        )
+        strategy.step_pre_backward(model.params, optimizers, strategy_state, step, {})
 
         for opt in optimizers.values():
             opt.zero_grad(set_to_none=True)
 
         loss.backward()
 
-        strategy.step_post_backward(
-            model.params,
-            optimizers,
-            strategy_state,
-            step,
-            {},
-        )
+        strategy.step_post_backward(model.params, optimizers, strategy_state, step, {})
 
         for opt in optimizers.values():
             opt.step()
@@ -561,6 +539,6 @@ def train_3dgs(
 
         if step % 1000 == 0:
             with torch.no_grad():
-                save_ply_3dgs_binary(out_file, model.detached_tensors)
+                save_ply_3dgs_binary(ply_out_file, model.detached_tensors)
 
     return model

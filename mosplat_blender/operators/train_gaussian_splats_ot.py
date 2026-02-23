@@ -1,12 +1,13 @@
 from functools import partial
 from pathlib import Path
-from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
+from typing import List, NamedTuple, Tuple
 
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     FrameTensorMetadata,
     SavedTensorFileName,
     SavedTensorKey,
+    SplatTrainingConfig,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
@@ -14,19 +15,21 @@ from ..infrastructure.schemas import (
 from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
-PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
 
-
-class ThreadKwargs(NamedTuple):
+class ProcessKwargs(NamedTuple):
     preprocess_script: Path
     media_files: List[Path]
     frame_range: Tuple[int, int]
     exported_file_formatter: str
-    ply_file_format: PlyFileFormat
+    median_height: int
+    median_width: int
     model_options: VGGTModelOptions
+    training_config: SplatTrainingConfig
 
 
-class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs]):
+class Mosplat_OT_train_gaussian_splats(
+    MosplatOperatorBase[Tuple[str, str], ProcessKwargs]
+):
     @classmethod
     def _contexted_poll(cls, pkg):
 
@@ -53,43 +56,44 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        ply_file_format: PlyFileFormat = cast(
-            PlyFileFormat, str(pkg.prefs.ply_file_format)
-        )
-        self.launch_thread(
+        media_io = pkg.props.media_io_accessor
+
+        self.launch_subprocess(
             pkg.context,
-            twargs=ThreadKwargs(
+            pwargs=ProcessKwargs(
                 preprocess_script=self._preprocess_script,
                 media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                ply_file_format=ply_file_format,
+                median_height=int(media_io.median_height),
+                median_width=int(media_io.median_width),
                 model_options=pkg.props.options_accessor.to_dataclass(),
+                training_config=pkg.props.config_accessor.to_dataclass(),
             ),
         )
 
         return "RUNNING_MODAL"
 
     @staticmethod
-    def _operator_thread(queue, cancel_event, *, twargs):
-
+    def _operator_subprocess(queue, cancel_event, *, pwargs):
         import torch
-        from safetensors.torch import save_file
 
         from ..infrastructure.dl_ops import (
             PointCloudTensors,
             TensorTypes as TensorTypes,
             load_and_verify_tensor_file,
-            save_ply_ascii,
-            save_ply_binary,
+        )
+        from ..interfaces.splat_interface import (
+            GsplatRasterizer,
+            SplatModel,
+            scalars_from_xyz,
+            train_3dgs,
         )
 
-        INTERFACE = VGGTInterface()
-
-        script, files, (start, end), exported_file_formatter, ply_format, options = (
-            twargs
+        script, files, (start, end), exported_file_formatter, H, W, options, config = (
+            pwargs
         )
-        pre_file_formatter = partial(
+        images_file_formatter = partial(
             exported_file_formatter.format,
             file_name=SavedTensorFileName.PREPROCESSED,
             file_ext="safetensors",
@@ -101,7 +105,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         )
         ply_file_formatter = partial(
             exported_file_formatter.format,
-            file_name=SavedTensorFileName.POINT_CLOUD,
+            file_name=SavedTensorFileName.SPLAT,
             file_ext="ply",
         )
 
@@ -113,7 +117,9 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 TensorTypes.ImagesAlphaTensor_0_255
             ),
         }
-        pct_tensor_map = PointCloudTensors.map()
+        pct_map = PointCloudTensors.map()
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
 
@@ -124,14 +130,15 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             -1, files, applied_preprocess_script, options
         )
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        SH_DEGREE = 1
+        rasterizer = GsplatRasterizer(device, (H, W), sh_degree=SH_DEGREE)
 
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
 
-            pre_in_file = Path(pre_file_formatter(frame_idx=idx))
-            pct_out_file = Path(pct_file_formatter(frame_idx=idx))
+            pre_in_file = Path(images_file_formatter(frame_idx=idx))
+            pct_in_file = Path(pct_file_formatter(frame_idx=idx))
             ply_out_file = Path(ply_file_formatter(frame_idx=idx))
 
             pre_metadata.frame_idx = idx
@@ -139,16 +146,10 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
             try:
                 try:
-                    _ = load_and_verify_tensor_file(
-                        pct_out_file, device, pct_metadata, map=pct_tensor_map
+                    pct_dict = load_and_verify_tensor_file(
+                        pct_in_file, device, pct_metadata, map=pct_map
                     )
-                    queue.put(
-                        (
-                            "update",
-                            f"Previous point cloud inference data found on disk for frame '{idx}'",
-                        )
-                    )
-                except (OSError, UserAssertionError, UserFacingError) as e:
+                    pct: PointCloudTensors = PointCloudTensors.from_dict(pct_dict)
 
                     pre_tensors = load_and_verify_tensor_file(
                         pre_in_file, device, pre_metadata, map=pre_tensor_map
@@ -159,25 +160,35 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                     images_alpha: TensorTypes.ImagesAlphaTensor_0_255 = pre_tensors[
                         SavedTensorKey.IMAGES_ALPHA
                     ]
-
-                    pct: PointCloudTensors = INTERFACE.run_inference(
-                        images, images_alpha, options
+                except (OSError, UserAssertionError, UserFacingError) as e:
+                    msg = UserFacingError.make_msg(
+                        f"Could not load saved data from disk for frame '{idx}'. Re-run preprocess step and inference step to clean up data state.",
+                        e,
                     )
-                    # save point cloud tensors to disk
-                    save_file(
-                        pct.to_dict(), pct_out_file, metadata=pct_metadata.to_dict()
-                    )
-                    # save PLY file to disk
-                    if ply_format == "ascii":
-                        save_ply_ascii(ply_out_file, pct.xyz, pct.rgb_0_255)
-                    else:
-                        save_ply_binary(ply_out_file, pct.xyz, pct.rgb_0_255)
+                    queue.put(("error", msg))
+                    return  # exit early here
 
-                    queue.put(("update", f"Ran inference on frame '{idx}'"))
+                voxel_size, base_scale = scalars_from_xyz(pct.xyz)
+                model = SplatModel.init_from_pointcloud_tensors(
+                    pct,
+                    device,
+                    voxel_size=voxel_size,
+                    base_scale=base_scale,
+                    sh_degree=SH_DEGREE,
+                )
+
+                train_3dgs(
+                    model, rasterizer, pct, images, images_alpha, ply_out_file, config
+                )
+
             except Exception as e:
                 msg = UserFacingError.make_msg(
-                    f"Error ocurred while running inference on frame '{idx}'.", e
+                    f"Error ocurred while training gaussian splats on frame '{idx}'.", e
                 )
                 queue.put(("warning", msg))
 
-        queue.put(("done", "Inference complete for current frame range."))
+        queue.put(("done", "Training complete for current frame range."))
+
+
+def process_entrypoint(*args, **kwargs):
+    Mosplat_OT_train_gaussian_splats._operator_subprocess(*args, **kwargs)

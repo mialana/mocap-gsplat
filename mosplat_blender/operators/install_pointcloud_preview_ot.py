@@ -52,7 +52,7 @@ class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
 
         PLY_FILE_FORMATTER = partial(
             self._exported_file_formatter.format,
-            file_name=SavedTensorFileName.POINTCLOUD,
+            file_name=SavedTensorFileName.POINT_CLOUD,
             file_ext="ply",
         )
 

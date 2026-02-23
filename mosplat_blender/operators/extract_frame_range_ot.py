@@ -52,7 +52,7 @@ class Mosplat_OT_extract_frame_range(
         return self.execute_with_package(pkg)
 
     def _contexted_execute(self, pkg):
-        accessor = pkg.props.metadata_accessor
+        media_io = pkg.props.media_io_accessor
 
         self.launch_subprocess(
             pkg.context,
@@ -60,8 +60,8 @@ class Mosplat_OT_extract_frame_range(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                median_height=int(accessor.median_height),
-                median_width=int(accessor.median_width),
+                median_height=int(media_io.median_height),
+                median_width=int(media_io.median_width),
                 create_preview_images=bool(pkg.prefs.create_preview_images),
                 data=self.data,
             ),
@@ -96,7 +96,7 @@ class Mosplat_OT_extract_frame_range(
 
         files, (start, end), exported_file_formatter, preview, H, W, data = pwargs
 
-        out_file_formatter = partial(
+        raw_file_formatter = partial(
             exported_file_formatter.format,
             file_name=SavedTensorFileName.RAW,
             file_ext="safetensors",
@@ -123,28 +123,24 @@ class Mosplat_OT_extract_frame_range(
 
         crop_geom = CropGeometry.from_image_dims(H=H, W=W)
 
+        raw_metadata = FrameTensorMetadata(-1, files, None, None)
+
+        raw_tensor_map = {
+            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
+                TensorTypes.ImagesTensor_0_255
+            )
+        }
+
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
 
-            out_file = Path(out_file_formatter(frame_idx=idx))
-            new_metadata = FrameTensorMetadata(
-                frame_idx=idx,
-                media_files=files,
-                preprocess_script=None,
-                model_options=None,
-            )
+            out_file = Path(raw_file_formatter(frame_idx=idx))
+            raw_metadata.frame_idx = idx
 
             try:
                 _ = load_and_verify_tensor_file(
-                    out_file,
-                    device,
-                    new_metadata,
-                    map={
-                        SavedTensorKey.IMAGES: TensorTypes.annotation_of(
-                            TensorTypes.ImagesTensor_0_255
-                        )
-                    },
+                    out_file, device, raw_metadata, map=raw_tensor_map
                 )
                 note = f"Safetensor data for frame '{idx}' already found on disk."
             except (OSError, UserAssertionError, UserFacingError):
@@ -156,7 +152,7 @@ class Mosplat_OT_extract_frame_range(
                     to_0_1(torch.stack(tensor_list, dim=0)), crop_geom
                 )  # crop tensors as soon as possible
 
-                save_images_tensor(out_file, new_metadata, tensor_0_1, None)
+                save_images_tensor(out_file, raw_metadata, tensor_0_1, None)
 
                 if preview:
                     save_images_png_preview_stacked(tensor_0_1, out_file)

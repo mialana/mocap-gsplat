@@ -308,13 +308,13 @@ class MosplatOperatorBase(
 
     def sync_to_props(self, props: Mosplat_PG_Global):
         """sync global properties with owned copy of data"""
-        props.metadata_accessor.from_dataclass(self.data)
+        props.media_io_accessor.from_dataclass(self.data)
 
     def commit_data_to_json(self, pkg: CtxPackage):
         # update JSON with current state of PG as source of truth
         try:
             json_filepath = pkg.props.media_io_metadata_filepath(pkg.prefs)
-            pkg.props.metadata_accessor.to_JSON(json_filepath)
+            pkg.props.media_io_accessor.to_JSON(json_filepath)
             self.logger.info(
                 f"Data from '{self.bl_idname}' committed to JSON: '{json_filepath}'"
             )

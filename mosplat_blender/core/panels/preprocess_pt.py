@@ -18,20 +18,22 @@ class Mosplat_PT_preprocess(MosplatPanelBase):
         box.row().label(text=props._meta.media_directory.name)
         box.row().prop(props, props._meta.media_directory.id, text="")
 
-        data = props.metadata_accessor
+        media_io = props.media_io_accessor
 
-        statuses = data.collection_property_to_dataclass_list(data.statuses_accessor)
+        statuses = media_io.collection_property_to_dataclass_list(
+            media_io.statuses_accessor
+        )
         statuses_length: int = len(statuses)
         if statuses_length == 0:
             return  # early return
 
         statuses_box = box.box()
-        statuses_box.label(text=data._meta.media_file_statuses.name)
+        statuses_box.label(text=media_io._meta.media_file_statuses.name)
 
         grid = statuses_box.grid_flow(columns=4, align=True, row_major=True)
 
         if EnvVariableEnum.TESTING in os.environ:
-            self._overwrite_median_as_status(data)
+            self._overwrite_median_as_status(media_io)
             statuses.append(_median_as_status)
 
         for s in statuses:
@@ -39,16 +41,16 @@ class Mosplat_PT_preprocess(MosplatPanelBase):
             _icon = "CON_TRANSFORM_CACHE" if s is _median_as_status else "FILE_MOVIE"
             column_factory(grid, _media_filename, not s.is_valid, icon=_icon)
 
-            fc_matches, w_matches, h_matches = s.matches_metadata(data)
+            fc_matches, w_matches, h_matches = s.matches_metadata(media_io)
 
             column_factory(grid, f"F: {s.frame_count}", not fc_matches, pos="RIGHT")
             column_factory(grid, f"W: {s.width}", not w_matches, pos="RIGHT")
             column_factory(grid, f"H: {s.height}", not h_matches, pos="RIGHT")
 
-        ranges = data.ranges_accessor
+        ranges = media_io.ranges_accessor
         if len(ranges) > 0:
             ranges_box = box.box()
-            ranges_box.label(text=data._meta.processed_frame_ranges.name)
+            ranges_box.label(text=media_io._meta.processed_frame_ranges.name)
             for r in ranges:
                 script = r.script_accessor
                 has_script: bool = script.file_path != ""

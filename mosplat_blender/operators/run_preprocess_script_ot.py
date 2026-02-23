@@ -100,12 +100,12 @@ class Mosplat_OT_run_preprocess_script(
 
         script, files, (start, end), exported_file_formatter, preview, data = pwargs
 
-        in_file_formatter = partial(
+        raw_file_formatter = partial(
             exported_file_formatter.format,
             file_name=SavedTensorFileName.RAW,
             file_ext="safetensors",
         )
-        out_file_formatter = partial(
+        pre_file_formatter = partial(
             exported_file_formatter.format,
             file_name=SavedTensorFileName.PREPROCESSED,
             file_ext="safetensors",
@@ -119,33 +119,37 @@ class Mosplat_OT_run_preprocess_script(
 
         applied_preprocess_script = AppliedPreprocessScript.from_file_path(script)
 
+        raw_metadata: FrameTensorMetadata = FrameTensorMetadata(
+            -1, files, None, None
+        )  # preprocess script did not exist in extraction step
+        pre_metadata: FrameTensorMetadata = FrameTensorMetadata(
+            -1, files, applied_preprocess_script, None
+        )
+
+        raw_tensor_map = {
+            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
+                TensorTypes.ImagesTensor_0_255
+            )
+        }
+        pre_tensor_map = raw_tensor_map | {
+            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
+                TensorTypes.ImagesAlphaTensor_0_255
+            )
+        }
+
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
             try:
-                in_file = Path(in_file_formatter(frame_idx=idx))
-                out_file = Path(out_file_formatter(frame_idx=idx))
+                in_file = Path(raw_file_formatter(frame_idx=idx))
+                out_file = Path(pre_file_formatter(frame_idx=idx))
 
-                new_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                    idx,
-                    files,
-                    preprocess_script=applied_preprocess_script,
-                    model_options=None,
-                )
+                raw_metadata.frame_idx = idx
+                pre_metadata.frame_idx = idx
 
                 try:
                     _ = load_and_verify_tensor_file(
-                        out_file,
-                        device,
-                        new_metadata,
-                        map={
-                            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
-                                TensorTypes.ImagesTensor_0_255
-                            ),
-                            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
-                                TensorTypes.ImagesAlphaTensor_0_255
-                            ),
-                        },
+                        out_file, device, pre_metadata, map=pre_tensor_map
                     )
                     queue.put(
                         (
@@ -155,22 +159,12 @@ class Mosplat_OT_run_preprocess_script(
                         )
                     )
                 except (OSError, UserAssertionError, UserFacingError):
-                    validation_metadata: FrameTensorMetadata = FrameTensorMetadata(
-                        idx, files, preprocess_script=None, model_options=None
-                    )  # preprocess script did not exist in extraction step
 
-                    tensors = load_and_verify_tensor_file(
-                        in_file,
-                        device,
-                        validation_metadata,
-                        map={
-                            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
-                                TensorTypes.ImagesTensor_0_255
-                            )
-                        },
+                    raw_tensors = load_and_verify_tensor_file(
+                        in_file, device, raw_metadata, map=raw_tensor_map
                     )
                     raw_images_0_1: TensorTypes.ImagesTensor_0_1 = to_0_1(
-                        tensors[SavedTensorKey.IMAGES]
+                        raw_tensors[SavedTensorKey.IMAGES]
                     )
 
                     output = preprocess_fn(idx, files, raw_images_0_1)
@@ -180,7 +174,7 @@ class Mosplat_OT_run_preprocess_script(
                     )
 
                     save_images_tensor(
-                        out_file, new_metadata, images_0_1, images_alpha_0_1
+                        out_file, pre_metadata, images_0_1, images_alpha_0_1
                     )
 
                     if preview:

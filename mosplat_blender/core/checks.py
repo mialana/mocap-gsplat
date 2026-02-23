@@ -159,9 +159,9 @@ def check_frame_range_poll_result(
             f"Start frame for '{curr_range_name}' must be less than end frame."
         )
 
-    if end >= props.metadata_accessor.median_frame_count:
-        prop_name = props.metadata_accessor._meta.median_frame_count.name
-        count = props.metadata_accessor.median_frame_count
+    if end >= props.media_io_accessor.median_frame_count:
+        prop_name = props.media_io_accessor._meta.median_frame_count.name
+        count = props.media_io_accessor.median_frame_count
         err_list.append(
             f"End frame must be less than '{prop_name}' of '{count}' frames."
         )

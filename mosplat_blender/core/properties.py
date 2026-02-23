@@ -32,6 +32,7 @@ from ..infrastructure.schemas import (
     MediaIOMetadata,
     ModelInferenceMode,
     ProcessedFrameRange,
+    SplatTrainingConfig,
     VGGTModelOptions,
 )
 from .checks import (
@@ -51,6 +52,7 @@ from .meta.properties_meta import (
     MOSPLAT_PG_MEDIAIOMETADATA_META,
     MOSPLAT_PG_OPERATORPROGRESS_META,
     MOSPLAT_PG_PROCESSEDFRAMERANGE_META,
+    MOSPLAT_PG_SPLATTRAININGCONFIG_META,
     MOSPLAT_PG_VGGTMODELOPTIONS_META,
     Mosplat_PG_AppliedPreprocessScript_Meta,
     Mosplat_PG_Global_Meta,
@@ -60,6 +62,7 @@ from .meta.properties_meta import (
     Mosplat_PG_MediaIOMetadata_Meta,
     Mosplat_PG_OperatorProgress_Meta,
     Mosplat_PG_ProcessedFrameRange_Meta,
+    Mosplat_PG_SplatTrainingConfig_Meta,
     Mosplat_PG_VGGTModelOptions_Meta,
 )
 
@@ -78,10 +81,10 @@ FrameRangeTuple: TypeAlias = Tuple[int, int]
 
 
 def update_frame_range(self: Mosplat_PG_Global, context: Context):
-    data = self.metadata_accessor.to_dataclass()
+    media_io = self.media_io_accessor.to_dataclass()
 
     start, end = self.frame_range_
-    self.was_frame_range_extracted = bool(data.query_frame_range(start, end - 1))
+    self.was_frame_range_extracted = bool(media_io.query_frame_range(start, end - 1))
 
     prefs = check_addonpreferences(context.preferences)
     poll_result = check_frame_range_poll_result(prefs, self)
@@ -287,7 +290,7 @@ class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase):
         return self.logs
 
 
-class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
+class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase[VGGTModelOptions]):
     _meta: Mosplat_PG_VGGTModelOptions_Meta = MOSPLAT_PG_VGGTMODELOPTIONS_META
     __dataclass_type__ = VGGTModelOptions
 
@@ -301,6 +304,21 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase):
         description="Minimum percentile for model-inferred confidence",
         default=97.5,
     )
+
+
+class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfig]):
+    _meta: Mosplat_PG_SplatTrainingConfig_Meta = MOSPLAT_PG_SPLATTRAININGCONFIG_META
+    __dataclass_type__ = SplatTrainingConfig
+
+    steps: IntProperty(name="Steps", default=30_000)
+    lr: float = 1e-2  # learning rate (`EPS` is too slow)
+    sh_degree: int = 0
+    batch_size: int = 1  # cameras per frame
+
+    alpha_weight: float = 0.1  # weight of alpha in loss computation
+    depth_weight: float = 0.01  # weight of depth in loss computation
+
+    save_ply_interval: int = 5000  # i.e. every x steps
 
 
 class Mosplat_PG_Global(MosplatPropertyGroupBase):
@@ -349,6 +367,12 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         options={"SKIP_SAVE"},
     )
 
+    splat_training_config: PointerProperty(
+        name="Splat Training Config",
+        type=Mosplat_PG_SplatTrainingConfig,
+        options={"SKIP_SAVE"},
+    )
+
     media_io_metadata: PointerProperty(
         name="Media IO Metadata",
         description="Metadata for all media I/O operations",
@@ -357,7 +381,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
     )
 
     @property
-    def metadata_accessor(self) -> Mosplat_PG_MediaIOMetadata:
+    def media_io_accessor(self) -> Mosplat_PG_MediaIOMetadata:
         return self.media_io_metadata
 
     @property
@@ -365,12 +389,16 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         return self.operator_progress
 
     @property
+    def log_hub_accessor(self) -> Mosplat_PG_LogEntryHub:
+        return self.log_entry_hub
+
+    @property
     def options_accessor(self) -> Mosplat_PG_VGGTModelOptions:
         return self.vggt_model_options
 
     @property
-    def log_hub_accessor(self) -> Mosplat_PG_LogEntryHub:
-        return self.log_entry_hub
+    def config_accessor(self) -> Mosplat_PG_SplatTrainingConfig:
+        return self.splat_training_config
 
     @property
     def media_directory_(self) -> Path:
@@ -394,7 +422,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
 
     @property
     def is_valid_media_directory_poll_result(self) -> List[str]:
-        data = self.metadata_accessor
+        data = self.media_io_accessor
 
         result = []
         if not data.is_valid_media_directory:

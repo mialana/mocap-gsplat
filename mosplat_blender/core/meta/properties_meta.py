@@ -1,4 +1,4 @@
-# 2026-02-21 23:45:28.575041
+# 2026-02-23 10:23:41.567705
 # created using 'generate_property_meta_files.py'
 
 
@@ -63,6 +63,10 @@ class Mosplat_PG_VGGTModelOptions_Meta(NamedTuple):
     confidence_percentile: PropertyMeta
 
 
+class Mosplat_PG_SplatTrainingConfig_Meta(NamedTuple):
+    steps: PropertyMeta
+
+
 class Mosplat_PG_Global_Meta(NamedTuple):
     media_directory: PropertyMeta
     frame_range: PropertyMeta
@@ -70,6 +74,7 @@ class Mosplat_PG_Global_Meta(NamedTuple):
     operator_progress: PropertyMeta
     log_entry_hub: PropertyMeta
     vggt_model_options: PropertyMeta
+    splat_training_config: PropertyMeta
     media_io_metadata: PropertyMeta
 
 
@@ -183,6 +188,10 @@ MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
     ),
 )
 
+MOSPLAT_PG_SPLATTRAININGCONFIG_META = Mosplat_PG_SplatTrainingConfig_Meta(
+    steps=PropertyMeta(id="steps", name="Steps", description=""),
+)
+
 MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
     media_directory=PropertyMeta(
         id="media_directory",
@@ -207,6 +216,9 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
     ),
     vggt_model_options=PropertyMeta(
         id="vggt_model_options", name="VGGT Model Options", description=""
+    ),
+    splat_training_config=PropertyMeta(
+        id="splat_training_config", name="Splat Training Config", description=""
     ),
     media_io_metadata=PropertyMeta(
         id="media_io_metadata",
