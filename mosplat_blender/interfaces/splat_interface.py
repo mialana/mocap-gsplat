@@ -124,7 +124,7 @@ def fuse_points_by_voxel(
 ) -> Tuple[
     Anno[torch.Tensor, dltype.Float32Tensor["M 3"]],  # means
     Anno[torch.Tensor, dltype.Float32Tensor["M 3"]],  # rgb_fused
-    Anno[torch.Tensor, dltype.Float32Tensor["M"]],  # depth_fused
+    Anno[torch.Tensor, dltype.Float32Tensor["M"]],  # conf_fused
 ]:
 
     device = xyz.device
@@ -204,7 +204,7 @@ class SplatModel(torch.nn.Module):
         quats: Anno[
             torch.Tensor, dltype.Float32Tensor["M 4"]
         ],  # should always be normalized before storage
-        opacities: Anno[torch.Tensor, dltype.Float32Tensor["M 1"]],
+        opacities: Anno[torch.Tensor, dltype.Float32Tensor["M"]],
         sh: Anno[torch.Tensor, dltype.Float32Tensor["M K 3"]],
     ):
 
@@ -224,23 +224,23 @@ class SplatModel(torch.nn.Module):
 
     @property
     def means(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
-        return self.get_parameter("means")
+        return self.params["means"]
 
     @property
     def scales(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
-        return self.get_parameter("scales")
+        return self.params["scales"]
 
     @property
     def quats(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 4"]]:
-        return self.get_parameter("quats")
+        return self.params["quats"]
 
     @property
-    def opacities(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 1"]]:
-        return self.get_parameter("opacities")
+    def opacities(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M"]]:
+        return self.params["opacities"]
 
     @property
     def sh(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M K 3"]]:
-        return self.get_parameter("sh")
+        return self.params["sh"]
 
     def post_step(self):
         with torch.no_grad():
@@ -256,8 +256,8 @@ class SplatModel(torch.nn.Module):
             }
         )
 
-    @dltype.dltyped()
     @classmethod
+    @dltype.dltyped()
     def init_from_pointcloud_tensors(
         cls,
         pct: PointCloudTensors,
@@ -278,7 +278,7 @@ class SplatModel(torch.nn.Module):
             conf_fused, base_scale=base_scale, scale_mult=scale_mult
         )
         quats = normalize_quat_tensor_(quats_identity(M, device))
-        opacities: Anno[torch.Tensor, dltype.Float32Tensor["M 1"]] = conf_fused.clamp(
+        opacities: Anno[torch.Tensor, dltype.Float32Tensor["M"]] = conf_fused.clamp(
             0.0, 1.0
         )
         sh = sh_from_rgb(rgb_fused, sh_degree)
@@ -292,7 +292,7 @@ class SplatModel(torch.nn.Module):
         means: Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]
         scales: Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]
         quats: Anno[torch.Tensor, dltype.Float32Tensor["M 4"]]
-        opacities: Anno[torch.Tensor, dltype.Float32Tensor["M 1"]]
+        opacities: Anno[torch.Tensor, dltype.Float32Tensor["M"]]
         sh: Anno[torch.Tensor, dltype.Float32Tensor["M K 3"]]
 
 
@@ -318,7 +318,7 @@ class GsplatRasterizer:
         model: SplatModel,
         extrinsic: TT.ExtrinsicTensor,
         intrinsic: TT.IntrinsicTensor,
-        backgrounds: Anno[torch.Tensor, dltype.Float32Tensor["S 1 H W"]],
+        backgrounds: Anno[torch.Tensor, dltype.Float32Tensor["S 3 H W"]],
     ) -> Tuple[
         Anno[torch.Tensor, dltype.Float32Tensor["S 3 H W"]],
         Anno[torch.Tensor, dltype.Float32Tensor["S 1 H W"]],
@@ -378,7 +378,6 @@ class GsplatRasterizer:
         return (rgb, depth, alpha)
 
 
-@dltype.dltyped()
 def save_ply_3dgs_binary(
     out_file: Path,
     tensors: SplatModel.ModelTensors,

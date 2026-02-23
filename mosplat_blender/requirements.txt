@@ -23,6 +23,7 @@ psutil
 dltype
 
 gsplat
+ninja # `gsplat` dependency
 
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"
