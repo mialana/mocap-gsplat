@@ -25,7 +25,7 @@ from .protocols import (
     SupportsCollectionProperty,
     SupportsDataclass,
 )
-from .schemas import DeveloperError, EnvVariableEnum
+from .schemas import DeveloperError, EnvVariableEnum, UserAssertionError
 
 S = TypeVar("S")
 
@@ -191,9 +191,16 @@ class DataclassInteropMixin(Generic[D]):
                     if isinstance(item_pg, DataclassInteropMixin):
                         item_pg.from_dataclass(item_dc)
                     else:
-                        item_pg = item_dc
+                        raise NotImplementedError
             else:
-                setattr(self, fld.name, value)
+                try:
+                    setattr(self, fld.name, value)
+                except TypeError:
+                    raise UserAssertionError(
+                        f"Cannot create from dataclass due to type mismatch in field '{fld.name}'.",
+                        expected=type(target),
+                        actual=type(value),
+                    )
 
     @staticmethod
     def collection_property_to_dataclass_list(

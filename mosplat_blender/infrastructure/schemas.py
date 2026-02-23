@@ -440,7 +440,7 @@ class VGGTModelOptions:
 @dataclass(frozen=True)
 class AppliedPreprocessScript:
     file_path: str
-    mod_time: float
+    mod_time: int  # blender `FloatProperty` is only 32-bit precision
     file_size: int
 
     @classmethod
@@ -455,7 +455,9 @@ class AppliedPreprocessScript:
         stat = try_access_path(file_path)
 
         return cls(
-            file_path=str(file_path), mod_time=stat.st_mtime, file_size=stat.st_size
+            file_path=str(file_path),
+            mod_time=int(stat.st_mtime),
+            file_size=stat.st_size,
         )
 
 
@@ -465,7 +467,7 @@ class ProcessedFrameRange:
     end_frame: int  # inclusive
     applied_preprocess_script: AppliedPreprocessScript = field(
         default_factory=lambda: AppliedPreprocessScript(
-            file_path="", mod_time=-1.0, file_size=-1
+            file_path="", mod_time=-1, file_size=-1
         )
     )
 
@@ -489,7 +491,7 @@ class MediaFileStatus:
     frame_count: int = -1
     width: int = -1
     height: int = -1
-    mod_time: float = -1.0
+    mod_time: int = -1
     file_size: int = -1
 
     @classmethod
@@ -506,7 +508,7 @@ class MediaFileStatus:
         frame_count: int,
         width: int,
         height: int,
-        mod_time: float,
+        mod_time: int,
         file_size: int,
     ):
         self.is_valid = is_valid
@@ -521,14 +523,14 @@ class MediaFileStatus:
         self.frame_count = -1
         self.width = -1
         self.height = -1
-        self.mod_time = -1.0
+        self.mod_time = -1
         self.file_size = -1
 
     def needs_reextraction(self, data: MediaIOMetadata) -> bool:
         return (
             not self.is_valid
             or not all(self.matches_metadata(data))
-            or self.mod_time == -1.0
+            or self.mod_time == -1
             or self.file_size == -1
         )
 
@@ -547,7 +549,7 @@ class MediaFileStatus:
                 frame_count=cast(int, frame_count),
                 width=cast(int, width),
                 height=cast(int, height),
-                mod_time=stat.st_mtime,
+                mod_time=int(stat.st_mtime),
                 file_size=stat.st_size,
             )
 

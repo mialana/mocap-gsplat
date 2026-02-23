@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from bpy.app.handlers import persistent
 
-from ..infrastructure.schemas import MediaIOMetadata, UserFacingError
+from ..infrastructure.schemas import (
+    MediaIOMetadata,
+    UserAssertionError,
+    UserFacingError,
+)
 from ..interfaces.logging_interface import LoggingInterface
 from .checks import check_addonpreferences, check_propertygroup
 
@@ -51,14 +56,24 @@ def load_metadata_property_group_from_json(
     """base entrypoint for restoring directly to property group"""
     prefs = prefs or check_addonpreferences(context.preferences)
 
-    data, msg = load_metadata_dataclass_from_json(props, prefs)
-    props.media_io_accessor.from_dataclass(data)  # transfer data to property group
+    data, json_filepath, msg = load_metadata_dataclass_from_json(props, prefs)
+
+    try:
+        props.media_io_accessor.from_dataclass(data)  # transfer data to property group
+    except UserAssertionError as e:
+        e.add_note(
+            f"Deleting '{json_filepath}' and falling back to default metadata values."
+        )
+        logger.warning(str(e))
+        if json_filepath:
+            json_filepath.unlink()
+
     return data, msg
 
 
 def load_metadata_dataclass_from_json(
     props: Mosplat_PG_Global, prefs: Mosplat_AP_Global
-) -> Tuple[MediaIOMetadata, str]:
+) -> Tuple[MediaIOMetadata, Optional[Path], str]:
     """base entrypoint for restoring to dataclass"""
     media_directory = props.media_directory_
     dc: MediaIOMetadata = MediaIOMetadata(base_directory=str(media_directory))
@@ -70,13 +85,13 @@ def load_metadata_dataclass_from_json(
 
         load_msg = dc.load_from_JSON(json_path=json_filepath)
 
-        return (dc, load_msg)
+        return (dc, json_filepath, load_msg)
     except (UserWarning, UserFacingError) as e:
         msg = UserFacingError.make_msg(
             "Unable to parse media directory for metadata. We can fall back to default values.",
             e,
         )
-        return (dc, msg)
+        return (dc, None, msg)
 
 
 @persistent

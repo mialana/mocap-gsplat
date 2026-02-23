@@ -83,6 +83,6 @@ class Mosplat_PT_preprocess(MosplatPanelBase):
             frame_count=data.median_frame_count,
             width=data.median_width,
             height=data.median_height,
-            mod_time=-1.0,
+            mod_time=-1,
             file_size=-1,
         )

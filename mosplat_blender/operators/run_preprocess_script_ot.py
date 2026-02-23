@@ -163,7 +163,7 @@ class Mosplat_OT_run_preprocess_script(
                 save_images_png_preview(
                     images_0_1 * images_alpha_0_1, out_file, ".masked"
                 )
-            queue.put(("update", f"Finished processing frame '{idx}'", None))
+            queue.put(("update", f"Finished preprocessing frame '{idx}'", None))
 
         frame_range = data.query_frame_range(start, end - 1)  # inclusive
         if not frame_range or len(frame_range) > 1:

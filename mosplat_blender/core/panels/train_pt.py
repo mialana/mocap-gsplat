@@ -21,7 +21,11 @@ class Mosplat_PT_train(MosplatPanelBase):
         layout.prop(config, config._meta.steps.id)
         layout.prop(config, config._meta.lr.id)
         layout.prop(config, config._meta.sh_degree.id)
-        layout.prop(config, config._meta.scene_size.id)
+
+        row = layout.row()
+        row.enabled = False
+        row.prop(config, config._meta.scene_size.id)
+
         layout.prop(config, config._meta.alpha_weight.id)
         layout.prop(config, config._meta.depth_weight.id)
         layout.prop(config, config._meta.save_ply_interval.id)

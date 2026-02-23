@@ -229,7 +229,6 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
         name="Scene Size",
         description="Number of cameras capturing the scene (read-only)",
         default=-1,
-        options={"READ_ONLY"},
     )
     alpha_weight: FloatProperty(
         name="Alpha Weight",
@@ -257,7 +256,9 @@ class Mosplat_PG_AppliedPreprocessScript(
     __dataclass_type__ = AppliedPreprocessScript
 
     file_path: StringProperty(name="File Path", subtype="FILE_PATH")
-    mod_time: FloatProperty(name="Modification Time", default=-1.0)
+    mod_time: IntProperty(
+        name="Modification Time", default=-1
+    )  # blender `FloatProperty` is only 32-bit precision
     file_size: IntProperty(name="File Size", default=-1)
 
 
@@ -285,7 +286,9 @@ class Mosplat_PG_MediaFileStatus(MosplatPropertyGroupBase[MediaFileStatus]):
     width: IntProperty(name="Width", default=-1)
     height: IntProperty(name="Height", default=-1)
     is_valid: BoolProperty(name="Is Valid", default=False)
-    mod_time: FloatProperty(name="Modification Time", default=-1.0)
+    mod_time: IntProperty(
+        name="Modification Time", default=-1
+    )  # blender `FloatProperty` is only 32-bit precision
     file_size: IntProperty(name="File Size", default=-1)
 
 
