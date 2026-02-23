@@ -181,6 +181,12 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
         default=True,
     )
 
+    force_all_operations: BoolProperty(
+        name="Force All Operations",
+        description="Force all operations to execute, overwriting pre-existing data found on disk.",
+        default=False,
+    )
+
     ply_file_format: EnumProperty(
         name="PLY File Format",
         description="Format of outputted point cloud files after running model inference",

@@ -214,7 +214,7 @@ def save_images_tensor(
     )
 
 
-def load_and_verify_tensor_file(
+def load_and_validate_tensor_file(
     in_file: Path,
     device: torch.device,
     new_metadata: FrameTensorMetadata,

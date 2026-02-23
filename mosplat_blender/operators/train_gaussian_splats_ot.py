@@ -85,7 +85,7 @@ class Mosplat_OT_train_gaussian_splats(
         from ..infrastructure.dl_ops import (
             PointCloudTensors,
             TensorTypes as TensorTypes,
-            load_and_verify_tensor_file,
+            load_and_validate_tensor_file,
         )
         from ..interfaces.splat_interface import (
             GsplatRasterizer,
@@ -149,12 +149,12 @@ class Mosplat_OT_train_gaussian_splats(
 
             try:
                 try:
-                    pct_dict = load_and_verify_tensor_file(
+                    pct_dict = load_and_validate_tensor_file(
                         pct_in_file, device, pct_metadata, map=pct_map
                     )
                     pct: PointCloudTensors = PointCloudTensors.from_dict(pct_dict)
 
-                    pre_tensors = load_and_verify_tensor_file(
+                    pre_tensors = load_and_validate_tensor_file(
                         pre_in_file, device, pre_metadata, map=pre_tensor_map
                     )
                     images: TensorTypes.ImagesTensor_0_255 = pre_tensors[

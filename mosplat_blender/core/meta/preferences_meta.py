@@ -1,4 +1,4 @@
-# 2026-02-16 03:21:44.967640
+# 2026-02-23 12:54:50.874792
 # created using 'generate_property_meta_files.py'
 
 
@@ -23,6 +23,7 @@ class Mosplat_AP_Global_Meta(NamedTuple):
     blender_max_log_entries: PropertyMeta
     vggt_hf_id: PropertyMeta
     create_preview_images: PropertyMeta
+    force_all_operations: PropertyMeta
     ply_file_format: PropertyMeta
 
 
@@ -95,6 +96,11 @@ MOSPLAT_AP_GLOBAL_META = Mosplat_AP_Global_Meta(
         id="create_preview_images",
         name="Create Preview Images",
         description="Create preview images for 1. after raw frame extraction and 2. after running preprocess script. The images will be in the same directory as the binary processed data. Note that writing to disk is difficult to optimize and will cause a non-arbitrary increase in operation time.",
+    ),
+    force_all_operations=PropertyMeta(
+        id="force_all_operations",
+        name="Force All Operations",
+        description="Force all operations to execute, overwriting pre-existing data found on disk.",
     ),
     ply_file_format=PropertyMeta(
         id="ply_file_format",
