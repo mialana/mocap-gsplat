@@ -335,6 +335,9 @@ class SplatTrainingConfig:
     save_ply_interval: int = 5000  # i.e. every x steps
 
 
+VGGTInitQueueTuple: TypeAlias = Tuple[str, str, int, int]
+
+
 @dataclass(frozen=True)
 class VGGTModelOptions:
     inference_mode: ModelInferenceMode

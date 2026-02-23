@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import NamedTuple
 
-from ..infrastructure.schemas import UnexpectedError
+from ..infrastructure.schemas import UnexpectedError, VGGTInitQueueTuple
 from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
@@ -11,11 +11,10 @@ class Kwargs(NamedTuple):
     model_cache_dir: Path
 
 
-class Mosplat_OT_initialize_model(
-    MosplatOperatorBase[VGGTInterface.InitQueueTuple, Kwargs]
-):
+class Mosplat_OT_initialize_model(MosplatOperatorBase[VGGTInitQueueTuple, Kwargs]):
     @classmethod
     def _contexted_poll(cls, pkg):
+
         if VGGTInterface().model is not None:
             cls.poll_message_set("Model has already been initialized.")
             return False  # prevent re-initialization

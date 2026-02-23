@@ -3,6 +3,8 @@
 `N` corresponds to # of reconstructed points
 `K` corresponds to # of SH coefficients per splat. `K = (sh_degree+1)^2)`
 `S` corresponds to scene size, which would be # of cameras capturing each frame
+
+try to keep as lazy import as there is top-level import of `dltype` and `torch`
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from typing import TYPE_CHECKING, Dict, NamedTuple, Self, Tuple
 
 from ..infrastructure.dl_ops import (
     PointCloudTensors,
-    TensorTypes as TT,
+    TensorTypes as TensorTypes,
     to_0_1,
     to_channel_as_item,
     to_channel_as_primary,
@@ -21,8 +23,6 @@ from ..infrastructure.schemas import SplatTrainingConfig
 
 if TYPE_CHECKING:
     from jaxtyping import Bool, Float32, Int64
-    from torch import Device, Tensor
-    from torch.nn import ParameterDict
 
 HASH_MULTIPLIER_X = 73856093
 HASH_MULTIPLIER_Y = 19349663
@@ -30,27 +30,34 @@ HASH_MULTIPLIER_Z = 83492791
 
 EPS: float = 1e-6
 
+import dltype
+import torch
 
-def normalize_quat_tensor_(q: Float32[Tensor, "M 4"]) -> Float32[Tensor, "M 4"]:
+
+def normalize_quat_tensor_(
+    q: Float32[torch.Tensor, "M 4"],
+) -> Float32[torch.Tensor, "M 4"]:
     """ensure all quaternion magnitudes of 1. `_` suffix denotes in-place operations"""
     return q.div_(q.norm(dim=-1, keepdim=True).clamp_min(EPS))
 
 
-def quats_identity(M: int, device: Device) -> Float32[Tensor, "M 4"]:
+def quats_identity(M: int, device: torch.device) -> Float32[torch.Tensor, "M 4"]:
     """creates tensor of quats where (x, y, z, w) = [0, 0, 0, 1]"""
-    import torch
 
-    q: Float32[Tensor, "M 4"] = torch.zeros((M, 4), device=device, dtype=torch.float32)
+    q: Float32[torch.Tensor, "M 4"] = torch.zeros(
+        (M, 4), device=device, dtype=torch.float32
+    )
     q[:, 3] = 1.0
     return q
 
 
-def w2c_3x4_to_view_4x4(extrinsic: TT.ExtrinsicTensor) -> Float32[Tensor, "S 4 4"]:
+def w2c_3x4_to_view_4x4(
+    extrinsic: TensorTypes.ExtrinsicTensor,
+) -> Float32[torch.Tensor, "S 4 4"]:
     """world-to-camera to view by simply adding homogeneous bottom row [0, 0, 0, 1]"""
-    import torch
 
     S = extrinsic.shape[0]
-    v: Float32[Tensor, "S 4 4"] = torch.zeros(
+    v: Float32[torch.Tensor, "S 4 4"] = torch.zeros(
         (S, 4, 4), device=extrinsic.device, dtype=extrinsic.dtype
     )
     v[:, :3, :4] = extrinsic
@@ -59,17 +66,16 @@ def w2c_3x4_to_view_4x4(extrinsic: TT.ExtrinsicTensor) -> Float32[Tensor, "S 4 4
 
 
 def sh_from_rgb(
-    rgb: Float32[Tensor, "M 3"], sh_degree: int = 0
-) -> Float32[Tensor, "M K 3"]:
+    rgb: Float32[torch.Tensor, "M 3"], sh_degree: int = 0
+) -> Float32[torch.Tensor, "M K 3"]:
     """derive spherical harmonics from RGB values, where only the DC (Direct Current) is filled in"""
-    import torch
 
     device = rgb.device
 
     K = (sh_degree + 1) ** 2
     N = rgb.shape[0]
 
-    sh: Float32[Tensor, "M K 3"] = torch.zeros(
+    sh: Float32[torch.Tensor, "M K 3"] = torch.zeros(
         (N, K, 3), device=device, dtype=torch.float32
     )
 
@@ -79,23 +85,22 @@ def sh_from_rgb(
 
 
 def scales_from_confidence(
-    conf: TT.ConfTensor,
+    conf: TensorTypes.ConfTensor,
     *,
     base_scale: float,
     scale_mult: float,
-) -> Tensor:
+) -> torch.Tensor:
     """use confidence values to initialize scale of splats"""
-    import torch
 
     s = base_scale * scale_mult / conf.clamp_min(1e-3)
     return torch.stack([s, s, s], dim=1)
 
 
 def scalars_from_xyz(
-    xyz: Float32[Tensor, "N 3"],
+    xyz: Float32[torch.Tensor, "N 3"],
     voxel_size_factor: float = 0.005,  # ~2.0m * 0.005 = 0.01 meters
     base_scale_factor: float = 0.02,  # corresponds to human height of ~2m
-) -> Tuple[TT.VoxelTensor, float]:
+) -> Tuple[TensorTypes.VoxelTensor, float]:
     """derive initial voxel size & base scale as factors of bounding box diagonal"""
     bbox = xyz.max(dim=0)[0] - xyz.min(dim=0)[0]
     diag = bbox.norm()  # `norm` returns a scalar tensor
@@ -103,30 +108,29 @@ def scalars_from_xyz(
 
 
 def fuse_points_by_voxel(
-    xyz: TT.XYZTensor,
-    rgb: Float32[Tensor, "N 3"],
-    conf: TT.ConfTensor,
-    voxel_size: TT.VoxelTensor,
+    xyz: TensorTypes.XYZTensor,
+    rgb: Float32[torch.Tensor, "N 3"],
+    conf: TensorTypes.ConfTensor,
+    voxel_size: TensorTypes.VoxelTensor,
 ) -> Tuple[
-    Float32[Tensor, "M 3"],  # means
-    Float32[Tensor, "M 3"],  # rgb_fused
-    Float32[Tensor, "M"],  # depth_fused
+    Float32[torch.Tensor, "M 3"],  # means
+    Float32[torch.Tensor, "M 3"],  # rgb_fused
+    Float32[torch.Tensor, "M"],  # depth_fused
 ]:
-    import torch
 
     device = xyz.device
 
     # points to voxel IDs, i.e. map continuous 3D points to integer voxel grid
-    ids: Int64[Tensor, "N 3"] = torch.floor(xyz / voxel_size).to(torch.int64)
+    ids: Int64[torch.Tensor, "N 3"] = torch.floor(xyz / voxel_size).to(torch.int64)
 
     # create a 1D hash ID for each voxel
-    hx: Int64[Tensor, "N"] = ids[:, 0] * HASH_MULTIPLIER_X
-    hy: Int64[Tensor, "N"] = ids[:, 1] * HASH_MULTIPLIER_Y
-    hz: Int64[Tensor, "N"] = ids[:, 2] * HASH_MULTIPLIER_Z
-    h: Int64[Tensor, "N"] = (hx ^ hy ^ hz).to(torch.int64)
+    hx: Int64[torch.Tensor, "N"] = ids[:, 0] * HASH_MULTIPLIER_X
+    hy: Int64[torch.Tensor, "N"] = ids[:, 1] * HASH_MULTIPLIER_Y
+    hz: Int64[torch.Tensor, "N"] = ids[:, 2] * HASH_MULTIPLIER_Z
+    h: Int64[torch.Tensor, "N"] = (hx ^ hy ^ hz).to(torch.int64)
 
     # define the order using sorted voxel hashes
-    order: Int64[Tensor, "N"] = torch.argsort(h)
+    order: Int64[torch.Tensor, "N"] = torch.argsort(h)
     # apply order, effectively sorting by voxel so that points in same voxel become contiguous
     h = h[order]
     xyz = xyz[order]
@@ -134,34 +138,40 @@ def fuse_points_by_voxel(
     conf = conf[order]
 
     # mark boundaries where voxel ID changes, i.e. `True`'s are boundaries b/t voxels
-    boundaries: Bool[Tensor, "N"] = torch.ones_like(h, dtype=torch.bool)
+    boundaries: Bool[torch.Tensor, "N"] = torch.ones_like(h, dtype=torch.bool)
     boundaries[1:] = h[1:] != h[:-1]
 
     # use cumulative sum to map all points to their voxel ID given boundaries
-    voxel_ids: Int64[Tensor, "N"] = torch.cumsum(boundaries.to(torch.int64), dim=0) - 1
+    voxel_ids: Int64[torch.Tensor, "N"] = (
+        torch.cumsum(boundaries.to(torch.int64), dim=0) - 1
+    )
     M: int = int(voxel_ids[-1].item()) + 1  # num unique voxels / future gaussians
 
-    wt: Float32[Tensor, "N"] = conf.clamp_min(EPS).to(xyz.dtype)  # weight from conf
-    wt_sum: Float32[Tensor, "M"] = torch.zeros(
+    wt: Float32[torch.Tensor, "N"] = conf.clamp_min(EPS).to(
+        xyz.dtype
+    )  # weight from conf
+    wt_sum: Float32[torch.Tensor, "M"] = torch.zeros(
         (M,), device=device, dtype=xyz.dtype
     ).scatter_add_(
         dim=0, index=voxel_ids, src=wt
     )  # scatter based on newfound `voxel_ids`
 
     # reduce positions using a representative weighted AVERAGE position per voxel
-    means: Float32[Tensor, "M 3"] = torch.zeros((M, 3), device=device, dtype=xyz.dtype)
+    means: Float32[torch.Tensor, "M 3"] = torch.zeros(
+        (M, 3), device=device, dtype=xyz.dtype
+    )
     means.scatter_add_(0, voxel_ids[:, None].expand(-1, 3), xyz * wt[:, None])
     means = means / wt_sum[:, None]
 
     # reduce rgb using a representative weighted AVERAGE rgb per voxel
-    rgb_fused: Float32[Tensor, "M 3"] = torch.zeros(
+    rgb_fused: Float32[torch.Tensor, "M 3"] = torch.zeros(
         (M, 3), device=device, dtype=rgb.dtype
     )
     rgb_fused.scatter_add_(0, voxel_ids[:, None].expand(-1, 3), rgb * wt[:, None])
     rgb_fused = rgb_fused / wt_sum[:, None]  # convert back to 'uint8'
 
     # reduce confidence using a representative MAX confidence per voxel
-    conf_fused: Float32[Tensor, "M"] = (
+    conf_fused: Float32[torch.Tensor, "M"] = (
         torch.zeros((M,), device=device, dtype=conf.dtype)
         .scatter_reduce_(0, voxel_ids, conf, reduce="amax")
         .to(conf.dtype)
@@ -171,19 +181,20 @@ def fuse_points_by_voxel(
 
 
 class SplatModel:
-    params: ParameterDict
+    params: torch.nn.ParameterDict
 
     def __init__(
         self,
         device,
         *,
-        means: Float32[Tensor, "M 3"],
-        scales: Float32[Tensor, "M 3"],  # range is > 0
-        quats: Float32[Tensor, "M 4"],  # should always be normalized before storage
-        opacities: Float32[Tensor, "M 1"],
-        sh: Float32[Tensor, "M K 3"],
+        means: Float32[torch.Tensor, "M 3"],
+        scales: Float32[torch.Tensor, "M 3"],  # range is > 0
+        quats: Float32[
+            torch.Tensor, "M 4"
+        ],  # should always be normalized before storage
+        opacities: Float32[torch.Tensor, "M 1"],
+        sh: Float32[torch.Tensor, "M K 3"],
     ):
-        import torch
 
         super().__init__()
 
@@ -200,28 +211,26 @@ class SplatModel:
             param.to(device)
 
     @property
-    def means(self) -> Float32[Tensor, "M 3"]:
+    def means(self) -> Float32[torch.Tensor, "M 3"]:
         return self.params.get_parameter("means")
 
     @property
-    def scales(self) -> Float32[Tensor, "M 3"]:
+    def scales(self) -> Float32[torch.Tensor, "M 3"]:
         return self.params.get_parameter("scales")
 
     @property
-    def quats(self) -> Float32[Tensor, "M 4"]:
+    def quats(self) -> Float32[torch.Tensor, "M 4"]:
         return self.params.get_parameter("quats")
 
     @property
-    def opacities(self) -> Float32[Tensor, "M 1"]:
+    def opacities(self) -> Float32[torch.Tensor, "M 1"]:
         return self.params.get_parameter("opacities")
 
     @property
-    def sh(self) -> Float32[Tensor, "M K 3"]:
+    def sh(self) -> Float32[torch.Tensor, "M K 3"]:
         return self.params.get_parameter("sh")
 
     def post_step(self):
-        import torch
-
         with torch.no_grad():
             q = self.quats
             normalize_quat_tensor_(q)
@@ -239,9 +248,9 @@ class SplatModel:
     def init_from_pointcloud_tensors(
         cls,
         pc_tensors: PointCloudTensors,
-        device: Device,
+        device: torch.device,
         *,
-        voxel_size: TT.VoxelTensor,
+        voxel_size: TensorTypes.VoxelTensor,
         base_scale: float,
         scale_mult: float = 1.0,
     ) -> Self:
@@ -266,18 +275,18 @@ class SplatModel:
         )
 
     class Tensors(NamedTuple):
-        means: Float32[Tensor, "M 3"]
-        scales: Float32[Tensor, "M 3"]
-        quats: Float32[Tensor, "M 4"]
-        opacities: Float32[Tensor, "M 1"]
-        sh: Float32[Tensor, "M K 3"]
+        means: Float32[torch.Tensor, "M 3"]
+        scales: Float32[torch.Tensor, "M 3"]
+        quats: Float32[torch.Tensor, "M 4"]
+        opacities: Float32[torch.Tensor, "M 1"]
+        sh: Float32[torch.Tensor, "M K 3"]
 
 
 class GsplatRasterizer:
 
     def __init__(
         self,
-        device: Device,
+        device: torch.device,
         image_size: Tuple[int, int],
         sh_degree: int,
         znear: float = 0.01,
@@ -292,10 +301,10 @@ class GsplatRasterizer:
     def render(
         self,
         model: SplatModel,
-        extrinsic: TT.ExtrinsicTensor,
-        intrinsic: TT.IntrinsicTensor,
-        backgrounds: TT.ImagesAlphaTensor_0_1,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+        extrinsic: TensorTypes.ExtrinsicTensor,
+        intrinsic: TensorTypes.IntrinsicTensor,
+        backgrounds: TensorTypes.ImagesAlphaTensor_0_1,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         from gsplat import rasterization
 
         assert model.sh.shape[1] == (self.sh_degree + 1) ** 2
@@ -326,10 +335,10 @@ class GsplatRasterizer:
         )
 
         # render_colors are (S,H,W,4) in `RGB+ED`, where last dimension is RGB + depth
-        rgb_as_item: Float32[Tensor, "S H W 3"] = render_colors[..., :3]
-        depth_as_item: Float32[Tensor, "S H W 1"] = render_colors[..., 3:]
+        rgb_as_item: Float32[torch.Tensor, "S H W 3"] = render_colors[..., :3]
+        depth_as_item: Float32[torch.Tensor, "S H W 1"] = render_colors[..., 3:]
 
-        alpha_as_item: Float32[Tensor, "S H W 1"] = render_alphas
+        alpha_as_item: Float32[torch.Tensor, "S H W 1"] = render_alphas
 
         rgb = to_channel_as_primary(rgb_as_item)
         depth = to_channel_as_primary(depth_as_item)
@@ -345,7 +354,6 @@ def save_ply_3dgs_binary(
     encode_opacity_in_logit: bool = True,  # convert 'opacity' 0-1 to unbounded logit space
 ) -> None:
     import numpy as np
-    import torch
 
     means, scales, quats, opacities, sh = tensors
 
@@ -427,12 +435,11 @@ def train_3dgs(
     rasterizer: GsplatRasterizer,
     pc_tensors: PointCloudTensors,
     *,
-    images_0_255: TT.ImagesTensor_0_255,
-    images_alpha_0_255: TT.ImagesAlphaTensor_0_255,
+    images_0_255: TensorTypes.ImagesTensor_0_255,
+    images_alpha_0_255: TensorTypes.ImagesAlphaTensor_0_255,
     out_file: Path,
     config: SplatTrainingConfig = SplatTrainingConfig(),
 ) -> SplatModel:
-    import torch
     from gsplat import DefaultStrategy
 
     device = rasterizer.device

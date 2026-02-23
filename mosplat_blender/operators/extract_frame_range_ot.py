@@ -86,11 +86,11 @@ class Mosplat_OT_extract_frame_range(
         from torchcodec.decoders import VideoDecoder
 
         from ..infrastructure.dl_ops import (
-            TensorTypes as TT,
+            TensorTypes as TensorTypes,
             crop_tensor,
             load_and_verify_tensor_file,
+            save_images_png_preview_stacked,
             save_images_tensor,
-            save_tensor_stack_png_preview,
             to_0_1,
         )
 
@@ -141,7 +141,9 @@ class Mosplat_OT_extract_frame_range(
                     device,
                     new_metadata,
                     map={
-                        SavedTensorKey.IMAGES: TT.annotation_of(TT.ImagesTensor_0_255)
+                        SavedTensorKey.IMAGES: TensorTypes.annotation_of(
+                            TensorTypes.ImagesTensor_0_255
+                        )
                     },
                 )
                 note = f"Safetensor data for frame '{idx}' already found on disk."
@@ -150,14 +152,14 @@ class Mosplat_OT_extract_frame_range(
 
                 tensor_list = [dec[cast(Integral, idx)].to(device) for dec in decoders]
 
-                tensor_0_1: TT.ImagesTensor_0_1 = crop_tensor(
+                tensor_0_1: TensorTypes.ImagesTensor_0_1 = crop_tensor(
                     to_0_1(torch.stack(tensor_list, dim=0)), crop_geom
                 )  # crop tensors as soon as possible
 
                 save_images_tensor(out_file, new_metadata, tensor_0_1, None)
 
                 if preview:
-                    save_tensor_stack_png_preview(tensor_0_1, out_file)
+                    save_images_png_preview_stacked(tensor_0_1, out_file)
 
                 note = f"Saved safetensor '{out_file}' to disk."
 

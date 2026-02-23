@@ -6,21 +6,44 @@ from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import (
     Annotated,
+    Any,
     Dict,
+    List,
+    NamedTuple,
     Optional,
     Self,
+    Tuple,
     TypeAlias,
-    TypeVar,
     get_args,
     get_type_hints,
 )
 
 import dltype
 import torch
-from dltype._lib._core import DLTypeAnnotation
 
+from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
 from .macros import try_access_path
-from .schemas import CropGeometry, FrameTensorMetadata
+from .schemas import (
+    CropGeometry,
+    FrameTensorMetadata,
+    SavedTensorKey,
+    UserAssertionError,
+)
+
+
+class UInt8Float32Tensor(dltype.TensorTypeBase):
+    def check(self, tensor, tensor_name="anonymous"):
+        import torch
+        from dltype import DLTypeDtypeError
+
+        super().check(tensor, tensor_name)
+
+        if tensor.dtype not in (torch.uint8, torch.float32):
+            raise DLTypeDtypeError(
+                tensor_name=tensor_name,
+                expected=(torch.uint8, torch.float32),
+                received=(tensor.dtype,),
+            )
 
 
 class TensorTypes:
@@ -55,27 +78,11 @@ class TensorTypes:
         torch.Tensor, dltype.Float32Tensor["S H W"]
     ]
 
-    class UInt8Float32Tensor(dltype.TensorTypeBase):
-        def check(self, tensor, tensor_name="anonymous"):
-            import torch
-            from dltype import DLTypeDtypeError
-
-            super().check(tensor, tensor_name)
-
-            if tensor.dtype not in (torch.uint8, torch.float32):
-                raise DLTypeDtypeError(
-                    tensor_name=tensor_name,
-                    expected=(torch.uint8, torch.float32),
-                    received=(tensor.dtype,),
-                )
-
     ImagesTensorLike: TypeAlias = Annotated[torch.Tensor, UInt8Float32Tensor["S 3 H W"]]
     ImagesAlphaTensorLike: TypeAlias = Annotated[
         torch.Tensor, UInt8Float32Tensor["S 1 H W"]
     ]
-
-    O = TypeVar("O")
-    S = TypeVar("S")
+    SceneTensorLike: TypeAlias = Annotated[torch.Tensor, UInt8Float32Tensor["S C H W"]]
 
     @staticmethod
     def annotation_of(annotated: Annotated) -> dltype.TensorTypeBase:
@@ -115,14 +122,31 @@ class PointCloudTensors:
         field_hints = get_type_hints(cls, include_extras=True)
         return {name: get_args(hint)[1] for name, hint in field_hints.items()}
 
-    def to(self, device: torch.Device):
+    def to(self, device: torch.device):
         for fld in fields(self):
             tensor: torch.Tensor = getattr(self, fld.name)
             tensor.to(device)
 
 
+class VGGTPredictions(NamedTuple):
+    pose_enc: Annotated[torch.Tensor, dltype.Float32Tensor["B S 9"]]
+    depth: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W 1"]]
+    depth_conf: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W"]]
+    world_points: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W 3"]]
+    world_points_conf: Annotated[torch.Tensor, dltype.Float32Tensor["B S H W"]]
+    images: TensorTypes.ImagesAlphaTensor_0_1
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> Self:
+        """create conservatively by parsing away undocumented fields"""
+        parsed = {k: v for k, v in d.items() if k in cls._fields}
+        return cls(**parsed)
+
+
 @dltype.dltyped()
-def to_0_1(tensor: torch.Tensor) -> torch.Tensor:
+def to_0_1(
+    tensor: Annotated[torch.Tensor, UInt8Float32Tensor["*dims"]],
+) -> Annotated[torch.Tensor, dltype.Float32Tensor["*dims"]]:
     if tensor.dtype == torch.float32:
         return tensor
 
@@ -134,7 +158,9 @@ def to_0_1(tensor: torch.Tensor) -> torch.Tensor:
 
 
 @dltype.dltyped()
-def to_0_255(tensor: torch.Tensor) -> torch.Tensor:
+def to_0_255(
+    tensor: Annotated[torch.Tensor, UInt8Float32Tensor["*dims"]],
+) -> Annotated[torch.Tensor, dltype.UInt8Tensor["*dims"]]:
     if tensor.dtype == torch.uint8:
         return tensor
 
@@ -146,49 +172,49 @@ def to_0_255(tensor: torch.Tensor) -> torch.Tensor:
 
 
 @dltype.dltyped()
-def to_channel_as_primary(tensor: torch.Tensor) -> torch.Tensor:
-    assert len(tensor.shape) == 4
+def to_channel_as_primary(
+    tensor: Annotated[torch.Tensor, dltype.TensorTypeBase["S H W C"]],
+) -> Annotated[torch.Tensor, dltype.TensorTypeBase["S C H W"]]:
     return tensor.permute(0, 3, 1, 2)
 
 
 @dltype.dltyped()
-def to_channel_as_item(tensor: torch.Tensor) -> torch.Tensor:
-    assert len(tensor.shape) == 4
+def to_channel_as_item(
+    tensor: Annotated[torch.Tensor, dltype.TensorTypeBase["S C H W"]],
+) -> Annotated[torch.Tensor, dltype.TensorTypeBase["S H W C"]]:
     return tensor.permute(0, 2, 3, 1)
 
 
 @dltype.dltyped()
-def save_tensor_stack_png_preview(
-    tensor: TensorTypes.ImagesTensor_0_1, tensor_out_file: Path, suffix: str = ""
+def save_images_png_preview_stacked(
+    images: TensorTypes.ImagesTensorLike, tensor_out_file: Path, suffix: str = ""
 ):
     from torchvision.utils import save_image
 
-    tensor_0_1 = to_0_1(tensor)
+    images_0_1 = to_0_1(images)
 
     preview_png_file: Path = (
         tensor_out_file.parent / f"{tensor_out_file.stem}{suffix}.png"
     )
 
-    save_image(tensor_0_1, preview_png_file, nrow=4)
+    save_image(images_0_1, preview_png_file, nrow=4)
 
 
 @dltype.dltyped()
 def save_images_tensor(
     out_file: Path,
     metadata: FrameTensorMetadata,
-    images_0_1: TensorTypes.ImagesAlphaTensor_0_1,
-    images_alpha_0_1: Optional[TensorTypes.ImagesAlphaTensor_0_1],
+    images: TensorTypes.ImagesTensorLike,
+    images_alpha: Optional[TensorTypes.ImagesAlphaTensorLike],
 ):
     from safetensors.torch import save_file
 
-    from .schemas import SavedTensorKey
+    images_0_255 = to_0_255(images)
+    out_tensors = {SavedTensorKey.IMAGES.value: images_0_255}
 
-    images = to_0_255(images_0_1)
-    out_tensors = {SavedTensorKey.IMAGES.value: images}
-
-    if images_alpha_0_1 is not None:
-        images_alpha = to_0_255(images_alpha_0_1)
-        out_tensors |= {SavedTensorKey.IMAGES_ALPHA.value: images_alpha}
+    if images_alpha is not None:
+        images_alpha_0_255 = to_0_255(images_alpha)
+        out_tensors |= {SavedTensorKey.IMAGES_ALPHA.value: images_alpha_0_255}
 
     save_file(
         out_tensors,
@@ -197,10 +223,9 @@ def save_images_tensor(
     )
 
 
-@dltype.dltyped()
 def load_and_verify_tensor_file(
     in_file: Path,
-    device: torch.Device,
+    device: torch.device,
     new_metadata: FrameTensorMetadata,
     map: Dict[str, dltype.TensorTypeBase],  # keys to type annotations
 ) -> Dict[str, torch.Tensor]:
@@ -259,7 +284,7 @@ def crop_tensor(
     *,
     mode: str = "bilinear",
     align_corners: bool = False,
-) -> Annotated[torch.Tensor, dltype.FloatTensor["B C H_out W_out"]]:
+) -> Annotated[torch.Tensor, dltype.FloatTensor["B C H_cropped W_cropped"]]:
     import torch.nn.functional as F
 
     _, _, H, W = tensor.shape
@@ -359,3 +384,43 @@ def save_ply_binary(
         vertices["blue"] = rgb_np[:, 2]
 
         f.write(vertices.tobytes())
+
+
+@dltype.dltyped()
+def ensure_tensor_shape_for_vggt(tensor: TensorTypes.SceneTensorLike):
+    """ensure tensors are the correct shape for VGGT model"""
+    _, _, H, W = tensor.shape
+    assert H <= VGGT_MAX_IMAGE_SIZE and W <= VGGT_MAX_IMAGE_SIZE
+    assert H % VGGT_IMAGE_DIMS_FACTOR == 0 and W % VGGT_IMAGE_DIMS_FACTOR == 0
+
+
+@dltype.dltyped()
+def ensure_tensor_inputs_for_vggt(
+    images: TensorTypes.ImagesTensorLike,
+    images_alpha: TensorTypes.ImagesAlphaTensorLike,
+):
+    """uses `dltype` for shape and type-checking, then ensure other constraints are met"""
+    ensure_tensor_shape_for_vggt(images)
+    ensure_tensor_shape_for_vggt(images_alpha)
+
+
+@dltype.dltyped()
+def validate_preprocess_script_output(
+    output, _: TensorTypes.ImagesTensor_0_1
+) -> Tuple[TensorTypes.ImagesTensor_0_1, TensorTypes.ImagesAlphaTensor_0_1]:
+    if not isinstance(output, tuple):
+        raise UserAssertionError(
+            f"Return value of preprocess script must be a tuple",
+            expected=tuple.__name__,
+            actual=type(output).__name__,
+        )
+    if not len(output) == 2:
+        raise UserAssertionError(
+            f"Return value of preprocess script must be a tuple of size 2",
+            expected=len(output),
+            actual=2,
+        )
+
+    images, images_alpha = output
+
+    return images, images_alpha

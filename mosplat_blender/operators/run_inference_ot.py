@@ -11,6 +11,7 @@ from ..infrastructure.schemas import (
     UserFacingError,
     VGGTModelOptions,
 )
+from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 PlyFileFormat: TypeAlias = Literal["ascii", "binary"]
@@ -28,7 +29,6 @@ class ThreadKwargs(NamedTuple):
 class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs]):
     @classmethod
     def _contexted_poll(cls, pkg):
-        from ..interfaces.vggt_interface import VGGTInterface
 
         if VGGTInterface().model is None:
             cls._poll_error_msg_list.append("Model must be initialized.")
@@ -78,12 +78,11 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
         from ..infrastructure.dl_ops import (
             PointCloudTensors,
-            TensorTypes as TT,
+            TensorTypes as TensorTypes,
             load_and_verify_tensor_file,
             save_ply_ascii,
             save_ply_binary,
         )
-        from ..interfaces.vggt_interface import VGGTInterface
 
         INTERFACE = VGGTInterface()
 
@@ -105,9 +104,11 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         )
 
         image_tensor_map = {
-            SavedTensorKey.IMAGES.value: TT.annotation_of(TT.ImagesTensor_0_255),
-            SavedTensorKey.IMAGES_ALPHA.value: TT.annotation_of(
-                TT.ImagesAlphaTensor_0_255
+            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
+                TensorTypes.ImagesTensor_0_255
+            ),
+            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
+                TensorTypes.ImagesAlphaTensor_0_255
             ),
         }
         pointcloud_tensor_map = PointCloudTensors.map()
@@ -157,8 +158,10 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                         validation_metadata,
                         map=image_tensor_map,
                     )
-                    images: TT.ImagesTensor_0_255 = tensors[SavedTensorKey.IMAGES]
-                    images_alpha: TT.ImagesAlphaTensor_0_255 = tensors[
+                    images: TensorTypes.ImagesTensor_0_255 = tensors[
+                        SavedTensorKey.IMAGES
+                    ]
+                    images_alpha: TensorTypes.ImagesAlphaTensor_0_255 = tensors[
                         SavedTensorKey.IMAGES_ALPHA
                     ]
 

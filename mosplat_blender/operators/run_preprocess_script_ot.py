@@ -4,7 +4,7 @@ import multiprocessing as mp
 from functools import partial
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Callable, List, NamedTuple, Optional, Tuple, TypeAlias
+from typing import Callable, List, NamedTuple, Optional, Tuple, TypeAlias
 
 from ..infrastructure.constants import PREPROCESS_SCRIPT_FUNCTION_NAME
 from ..infrastructure.macros import (
@@ -22,9 +22,6 @@ from ..infrastructure.schemas import (
     UserFacingError,
 )
 from .base_ot import MosplatOperatorBase
-
-if TYPE_CHECKING:
-    from ..infrastructure.dl_ops import TensorTypes
 
 QueueTuple: TypeAlias = Tuple[str, str, Optional[MediaIOMetadata]]
 
@@ -93,11 +90,12 @@ class Mosplat_OT_run_preprocess_script(
         import torch
 
         from ..infrastructure.dl_ops import (
-            TensorTypes as TT,
+            TensorTypes as TensorTypes,
             load_and_verify_tensor_file,
+            save_images_png_preview_stacked,
             save_images_tensor,
-            save_tensor_stack_png_preview,
             to_0_1,
+            validate_preprocess_script_output,
         )
 
         script, files, (start, end), exported_file_formatter, preview, data = pwargs
@@ -141,11 +139,11 @@ class Mosplat_OT_run_preprocess_script(
                         device,
                         new_metadata,
                         map={
-                            SavedTensorKey.IMAGES.value: TT.annotation_of(
-                                TT.ImagesTensor_0_255
+                            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
+                                TensorTypes.ImagesTensor_0_255
                             ),
-                            SavedTensorKey.IMAGES_ALPHA.value: TT.annotation_of(
-                                TT.ImagesAlphaTensor_0_255
+                            SavedTensorKey.IMAGES_ALPHA.value: TensorTypes.annotation_of(
+                                TensorTypes.ImagesAlphaTensor_0_255
                             ),
                         },
                     )
@@ -166,18 +164,19 @@ class Mosplat_OT_run_preprocess_script(
                         device,
                         validation_metadata,
                         map={
-                            SavedTensorKey.IMAGES.value: TT.annotation_of(
-                                TT.ImagesTensor_0_255
+                            SavedTensorKey.IMAGES.value: TensorTypes.annotation_of(
+                                TensorTypes.ImagesTensor_0_255
                             )
                         },
                     )
-                    saved_images_0_255 = tensors[SavedTensorKey.IMAGES]
-                    saved_images_0_1: TT.ImagesTensor_0_1 = to_0_1(saved_images_0_255)
+                    raw_images_0_1: TensorTypes.ImagesTensor_0_1 = to_0_1(
+                        tensors[SavedTensorKey.IMAGES]
+                    )
 
-                    output = preprocess_fn(idx, files, saved_images_0_1)
+                    output = preprocess_fn(idx, files, raw_images_0_1)
 
-                    images_0_1, images_alpha_0_1 = _validate_preprocess_script_output(
-                        output, saved_images_0_1
+                    images_0_1, images_alpha_0_1 = validate_preprocess_script_output(
+                        output, raw_images_0_1
                     )
 
                     save_images_tensor(
@@ -185,8 +184,8 @@ class Mosplat_OT_run_preprocess_script(
                     )
 
                     if preview:
-                        save_tensor_stack_png_preview(images_0_1, out_file)
-                        save_tensor_stack_png_preview(
+                        save_images_png_preview_stacked(images_0_1, out_file)
+                        save_images_png_preview_stacked(
                             images_0_1 * images_alpha_0_1, out_file, ".masked"
                         )
                     queue.put(("update", f"Finished processing frame '{idx}'", None))
@@ -238,68 +237,6 @@ def _retrieve_preprocess_fn(
         return None
 
     return preprocess_fn
-
-
-def _validate_preprocess_script_output(
-    output, input_images: TensorTypes.ImagesTensor_0_1
-) -> Tuple[TensorTypes.ImagesTensor_0_1, TensorTypes.ImagesAlphaTensor_0_1]:
-    import torch
-
-    from ..infrastructure.dl_ops import to_0_1
-
-    if not isinstance(output, tuple):
-        raise UserAssertionError(
-            f"Return value of preprocess script must be a tuple",
-            expected=tuple.__name__,
-            actual=type(output).__name__,
-        )
-    if not len(output) == 2:
-        raise UserAssertionError(
-            f"Return value of preprocess script must be a tuple of size 2",
-            expected=len(output),
-            actual=2,
-        )
-
-    images, images_alpha = output
-
-    # validate returned images
-    if not isinstance(images, torch.Tensor):
-        raise UserAssertionError(
-            f"Returned images of preprocess script must be a torch tensor",
-            expected=torch.Tensor.__name__,
-            actual=type(images).__name__,
-        )
-    if not images.dtype == input_images.dtype:
-        raise UserAssertionError(
-            f"Datatype of images tensor cannot change after preprocess script",
-            expected=input_images.dtype,
-            actual=images.dtype,
-        )
-    if not images.shape == input_images.shape:
-        raise UserAssertionError(
-            f"Shape of images tensor cannot change after preprocess script",
-            expected=images.shape,
-            actual=images.shape,
-        )
-
-    if images_alpha is None:
-        images_alpha = torch.ones_like(images[:, :1], dtype=torch.float32)
-    if not images_alpha.dtype == torch.float32:
-        raise UserAssertionError(
-            f"Datatype of images alpha tensor incorrect",
-            expected=torch.float32,
-            actual=images_alpha.dtype,
-        )
-    S, _, H, W = input_images.shape
-    expected_shape = torch.Size((S, 1, H, W))
-    if not images_alpha.shape == expected_shape:
-        raise UserAssertionError(
-            f"Shape of images alpha tensor incorrect",
-            expected=expected_shape,
-            actual=images_alpha.shape,
-        )
-
-    return to_0_1(images), to_0_1(images_alpha)
 
 
 def process_entrypoint(*args, **kwargs):
