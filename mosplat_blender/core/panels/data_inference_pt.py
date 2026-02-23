@@ -10,6 +10,7 @@ class Mosplat_PT_data_inference(MosplatPanelBase):
             len(props.is_valid_media_directory_poll_result) == 0
             and len(props.frame_range_poll_result(pkg.prefs)) == 0
             and pkg.props.was_frame_range_extracted
+            and pkg.props.was_frame_range_preprocessed
         )
 
     def draw_with_layout(self, pkg, layout):

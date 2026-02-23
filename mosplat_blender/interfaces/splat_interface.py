@@ -490,7 +490,7 @@ def train_3dgs(
     S: int = images_0_1.shape[0]
 
     for step in range(config.steps):
-        idx = torch.randint(0, S, (config.batch_size,), device=device)
+        idx = torch.randint(0, S, (config.scene_size,), device=device)
 
         rgb = images_0_1.index_select(0, idx)
         alpha = images_alpha_0_1.index_select(0, idx)
@@ -500,7 +500,7 @@ def train_3dgs(
         dep_cf = depth_conf_unsqueezed.index_select(0, idx)
 
         bg = torch.zeros(
-            (config.batch_size, 3, rasterizer.H, rasterizer.W),
+            (config.scene_size, 3, rasterizer.H, rasterizer.W),
             device=device,
             dtype=torch.float32,
         )
@@ -537,7 +537,7 @@ def train_3dgs(
 
         model.post_step()
 
-        if step % 1000 == 0:
+        if step % 1000 == 0 or step == config.steps - 1:
             with torch.no_grad():
                 save_ply_3dgs_binary(ply_out_file, model.detached_tensors)
 

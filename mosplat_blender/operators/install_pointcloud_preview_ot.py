@@ -32,7 +32,7 @@ DEFAULT_POINT_RADIUS = 0.15
 PLY_FILE_FORMATTER = None
 
 
-class Mosplat_OT_install_pointcloud_preview(MosplatOperatorBase):
+class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
     @classmethod
     def _contexted_poll(cls, pkg):
         props = pkg.props

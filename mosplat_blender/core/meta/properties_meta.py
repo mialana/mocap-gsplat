@@ -1,10 +1,44 @@
-# 2026-02-23 10:23:41.567705
+# 2026-02-23 12:49:19.423831
 # created using 'generate_property_meta_files.py'
 
 
 from typing import NamedTuple
 
 from ...infrastructure.schemas import PropertyMeta
+
+
+class Mosplat_PG_OperatorProgress_Meta(NamedTuple):
+    current: PropertyMeta
+    total: PropertyMeta
+    in_use: PropertyMeta
+
+
+class Mosplat_PG_LogEntry_Meta(NamedTuple):
+    level: PropertyMeta
+    message: PropertyMeta
+    session_index: PropertyMeta
+    full_message: PropertyMeta
+
+
+class Mosplat_PG_LogEntryHub_Meta(NamedTuple):
+    logs: PropertyMeta
+    logs_active_index: PropertyMeta
+    logs_level_filter: PropertyMeta
+
+
+class Mosplat_PG_VGGTModelOptions_Meta(NamedTuple):
+    confidence_percentile: PropertyMeta
+    inference_mode: PropertyMeta
+
+
+class Mosplat_PG_SplatTrainingConfig_Meta(NamedTuple):
+    steps: PropertyMeta
+    lr: PropertyMeta
+    sh_degree: PropertyMeta
+    scene_size: PropertyMeta
+    alpha_weight: PropertyMeta
+    depth_weight: PropertyMeta
+    save_ply_interval: PropertyMeta
 
 
 class Mosplat_PG_AppliedPreprocessScript_Meta(NamedTuple):
@@ -39,44 +73,100 @@ class Mosplat_PG_MediaIOMetadata_Meta(NamedTuple):
     processed_frame_ranges: PropertyMeta
 
 
-class Mosplat_PG_OperatorProgress_Meta(NamedTuple):
-    current: PropertyMeta
-    total: PropertyMeta
-    in_use: PropertyMeta
-
-
-class Mosplat_PG_LogEntry_Meta(NamedTuple):
-    level: PropertyMeta
-    message: PropertyMeta
-    session_index: PropertyMeta
-    full_message: PropertyMeta
-
-
-class Mosplat_PG_LogEntryHub_Meta(NamedTuple):
-    logs: PropertyMeta
-    logs_active_index: PropertyMeta
-    logs_level_filter: PropertyMeta
-
-
-class Mosplat_PG_VGGTModelOptions_Meta(NamedTuple):
-    inference_mode: PropertyMeta
-    confidence_percentile: PropertyMeta
-
-
-class Mosplat_PG_SplatTrainingConfig_Meta(NamedTuple):
-    steps: PropertyMeta
-
-
 class Mosplat_PG_Global_Meta(NamedTuple):
     media_directory: PropertyMeta
     frame_range: PropertyMeta
     was_frame_range_extracted: PropertyMeta
+    was_frame_range_preprocessed: PropertyMeta
+    ran_inference_on_frame_range: PropertyMeta
     operator_progress: PropertyMeta
     log_entry_hub: PropertyMeta
     vggt_model_options: PropertyMeta
     splat_training_config: PropertyMeta
     media_io_metadata: PropertyMeta
 
+
+MOSPLAT_PG_OPERATORPROGRESS_META = Mosplat_PG_OperatorProgress_Meta(
+    current=PropertyMeta(
+        id="current",
+        name="Progress Current",
+        description="Singleton current progress of operators.",
+    ),
+    total=PropertyMeta(
+        id="total",
+        name="Progress Total",
+        description="Singleton total progress of operators.",
+    ),
+    in_use=PropertyMeta(
+        id="in_use",
+        name="Progress In Use",
+        description="Whether any operator is 'using' the progress-related properties.",
+    ),
+)
+
+MOSPLAT_PG_LOGENTRY_META = Mosplat_PG_LogEntry_Meta(
+    level=PropertyMeta(id="level", name="Log Entry Level", description=""),
+    message=PropertyMeta(id="message", name="Log Entry Message", description=""),
+    session_index=PropertyMeta(
+        id="session_index",
+        name="Log Session Index",
+        description="The self-stored index represented as a monotonic increasing index since the session start.",
+    ),
+    full_message=PropertyMeta(
+        id="full_message",
+        name="Log Entry Full Message",
+        description="The property that is displayed in the dynamic tooltip while hovering on the log item.",
+    ),
+)
+
+MOSPLAT_PG_LOGENTRYHUB_META = Mosplat_PG_LogEntryHub_Meta(
+    logs=PropertyMeta(id="logs", name="Log Entries Data", description=""),
+    logs_active_index=PropertyMeta(
+        id="logs_active_index", name="Log Entries Active Index", description=""
+    ),
+    logs_level_filter=PropertyMeta(
+        id="logs_level_filter", name="Log Entries Level Filter", description=""
+    ),
+)
+
+MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
+    confidence_percentile=PropertyMeta(
+        id="confidence_percentile",
+        name="Confidence",
+        description="Minimum percentile for model-inferred confidence",
+    ),
+    inference_mode=PropertyMeta(
+        id="inference_mode", name="Inference Mode", description=""
+    ),
+)
+
+MOSPLAT_PG_SPLATTRAININGCONFIG_META = Mosplat_PG_SplatTrainingConfig_Meta(
+    steps=PropertyMeta(id="steps", name="Steps", description=""),
+    lr=PropertyMeta(id="lr", name="Learning Rate", description=""),
+    sh_degree=PropertyMeta(
+        id="sh_degree", name="Spherical Harmonics Degree", description=""
+    ),
+    scene_size=PropertyMeta(
+        id="scene_size",
+        name="Scene Size",
+        description="Number of cameras capturing the scene (read-only)",
+    ),
+    alpha_weight=PropertyMeta(
+        id="alpha_weight",
+        name="Alpha Weight",
+        description="Weighting of alpha values in loss computation",
+    ),
+    depth_weight=PropertyMeta(
+        id="depth_weight",
+        name="Depth Weight",
+        description="Weighting of depth values in loss computation",
+    ),
+    save_ply_interval=PropertyMeta(
+        id="save_ply_interval",
+        name="Save to PLY Interval",
+        description="The amount of steps in between saving an evaluated PLY file to disk.",
+    ),
+)
 
 MOSPLAT_PG_APPLIEDPREPROCESSSCRIPT_META = Mosplat_PG_AppliedPreprocessScript_Meta(
     file_path=PropertyMeta(id="file_path", name="File Path", description=""),
@@ -134,64 +224,6 @@ MOSPLAT_PG_MEDIAIOMETADATA_META = Mosplat_PG_MediaIOMetadata_Meta(
     ),
 )
 
-MOSPLAT_PG_OPERATORPROGRESS_META = Mosplat_PG_OperatorProgress_Meta(
-    current=PropertyMeta(
-        id="current",
-        name="Progress Current",
-        description="Singleton current progress of operators.",
-    ),
-    total=PropertyMeta(
-        id="total",
-        name="Progress Total",
-        description="Singleton total progress of operators.",
-    ),
-    in_use=PropertyMeta(
-        id="in_use",
-        name="Progress In Use",
-        description="Whether any operator is 'using' the progress-related properties.",
-    ),
-)
-
-MOSPLAT_PG_LOGENTRY_META = Mosplat_PG_LogEntry_Meta(
-    level=PropertyMeta(id="level", name="Log Entry Level", description=""),
-    message=PropertyMeta(id="message", name="Log Entry Message", description=""),
-    session_index=PropertyMeta(
-        id="session_index",
-        name="Log Session Index",
-        description="The self-stored index represented as a monotonic increasing index since the session start.",
-    ),
-    full_message=PropertyMeta(
-        id="full_message",
-        name="Log Entry Full Message",
-        description="The property that is displayed in the dynamic tooltip while hovering on the log item.",
-    ),
-)
-
-MOSPLAT_PG_LOGENTRYHUB_META = Mosplat_PG_LogEntryHub_Meta(
-    logs=PropertyMeta(id="logs", name="Log Entries Data", description=""),
-    logs_active_index=PropertyMeta(
-        id="logs_active_index", name="Log Entries Active Index", description=""
-    ),
-    logs_level_filter=PropertyMeta(
-        id="logs_level_filter", name="Log Entries Level Filter", description=""
-    ),
-)
-
-MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
-    inference_mode=PropertyMeta(
-        id="inference_mode", name="Inference Mode", description=""
-    ),
-    confidence_percentile=PropertyMeta(
-        id="confidence_percentile",
-        name="Confidence",
-        description="Minimum percentile for model-inferred confidence",
-    ),
-)
-
-MOSPLAT_PG_SPLATTRAININGCONFIG_META = Mosplat_PG_SplatTrainingConfig_Meta(
-    steps=PropertyMeta(id="steps", name="Steps", description=""),
-)
-
 MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
     media_directory=PropertyMeta(
         id="media_directory",
@@ -207,6 +239,16 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
         id="was_frame_range_extracted",
         name="Was Frame Range Extracted",
         description="Tracks whether the currently selected frame range extracted already.",
+    ),
+    was_frame_range_preprocessed=PropertyMeta(
+        id="was_frame_range_preprocessed",
+        name="Was Frame Range Preprocessed",
+        description="Tracks whether the currently selected frame range has been preprocessed.",
+    ),
+    ran_inference_on_frame_range=PropertyMeta(
+        id="ran_inference_on_frame_range",
+        name="Was Frame Range Inferred",
+        description="Tracks whether the currently selected frame range has had data inference ran on it already.",
     ),
     operator_progress=PropertyMeta(
         id="operator_progress", name="Operator Progress", description=""

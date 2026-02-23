@@ -14,15 +14,16 @@ from .log_entries_pt import (
     Mosplat_PT_log_entries,
     Mosplat_UL_log_entries,
 )
-from .main_pt import Mosplat_PT_Main
+from .main_pt import Mosplat_PT_main
 from .preprocess_pt import Mosplat_PT_preprocess
+from .train_pt import Mosplat_PT_train
 
 _ADDON_SHORTNAME = AddonMeta().shortname
 panel_registry: Dict[
     Type[MosplatPanelBase],
     MosplatPanelMetadata,
 ] = {
-    Mosplat_PT_Main: MosplatPanelMetadata(
+    Mosplat_PT_main: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.MAIN,
         bl_description=f"Main panel holding all '{_ADDON_SHORTNAME}' panels",
         bl_options={"HIDE_HEADER"},
@@ -35,6 +36,11 @@ panel_registry: Dict[
     Mosplat_PT_data_inference: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.DATA_INFERENCE,
         bl_description="Holds data inference operations",
+        bl_parent_id=PanelIDEnum.MAIN,
+    ),
+    Mosplat_PT_train: MosplatPanelMetadata(
+        bl_idname=PanelIDEnum.TRAIN,
+        bl_description="Holds training configuration options",
         bl_parent_id=PanelIDEnum.MAIN,
     ),
     Mosplat_PT_log_entries: MosplatPanelMetadata(

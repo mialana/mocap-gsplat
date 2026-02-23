@@ -34,10 +34,15 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             cls._poll_error_msg_list.append("Model must be initialized.")
         if not pkg.props.was_frame_range_extracted:
             cls._poll_error_msg_list.append("Frame range must be extracted.")
+        if not pkg.props.was_frame_range_preprocessed:
+            cls._poll_error_msg_list.append("Frame range must be preprocessed.")
 
         return len(cls._poll_error_msg_list) == 0
 
     def _queue_callback(self, pkg, event, next):
+        status, _ = next
+        if status == "done":
+            pkg.props.ran_inference_on_frame_range = True
 
         return super()._queue_callback(pkg, event, next)
 

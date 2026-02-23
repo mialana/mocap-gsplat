@@ -33,6 +33,7 @@ from ..infrastructure.schemas import (
     ModelInferenceMode,
     ProcessedFrameRange,
     SplatTrainingConfig,
+    UserFacingError,
     VGGTModelOptions,
 )
 from .checks import (
@@ -81,12 +82,29 @@ FrameRangeTuple: TypeAlias = Tuple[int, int]
 
 
 def update_frame_range(self: Mosplat_PG_Global, context: Context):
+    prefs = check_addonpreferences(context.preferences)
+
     media_io = self.media_io_accessor.to_dataclass()
 
     start, end = self.frame_range_
-    self.was_frame_range_extracted = bool(media_io.query_frame_range(start, end - 1))
+    ranges = media_io.query_frame_range(start, end - 1)
+    self.was_frame_range_extracted = len(ranges) > 0
 
-    prefs = check_addonpreferences(context.preferences)
+    self.was_frame_range_preprocessed = False
+    if self.was_frame_range_extracted:
+        try:
+            curr_script = AppliedPreprocessScript.from_file_path(
+                prefs.preprocess_media_script_file_
+            )
+            matching_ranges = list(
+                filter(lambda r: r.applied_preprocess_script == curr_script, ranges)
+            )  # check if any existing ranges have the same applied preprocess script
+            self.was_frame_range_preprocessed = len(matching_ranges) > 0
+        except UserFacingError as e:
+            pass
+
+    self.ran_inference_on_frame_range = False
+
     poll_result = check_frame_range_poll_result(prefs, self)
     if len(poll_result) > 0:
         poll_result_str = "\n".join(poll_result)
@@ -101,7 +119,7 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
         scene.frame_end = end - 1
 
     try:
-        OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINTCLOUD_PREVIEW, "INVOKE_DEFAULT")
+        OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINT_CLOUD_PREVIEW, "INVOKE_DEFAULT")
     except RuntimeError as e:
         self.logger.error(str(e))
         return
@@ -126,6 +144,113 @@ class MosplatPropertyGroupBase(
     DataclassInteropMixin[D],
 ):
     pass
+
+
+class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase):
+    _meta: Mosplat_PG_OperatorProgress_Meta = MOSPLAT_PG_OPERATORPROGRESS_META
+    __dataclass_type__ = None
+
+    current: IntProperty(
+        name="Progress Current",
+        description="Singleton current progress of operators.",
+        default=-1,
+    )
+
+    total: IntProperty(
+        name="Progress Total",
+        description="Singleton total progress of operators.",
+        default=-1,
+    )
+
+    in_use: BoolProperty(
+        name="Progress In Use",
+        description="Whether any operator is 'using' the progress-related properties.",
+        default=False,
+    )
+
+
+class Mosplat_PG_LogEntry(MosplatPropertyGroupBase):
+    _meta: Mosplat_PG_LogEntry_Meta = MOSPLAT_PG_LOGENTRY_META
+    __dataclass_type__ = None
+
+    level: EnumProperty(
+        name="Log Entry Level",
+        items=LogEntryLevelEnumItems,
+        default=LogEntryLevelEnum.INFO.value,
+    )
+    message: StringProperty(name="Log Entry Message")
+    session_index: IntProperty(
+        name="Log Session Index",
+        description="The self-stored index represented as a monotonic increasing index since the session start.",
+        default=-1,
+    )
+    full_message: StringProperty(
+        name="Log Entry Full Message",
+        description="The property that is displayed in the dynamic tooltip while hovering on the log item.",
+    )
+
+
+class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase):
+    _meta: Mosplat_PG_LogEntryHub_Meta = MOSPLAT_PG_LOGENTRYHUB_META
+    __dataclass_type__ = None
+
+    logs: CollectionProperty(name="Log Entries Data", type=Mosplat_PG_LogEntry)
+    logs_active_index: IntProperty(name="Log Entries Active Index", default=0)
+    logs_level_filter: EnumProperty(
+        name="Log Entries Level Filter",
+        items=LogEntryLevelEnumItems,
+        default=LogEntryLevelEnum.ALL.value,
+    )
+
+    @property
+    def entries_accessor(self) -> SupportsCollectionProperty[Mosplat_PG_LogEntry]:
+        return self.logs
+
+
+class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase[VGGTModelOptions]):
+    _meta: Mosplat_PG_VGGTModelOptions_Meta = MOSPLAT_PG_VGGTMODELOPTIONS_META
+    __dataclass_type__ = VGGTModelOptions
+
+    confidence_percentile: FloatProperty(
+        name="Confidence",
+        description="Minimum percentile for model-inferred confidence",
+        default=97.5,
+    )
+    inference_mode: EnumProperty(
+        name="Inference Mode",
+        items=ModelInferenceModeEnumItems,
+        default=ModelInferenceMode.POINTMAP.value,
+    )
+
+
+class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfig]):
+    _meta: Mosplat_PG_SplatTrainingConfig_Meta = MOSPLAT_PG_SPLATTRAININGCONFIG_META
+    __dataclass_type__ = SplatTrainingConfig
+
+    steps: IntProperty(name="Steps", default=30_000)
+    lr: FloatProperty(name="Learning Rate", default=1e-2)
+    sh_degree: IntProperty(name="Spherical Harmonics Degree", default=0)
+    scene_size: IntProperty(
+        name="Scene Size",
+        description="Number of cameras capturing the scene (read-only)",
+        default=-1,
+        options={"READ_ONLY"},
+    )
+    alpha_weight: FloatProperty(
+        name="Alpha Weight",
+        description="Weighting of alpha values in loss computation",
+        default=0.1,
+    )
+    depth_weight: FloatProperty(
+        name="Depth Weight",
+        description="Weighting of depth values in loss computation",
+        default=0.01,
+    )
+    save_ply_interval: IntProperty(
+        name="Save to PLY Interval",
+        description="The amount of steps in between saving an evaluated PLY file to disk.",
+        default=5000,
+    )
 
 
 class Mosplat_PG_AppliedPreprocessScript(
@@ -229,98 +354,6 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
         return self.processed_frame_ranges
 
 
-class Mosplat_PG_OperatorProgress(MosplatPropertyGroupBase):
-    _meta: Mosplat_PG_OperatorProgress_Meta = MOSPLAT_PG_OPERATORPROGRESS_META
-    __dataclass_type__ = None
-
-    current: IntProperty(
-        name="Progress Current",
-        description="Singleton current progress of operators.",
-        default=-1,
-    )
-
-    total: IntProperty(
-        name="Progress Total",
-        description="Singleton total progress of operators.",
-        default=-1,
-    )
-
-    in_use: BoolProperty(
-        name="Progress In Use",
-        description="Whether any operator is 'using' the progress-related properties.",
-        default=False,
-    )
-
-
-class Mosplat_PG_LogEntry(MosplatPropertyGroupBase):
-    _meta: Mosplat_PG_LogEntry_Meta = MOSPLAT_PG_LOGENTRY_META
-    __dataclass_type__ = None
-
-    level: EnumProperty(
-        name="Log Entry Level",
-        items=LogEntryLevelEnumItems,
-        default=LogEntryLevelEnum.INFO.value,
-    )
-    message: StringProperty(name="Log Entry Message")
-    session_index: IntProperty(
-        name="Log Session Index",
-        description="The self-stored index represented as a monotonic increasing index since the session start.",
-        default=-1,
-    )
-    full_message: StringProperty(
-        name="Log Entry Full Message",
-        description="The property that is displayed in the dynamic tooltip while hovering on the log item.",
-    )
-
-
-class Mosplat_PG_LogEntryHub(MosplatPropertyGroupBase):
-    _meta: Mosplat_PG_LogEntryHub_Meta = MOSPLAT_PG_LOGENTRYHUB_META
-    __dataclass_type__ = None
-
-    logs: CollectionProperty(name="Log Entries Data", type=Mosplat_PG_LogEntry)
-    logs_active_index: IntProperty(name="Log Entries Active Index", default=0)
-    logs_level_filter: EnumProperty(
-        name="Log Entries Level Filter",
-        items=LogEntryLevelEnumItems,
-        default=LogEntryLevelEnum.ALL.value,
-    )
-
-    @property
-    def entries_accessor(self) -> SupportsCollectionProperty[Mosplat_PG_LogEntry]:
-        return self.logs
-
-
-class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase[VGGTModelOptions]):
-    _meta: Mosplat_PG_VGGTModelOptions_Meta = MOSPLAT_PG_VGGTMODELOPTIONS_META
-    __dataclass_type__ = VGGTModelOptions
-
-    inference_mode: EnumProperty(
-        name="Inference Mode",
-        items=ModelInferenceModeEnumItems,
-        default=ModelInferenceMode.POINTMAP.value,
-    )
-    confidence_percentile: FloatProperty(
-        name="Confidence",
-        description="Minimum percentile for model-inferred confidence",
-        default=97.5,
-    )
-
-
-class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfig]):
-    _meta: Mosplat_PG_SplatTrainingConfig_Meta = MOSPLAT_PG_SPLATTRAININGCONFIG_META
-    __dataclass_type__ = SplatTrainingConfig
-
-    steps: IntProperty(name="Steps", default=30_000)
-    lr: float = 1e-2  # learning rate (`EPS` is too slow)
-    sh_degree: int = 0
-    batch_size: int = 1  # cameras per frame
-
-    alpha_weight: float = 0.1  # weight of alpha in loss computation
-    depth_weight: float = 0.01  # weight of depth in loss computation
-
-    save_ply_interval: int = 5000  # i.e. every x steps
-
-
 class Mosplat_PG_Global(MosplatPropertyGroupBase):
     _meta: Mosplat_PG_Global_Meta = MOSPLAT_PG_GLOBAL_META
     __dataclass_type__ = None
@@ -347,6 +380,20 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
     was_frame_range_extracted: BoolProperty(
         name="Was Frame Range Extracted",
         description="Tracks whether the currently selected frame range extracted already.",
+        default=False,
+        options={"SKIP_SAVE"},
+    )
+
+    was_frame_range_preprocessed: BoolProperty(
+        name="Was Frame Range Preprocessed",
+        description="Tracks whether the currently selected frame range has been preprocessed.",
+        default=False,
+        options={"SKIP_SAVE"},
+    )
+
+    ran_inference_on_frame_range: BoolProperty(
+        name="Was Frame Range Inferred",
+        description="Tracks whether the currently selected frame range has had data inference ran on it already.",
         default=False,
         options={"SKIP_SAVE"},
     )

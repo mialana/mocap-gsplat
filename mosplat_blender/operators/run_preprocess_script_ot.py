@@ -83,6 +83,8 @@ class Mosplat_OT_run_preprocess_script(
         if new_data:
             self.data = new_data
             self.sync_to_props(pkg.props)
+        if status == "done":
+            pkg.props.was_frame_range_preprocessed = True
         return super()._queue_callback(pkg, event, next)
 
     @staticmethod

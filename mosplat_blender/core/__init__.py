@@ -26,6 +26,7 @@ from .properties import (
     Mosplat_PG_MediaIOMetadata,
     Mosplat_PG_OperatorProgress,
     Mosplat_PG_ProcessedFrameRange,
+    Mosplat_PG_SplatTrainingConfig,
     Mosplat_PG_VGGTModelOptions,
     MosplatPropertyGroupBase,
 )
@@ -45,6 +46,7 @@ properties_registry: List[Type[MosplatPropertyGroupBase]] = [
     Mosplat_PG_LogEntry,
     Mosplat_PG_LogEntryHub,
     Mosplat_PG_VGGTModelOptions,
+    Mosplat_PG_SplatTrainingConfig,
     Mosplat_PG_Global,
 ]
 

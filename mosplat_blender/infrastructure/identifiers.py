@@ -47,7 +47,8 @@ class OperatorIDEnum(StrEnum):
     EXTRACT_FRAME_RANGE = auto()
     RUN_PREPROCESS_SCRIPT = auto()
     RUN_INFERENCE = auto()
-    INSTALL_POINTCLOUD_PREVIEW = auto()
+    INSTALL_POINT_CLOUD_PREVIEW = auto()
+    TRAIN_GAUSSIAN_SPLATS = auto()
 
 
 class PanelIDEnum(StrEnum):
@@ -74,6 +75,7 @@ class PanelIDEnum(StrEnum):
     MAIN = auto()
     PREPROCESS = auto()
     DATA_INFERENCE = auto()
+    TRAIN = auto()
     LOG_ENTRIES = auto()
 
 

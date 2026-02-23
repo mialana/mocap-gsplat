@@ -37,6 +37,10 @@ class Mosplat_OT_train_gaussian_splats(
             cls._poll_error_msg_list.append("Model must be initialized.")
         if not pkg.props.was_frame_range_extracted:
             cls._poll_error_msg_list.append("Frame range must be extracted.")
+        if not pkg.props.was_frame_range_preprocessed:
+            cls._poll_error_msg_list.append("Frame range must be preprocessed.")
+        if not pkg.props.ran_inference_on_frame_range:
+            cls._poll_error_msg_list.append("Must run inference on frame range.")
 
         return len(cls._poll_error_msg_list) == 0
 
@@ -130,8 +134,7 @@ class Mosplat_OT_train_gaussian_splats(
             -1, files, applied_preprocess_script, options
         )
 
-        SH_DEGREE = 1
-        rasterizer = GsplatRasterizer(device, (H, W), sh_degree=SH_DEGREE)
+        rasterizer = GsplatRasterizer(device, (H, W), sh_degree=config.sh_degree)
 
         for idx in range(start, end):
             if cancel_event.is_set():
@@ -174,7 +177,7 @@ class Mosplat_OT_train_gaussian_splats(
                     device,
                     voxel_size=voxel_size,
                     base_scale=base_scale,
-                    sh_degree=SH_DEGREE,
+                    sh_degree=config.sh_degree,
                 )
 
                 train_3dgs(

@@ -313,58 +313,6 @@ class CropGeometry(NamedTuple):
         )
 
 
-@dataclass(frozen=True)
-class SplatTrainingConfig:
-    steps: int = 30_000
-    lr: float = 1e-2  # learning rate (`EPS` is too slow)
-    sh_degree: int = 0
-    batch_size: int = 1  # cameras per frame
-
-    alpha_weight: float = 0.1  # weight of alpha in loss computation
-    depth_weight: float = 0.01  # weight of depth in loss computation
-
-    save_ply_interval: int = 5000  # i.e. every x steps
-
-    def to_dict(self) -> Dict:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, d: Dict) -> Self:
-        return cls(**d)
-
-
-class ModelInferenceMode(StrEnum):
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return name.upper()
-
-    def to_blender_enum_item(self) -> BlenderEnumItem:
-        human_readable = self.value.replace("_", " ").upper()
-        return (self.value, human_readable, "")
-
-    POINTMAP = auto()
-    DEPTH_CAM = auto()
-
-
-@dataclass(frozen=True)
-class VGGTModelOptions:
-    inference_mode: ModelInferenceMode
-    confidence_percentile: float
-
-    def to_dict(self) -> Dict:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, d: Dict) -> Self:
-        new_dict = d
-        mode: str = new_dict.get("inference_mode", "")
-        if not mode:
-            raise KeyError("Expected `inference_mode` in options as dictionary.")
-        new_dict.setdefault("inference_mode", ModelInferenceMode(mode))
-
-        return cls(**new_dict)
-
-
 @dataclass
 class FrameTensorMetadata:
     frame_idx: int
@@ -407,6 +355,58 @@ class FrameTensorMetadata:
             )
         except (KeyError, json.JSONDecodeError) as e:
             raise OSError(str(e)) from e
+
+
+@dataclass(frozen=True)
+class SplatTrainingConfig:
+    steps: int = 30_000
+    lr: float = 1e-2  # learning rate (`EPS` is too slow)
+    sh_degree: int = 0
+    scene_size: int = -1  # cameras per frame
+
+    alpha_weight: float = 0.1  # weight of alpha in loss computation
+    depth_weight: float = 0.01  # weight of depth in loss computation
+
+    save_ply_interval: int = 5000  # i.e. every x steps
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> Self:
+        return cls(**d)
+
+
+class ModelInferenceMode(StrEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name.upper()
+
+    def to_blender_enum_item(self) -> BlenderEnumItem:
+        human_readable = self.value.replace("_", " ").upper()
+        return (self.value, human_readable, "")
+
+    POINTMAP = auto()
+    DEPTH_CAM = auto()
+
+
+@dataclass(frozen=True)
+class VGGTModelOptions:
+    confidence_percentile: float
+    inference_mode: ModelInferenceMode = ModelInferenceMode.POINTMAP
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> Self:
+        new_dict = d
+        mode: str = new_dict.get("inference_mode", "")
+        if not mode:
+            raise KeyError("Expected `inference_mode` in options as dictionary.")
+        new_dict.setdefault("inference_mode", ModelInferenceMode(mode))
+
+        return cls(**new_dict)
 
 
 @dataclass(frozen=True)
