@@ -19,6 +19,7 @@ from ..infrastructure.dl_ops import (
     to_0_1,
     to_channel_as_primary,
 )
+from ..infrastructure.macros import add_suffix_to_path
 from ..infrastructure.schemas import SplatTrainingConfig, UnexpectedError
 
 HASH_MULTIPLIER_X = 73856093
@@ -271,7 +272,7 @@ class SplatModel(torch.nn.Module):
         return self.params.get_parameter("sh0")
 
     @property
-    def shN_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M K-1 3"]]:
+    def shN_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M Kminus1 3"]]:
         return self.params.get_parameter("shN")
 
     @torch.no_grad
@@ -290,7 +291,6 @@ class SplatModel(torch.nn.Module):
         )
 
     @classmethod
-    @dltype.dltyped()
     def init_from_pointcloud_tensors(
         cls,
         pct: PointCloudTensors,
@@ -339,7 +339,7 @@ class SplatModel(torch.nn.Module):
         quats: Anno[torch.Tensor, dltype.Float32Tensor["M 4"]]
         opacities: Anno[torch.Tensor, dltype.Float32Tensor["M"]]
         sh0: Anno[torch.Tensor, dltype.Float32Tensor["M 1 3"]]
-        shN: Anno[torch.Tensor, dltype.Float32Tensor["M K-1 3"]]
+        shN: Anno[torch.Tensor, dltype.Float32Tensor["M Kminus1 3"]]
 
 
 class GsplatRasterizer:
@@ -447,7 +447,7 @@ def save_ply_3dgs(
     # opacities can use view as the data is contiguous in memory
     opacities: Anno[torch.Tensor, dltype.Float32Tensor["M 1"]] = opacities.view(M, 1)
     sh0: Anno[torch.Tensor, dltype.Float32Tensor["M 3"]] = sh0.reshape(M, -1)
-    shN: Anno[torch.Tensor, dltype.Float32Tensor["M 3*(K-1)"]] = shN.reshape(M, -1)
+    shN: Anno[torch.Tensor, dltype.Float32Tensor["M 3xKminus1"]] = shN.reshape(M, -1)
 
     props = [
         ("x", "float"),
@@ -516,6 +516,7 @@ def train_3dgs(
     config: SplatTrainingConfig,
     *,
     verbose: bool = True,
+    increment_ply_file: bool = True,
 ) -> SplatModel:
     from gsplat import DefaultStrategy
 
@@ -553,6 +554,7 @@ def train_3dgs(
         idx = torch.randint(0, S, (config.scene_size,), device=device)
 
         rgb = images_0_1.index_select(0, idx)
+        alp = images_alpha_0_1.index_select(0, idx)
         view = viewmats.index_select(0, idx)
         intri = intrinsic.index_select(0, idx)
         dep = depth.index_select(0, idx)
@@ -568,10 +570,10 @@ def train_3dgs(
             msk_rgb = msk.expand(-1, 3, -1, -1)
             rgb_loss = (pred_rgb - rgb).abs()[msk_rgb].mean()
 
-            alpha_loss = (pred_alpha - msk).abs()[mask].mean()
+            alpha_loss = (pred_alpha - alp).abs()[msk].mean()
 
             depth_err = (pred_depth - dep).abs()
-            depth_loss = (depth_err * dep_cf)[mask].mean()
+            depth_loss = (depth_err * dep_cf)[msk].mean()
 
             loss = (
                 rgb_loss
@@ -596,5 +598,10 @@ def train_3dgs(
         if step % config.save_ply_interval == 0 or step == config.steps - 1:
             torch.cuda.synchronize()
             with torch.no_grad():
-                save_ply_3dgs(ply_out_file, model.detached_tensors)
+                out_file = (
+                    add_suffix_to_path(ply_out_file, f".{step:06d}")
+                    if increment_ply_file
+                    else ply_out_file
+                )
+                save_ply_3dgs(out_file, model.detached_tensors)
     return model

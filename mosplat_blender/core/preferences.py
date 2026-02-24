@@ -179,7 +179,8 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
     stdout_log_format: StringProperty(
         name="STDOUT Logging Log Format",
         description=f"`logging.Formatter` format string. Refer to `{LoggingInterface._set_log_record_factory.__qualname__}` for info about custom logrecord attributes: `levelletter`, `dirname`, and `classname`.",
-        default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
+        default="[%(levelletter)s] %(message)s",
+        # default="[%(levelletter)s][%(asctime)s][%(dirname)s::%(filename)s::%(classname)s::%(funcName)s:%(lineno)s] %(message)s",
         update=make_update_logging_fn(handler=LoggingHandler.STDOUT),
     )
 

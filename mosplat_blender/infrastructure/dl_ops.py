@@ -22,7 +22,7 @@ import dltype
 import torch
 
 from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
-from .macros import try_access_path
+from .macros import add_suffix_to_path, try_access_path
 from .schemas import (
     CropGeometry,
     ExportedTensorKey,
@@ -74,7 +74,6 @@ class TensorTypes(SimpleNamespace):
 
     ImagesTensorLike: TypeAlias = Anno[torch.Tensor, UInt8Float32Tensor["S 3 H W"]]
     ImagesAlphaTensorLike: TypeAlias = Anno[torch.Tensor, UInt8Float32Tensor["S 1 H W"]]
-    SceneTensorLike: TypeAlias = Anno[torch.Tensor, UInt8Float32Tensor["S C H W"]]
 
     @staticmethod
     def annotation_of(annotated: Anno) -> dltype.TensorTypeBase:
@@ -200,9 +199,7 @@ def save_images_png_preview(
 
     images_0_1 = to_0_1(images)
 
-    preview_png_file: Path = (
-        tensor_out_file.parent / f"{tensor_out_file.stem}{suffix}.png"
-    )
+    preview_png_file = add_suffix_to_path(tensor_out_file, suffix)
 
     save_image(images_0_1, preview_png_file, nrow=4)
 
@@ -240,7 +237,6 @@ def load_safetensors(
 
     from .schemas import (
         FrameTensorMetadata,
-        UserAssertionError,
         UserFacingError,
     )
 
@@ -387,21 +383,19 @@ def save_ply_binary(
 
 
 @dltype.dltyped()
-def ensure_tensor_shape_for_vggt(tensor: TensorTypes.SceneTensorLike):
-    """ensure tensors are the correct shape for VGGT model"""
-    _, _, H, W = tensor.shape
-    assert H <= VGGT_MAX_IMAGE_SIZE and W <= VGGT_MAX_IMAGE_SIZE
-    assert H % VGGT_IMAGE_DIMS_FACTOR == 0 and W % VGGT_IMAGE_DIMS_FACTOR == 0
-
-
-@dltype.dltyped()
 def ensure_tensor_inputs_for_vggt(
     images: TensorTypes.ImagesTensorLike,
     images_alpha: TensorTypes.ImagesAlphaTensorLike,
 ):
+    def _ensure_tensor_shape_for_vggt(tensor):
+        """ensure tensors are the correct shape for VGGT model"""
+        _, _, H, W = tensor.shape
+        assert H <= VGGT_MAX_IMAGE_SIZE and W <= VGGT_MAX_IMAGE_SIZE
+        assert H % VGGT_IMAGE_DIMS_FACTOR == 0 and W % VGGT_IMAGE_DIMS_FACTOR == 0
+
     """uses `dltype` for shape and type-checking, then ensure other constraints are met"""
-    ensure_tensor_shape_for_vggt(images)
-    ensure_tensor_shape_for_vggt(images_alpha)
+    _ensure_tensor_shape_for_vggt(images)
+    _ensure_tensor_shape_for_vggt(images_alpha)
 
 
 @dltype.dltyped()

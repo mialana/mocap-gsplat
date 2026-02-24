@@ -243,7 +243,7 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
     save_ply_interval: IntProperty(
         name="Save to PLY Interval",
         description="The amount of steps in between saving an evaluated PLY file to disk.",
-        default=5000,
+        default=1000,
     )
 
 
@@ -373,7 +373,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         name="Frame Range",
         description="Start and end (exclusive) frame of data to be processed.",
         size=2,
-        default=(0, 60),
+        default=(0, 3),
         min=0,
         options={"SKIP_SAVE"},
         update=update_frame_range,

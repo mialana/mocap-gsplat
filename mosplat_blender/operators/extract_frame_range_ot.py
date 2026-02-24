@@ -70,13 +70,17 @@ class Mosplat_OT_extract_frame_range(
 
     def _queue_callback(self, pkg, event, next):
         status, msg, new_data = next
+        props = pkg.props
+
         # sync props regardless as the updated dataclass is still valid
         if new_data:
             self.data = new_data
-            self.sync_to_props(pkg.props)
+            self.sync_to_props(props)
 
         if status == "done":
-            pkg.props.was_frame_range_extracted = True
+            props.was_frame_range_extracted = True
+            props.was_frame_range_preprocessed = False
+            props.ran_inference_on_frame_range = False
         return super()._queue_callback(pkg, event, next)
 
     @staticmethod

@@ -76,6 +76,10 @@ def is_path_accessible(p: Path) -> bool:
         return False
 
 
+def add_suffix_to_path(p: Path, suffix: str) -> Path:
+    return p.with_suffix(f".{suffix}{p.suffix}")
+
+
 def tuple_type_matches_known_tuple_type(
     unknown_tuple: Tuple, known_tuple: K
 ) -> TypeGuard[K]:
