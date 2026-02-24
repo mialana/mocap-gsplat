@@ -99,7 +99,11 @@ def scales_from_confidence(
 ) -> Anno[torch.Tensor, dltype.Float32Tensor["N 3"]]:
     """use confidence values to initialize scale of splats"""
 
-    s = base_scale * scale_mult / conf.clamp_min(1e-3)
+    conf_median = conf.median()
+
+    scale_factor = conf_median / (conf + EPS)
+
+    s = base_scale * scale_mult * scale_factor
     return torch.stack([s, s, s], dim=1)
 
 
@@ -223,29 +227,32 @@ class SplatModel(torch.nn.Module):
             param.to(device)
 
     @property
-    def means(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
+    def means_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
         return self.params["means"]
 
     @property
-    def scales(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
+    def scales_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
         return self.params["scales"]
 
     @property
-    def quats(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 4"]]:
+    def quats_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M 4"]]:
         return self.params["quats"]
 
     @property
-    def opacities(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M"]]:
+    def opacities_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M"]]:
         return self.params["opacities"]
 
     @property
-    def sh(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M K 3"]]:
+    def sh_(self) -> Anno[torch.Tensor, dltype.Float32Tensor["M K 3"]]:
         return self.params["sh"]
 
     def post_step(self):
         with torch.no_grad():
-            q = self.quats
+            q = self.quats_
             normalize_quat_tensor_(q)
+
+            self.scales_.data.clamp_(min=1e-3)  # prevent shrink to 0
+            self.opacities_.data.clamp_(min=0.05, max=0.99)  # prevent opacity collapse
 
     @property
     def detached_tensors(self) -> ModelTensors:
@@ -318,15 +325,16 @@ class GsplatRasterizer:
         model: SplatModel,
         extrinsic: TT.ExtrinsicTensor,
         intrinsic: TT.IntrinsicTensor,
-        backgrounds: Anno[torch.Tensor, dltype.Float32Tensor["S 3 H W"]],
+        backgrounds: Anno[torch.Tensor, dltype.Float32Tensor["S 3"]],
     ) -> Tuple[
         Anno[torch.Tensor, dltype.Float32Tensor["S 3 H W"]],
         Anno[torch.Tensor, dltype.Float32Tensor["S 1 H W"]],
         Anno[torch.Tensor, dltype.Float32Tensor["S 1 H W"]],
+        Dict,
     ]:
         from gsplat import rasterization
 
-        assert model.sh.shape[1] == (self.sh_degree + 1) ** 2
+        assert model.sh_.shape[1] == (self.sh_degree + 1) ** 2
 
         device = self.device
 
@@ -337,11 +345,11 @@ class GsplatRasterizer:
         view = w2c_3x4_to_view_4x4(extrinsic)
 
         render_colors, render_alphas, meta = rasterization(
-            means=model.means,
-            quats=model.quats,
-            scales=model.scales,
-            opacities=model.opacities,
-            colors=model.sh,
+            means=model.means_,
+            quats=model.quats_,
+            scales=model.scales_,
+            opacities=model.opacities_,
+            colors=model.sh_,
             viewmats=view,
             Ks=intrinsic,
             width=self.W,
@@ -349,8 +357,9 @@ class GsplatRasterizer:
             near_plane=self.znear,
             far_plane=self.zfar,
             sh_degree=self.sh_degree,
-            backgrounds=to_channel_as_item(backgrounds),
+            packed=True,
             render_mode="RGB+ED",
+            absgrad=True,
         )
 
         # render_colors are (S,H,W,4) in `RGB+ED`, where last dimension is RGB + depth
@@ -375,7 +384,7 @@ class GsplatRasterizer:
             to_channel_as_primary(alpha_as_item)
         )
 
-        return (rgb, depth, alpha)
+        return (rgb, depth, alpha, meta)
 
 
 def save_ply_3dgs_binary(
@@ -394,6 +403,10 @@ def save_ply_3dgs_binary(
     if encode_opacity_in_logit:
         x = opacities.clamp(EPS, 1.0 - EPS)
         opacities = torch.log(x) - torch.log1p(-x)
+
+    opacities_unsqueezed: Anno[torch.Tensor, dltype.Float32Tensor["M 1"]] = (
+        opacities.unsqueeze(dim=1)
+    )
 
     M, K, C = sh.shape
 
@@ -437,14 +450,15 @@ def save_ply_3dgs_binary(
     header += ["end_header\n"]
     header_str = "\n".join(header)
 
-    normals = torch.zeros((M, 3), dtype=torch.float32)  # set normals to zero
+    normals = torch.zeros(
+        (M, 3), dtype=torch.float32, device=means.device
+    )  # set normals to zero
 
     body = (
         torch.cat(
-            [means, normals, f_dc, f_rest, opacities, scales, quats],
-            dim=1,
+            [means, normals, f_dc, f_rest, opacities_unsqueezed, scales, quats], dim=1
         )
-        .cpu()  # convert to cpu first
+        .cpu()
         .numpy()
     )
 
@@ -470,9 +484,8 @@ def train_3dgs(
     pct.to(device)
     extrinsic = pct.extrinsic
     intrinsic = pct.intrinsic
-    depth = pct.depth
-    depth_conf = pct.depth_conf
-    depth_conf_unsqueezed = depth_conf.unsqueeze(1)
+    depth = to_channel_as_primary(pct.depth)
+    depth_conf = pct.depth_conf.unsqueeze(1)
 
     images_0_1 = to_0_1(images)
     images_alpha_0_1 = to_0_1(images_alpha)
@@ -492,29 +505,30 @@ def train_3dgs(
         idx = torch.randint(0, S, (config.scene_size,), device=device)
 
         rgb = images_0_1.index_select(0, idx)
-        alpha = images_alpha_0_1.index_select(0, idx)
+        alp = images_alpha_0_1.index_select(0, idx)
         extri = extrinsic.index_select(0, idx)
         intri = intrinsic.index_select(0, idx)
         dep = depth.index_select(0, idx)
-        dep_cf = depth_conf_unsqueezed.index_select(0, idx)
+        dep_cf = depth_conf.index_select(0, idx)
 
         bg = torch.zeros(
-            (config.scene_size, 3, rasterizer.H, rasterizer.W),
+            (config.scene_size, 3),
             device=device,
             dtype=torch.float32,
         )
 
-        pred_rgb, pred_depth, pred_alpha = rasterizer.render(model, extri, intri, bg)
+        pred_rgb, pred_depth, pred_alpha, meta = rasterizer.render(
+            model, extri, intri, bg
+        )
 
-        diff = (pred_rgb - rgb).abs()
+        mask = alp > 0.5
 
-        rgb_loss = (diff * alpha).sum() / (alpha.sum() + EPS)
-        alpha_loss = ((pred_alpha - alpha).abs()).mean()
+        if mask.sum() == 0:
+            continue  # if no foreground pixels in batch, skip step
 
-        depth_diff = (pred_depth - dep).abs()
-        depth_mask = alpha * dep_cf  # use depth confidence as extra stabilizer
-
-        depth_loss = (depth_diff * depth_mask).sum() / (depth_mask.sum() + EPS)
+        rgb_loss = (pred_rgb - rgb).abs()[mask].mean()
+        alpha_loss = (pred_alpha - alp).abs()[mask].mean()
+        depth_loss = (pred_depth - dep).abs()[mask].mean()
 
         loss = (
             rgb_loss
@@ -522,21 +536,23 @@ def train_3dgs(
             + config.depth_weight * depth_loss
         )
 
-        strategy.step_pre_backward(model.params, optimizers, strategy_state, step, {})
+        strategy.step_pre_backward(model.params, optimizers, strategy_state, step, meta)
 
         for opt in optimizers.values():
             opt.zero_grad(set_to_none=True)
 
         loss.backward()
 
-        strategy.step_post_backward(model.params, optimizers, strategy_state, step, {})
+        strategy.step_post_backward(
+            model.params, optimizers, strategy_state, step, meta, packed=True
+        )
 
         for opt in optimizers.values():
             opt.step()
 
         model.post_step()
 
-        if step % 1000 == 0 or step == config.steps - 1:
+        if step % config.save_ply_interval == 0 or step == config.steps - 1:
             with torch.no_grad():
                 save_ply_3dgs_binary(ply_out_file, model.detached_tensors)
 

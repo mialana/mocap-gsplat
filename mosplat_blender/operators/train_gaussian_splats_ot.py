@@ -20,7 +20,6 @@ class ProcessKwargs(NamedTuple):
     media_files: List[Path]
     frame_range: Tuple[int, int]
     exported_file_formatter: str
-    median_HW: Tuple[int, int]
     model_options: VGGTModelOptions
     training_config: SplatTrainingConfig
 
@@ -30,6 +29,11 @@ class Mosplat_OT_train_gaussian_splats(
 ):
     @classmethod
     def _contexted_poll(cls, pkg):
+        import torch
+
+        if not torch.cuda.is_available():
+            cls._poll_error_msg_list.append("CUDA is required to train splats.")
+            return False
 
         if VGGTInterface().model is None:
             cls._poll_error_msg_list.append("Model must be initialized.")
@@ -67,7 +71,6 @@ class Mosplat_OT_train_gaussian_splats(
                 media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                median_HW=props.media_io_accessor.median_HW,
                 model_options=props.options_accessor.to_dataclass(),
                 training_config=props.config_accessor.to_dataclass(),
             ),
@@ -91,7 +94,7 @@ class Mosplat_OT_train_gaussian_splats(
             train_3dgs,
         )
 
-        script_path, files, (start, end), formatter, (H, W), options, config = pwargs
+        script_path, files, (start, end), formatter, options, config = pwargs
         pre_file_formatter = ExportedFileName.to_formatter(
             formatter, ExportedFileName.PREPROCESSED
         )
@@ -112,8 +115,7 @@ class Mosplat_OT_train_gaussian_splats(
         pre_metadata = FrameTensorMetadata(-1, files, script, None)
         pct_metadata = FrameTensorMetadata(-1, files, script, options)
 
-        rasterizer = GsplatRasterizer(device, (H, W), sh_degree=config.sh_degree)
-
+        rasterizer = None
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
@@ -147,6 +149,12 @@ class Mosplat_OT_train_gaussian_splats(
                 )
                 queue.put(("error", msg))
                 return  # exit early here
+
+            if rasterizer is None:
+                _, _, H, W = images.shape
+                rasterizer = GsplatRasterizer(
+                    device, (H, W), sh_degree=config.sh_degree
+                )
 
             voxel_size, base_scale = scalars_from_xyz(pct.xyz)
             model = SplatModel.init_from_pointcloud_tensors(

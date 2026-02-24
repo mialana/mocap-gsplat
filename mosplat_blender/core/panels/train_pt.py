@@ -5,6 +5,8 @@ from .base_pt import MosplatPanelBase
 class Mosplat_PT_train(MosplatPanelBase):
     @classmethod
     def _contexted_poll(cls, pkg) -> bool:
+        import torch
+
         props = pkg.props
         return (
             len(props.is_valid_media_directory_poll_result) == 0
@@ -12,6 +14,7 @@ class Mosplat_PT_train(MosplatPanelBase):
             and pkg.props.was_frame_range_extracted
             and pkg.props.was_frame_range_preprocessed
             and pkg.props.ran_inference_on_frame_range
+            and torch.cuda.is_available()
         )
 
     def draw_with_layout(self, pkg, layout):

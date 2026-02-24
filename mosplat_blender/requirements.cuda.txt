@@ -24,8 +24,12 @@ python-dotenv
 psutil
 dltype
 
-gsplat
-ninja # `gsplat` dependency
+# `gsplat` is installed separately within `build.py`
+# git+https://github.com/nerfstudio-project/gsplat.git
+
+# `gsplat` dependencies
+jaxtyping
+rich
 
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"

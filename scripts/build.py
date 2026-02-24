@@ -48,6 +48,17 @@ def _():
     step_tracker += 1
 
 
+INSTALL_FROM_WHEELS_CMD_LIST = [  # shared between installation from wheels
+    sys.executable,
+    "-m",
+    "pip",
+    "install",
+    "--no-index",
+    "--only-binary=:all:",
+    "--find-links",
+]
+
+
 @dataclass
 class BuildContext:
     """capitalized indicates it is an input resource (i.e. expected to exist)"""
@@ -121,13 +132,6 @@ def get_args(defaults: ArgparseDefaults):
     )
 
     args = parser.parse_args()
-
-    if args.cuda:
-        CUDA_HOME = os.environ.get("CUDA_HOME", None)
-        if CUDA_HOME is None or not Path(CUDA_HOME).resolve().is_dir():
-            print("Cannot install CUDA build without env variable `CUDA_HOME` set.")
-            args.cuda = False
-        print(f"`CUDA_HOME` detected at '{CUDA_HOME}', CUDA build will be installed.")
 
     return args
 
@@ -237,6 +241,7 @@ def download_pypi_wheels(
                 "-m",
                 "pip",
                 "wheel",
+                "--no-deps",
                 "-r",
                 str(ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE),
                 "--wheel-dir",
@@ -259,21 +264,14 @@ def install_dev_pypi_packages(ctx: BuildContext, cuda: bool, clean: bool):
     """install wheels for development"""
     print("Beginning install...")
 
-    pip_install_from_wheels_args_sublist = [  # shared between installation from wheels
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "--no-index",
-        "--only-binary=:all:",
-        "--find-links",
+    cmd_list = INSTALL_FROM_WHEELS_CMD_LIST + [
         str(ctx.wheels_dir),
         *(["--force-reinstall"] if clean else []),
     ]
     try:
         subprocess.check_call(
             [
-                *pip_install_from_wheels_args_sublist,
+                *cmd_list,
                 "-r",
                 str(
                     ctx.ADDON_REQUIREMENTS_CUDA_TXT_FILE
@@ -284,7 +282,7 @@ def install_dev_pypi_packages(ctx: BuildContext, cuda: bool, clean: bool):
         )
         subprocess.check_call(
             [
-                *pip_install_from_wheels_args_sublist,
+                *cmd_list,
                 "-r",
                 str(ctx.ADDON_NOBINARY_REQUIREMENTS_TXT_FILE),
             ]
@@ -364,6 +362,32 @@ def package(ctx: BuildContext):
     print(f"Addon packaged as `{zip_path}`")
 
 
+def build_cuda(ctx: BuildContext, clean: bool, should_install: bool):
+    gsplat_repository_url = "git+https://github.com/nerfstudio-project/gsplat.git"
+    subprocess.check_call(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            "--no-build-isolation",
+            "--no-deps",
+            gsplat_repository_url,
+            "--wheel-dir",
+            str(ctx.wheels_dir),
+        ]
+    )
+    if not should_install:
+        return
+
+    install_cmd_list = INSTALL_FROM_WHEELS_CMD_LIST + [
+        str(ctx.wheels_dir),
+        *(["--force-reinstall"] if clean else []),
+        "gsplat",
+    ]
+    subprocess.check_call(install_cmd_list)
+
+
 def clean(wheels_dir: Path):
     print(f"Beginning clean...")
     if os.path.exists(wheels_dir) and os.path.isdir(wheels_dir):
@@ -396,7 +420,7 @@ def main():
 
     _()  # skip a line
 
-    if args.dev or args.clean:
+    if args.clean:
         clean(ctx.wheels_dir)
         _()  # skip a line
 
@@ -407,6 +431,10 @@ def main():
         clean=args.clean,
         should_install=args.dev,
     )
+    _()  # skip a line
+
+    build_cuda(ctx, args.clean, args.dev)
+
     _()  # skip a line
 
     generate_blender_manifest_toml(ctx)
