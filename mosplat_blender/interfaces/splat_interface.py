@@ -297,14 +297,14 @@ class SplatModel(torch.nn.Module):
         device: torch.device,
         *,
         neighborhood_size: int = 3,  # for `scales` initialization
-        scales_multiplier: float = 1.0,
+        scales_multiplier: float = 1.5,
         sh_degree: int = 0,
         ###
         fuse_by_voxel: bool = False,
         voxel_size_factor: float = 0.005,  # ~2.0m person * 0.005 = 0.01 meters
         ###
         init_tactics: Literal["custom", "gsplat"] = "gsplat",
-        opacity_initial: float = 0.1,  # if `init_tactics` is `gsplat`
+        opacity_initial: float = 0.7,  # if `init_tactics` is `gsplat`
     ) -> Self:
         pct.to(device)  # convert all tensors to device
 
@@ -322,7 +322,7 @@ class SplatModel(torch.nn.Module):
 
         if init_tactics == "gsplat":
             quats = torch.rand((M, 4), device=device)
-            opacities = torch.logit(torch.full((M,), opacity_initial, device=device))
+            opacities = torch.full((M,), opacity_initial, device=device).logit_()
         else:
             quats = quats_identity(M, device)
             opacities = opacities_from_confidence(conf)
@@ -435,11 +435,7 @@ class GsplatRasterizer:
         return (rgb, depth, alpha, meta)
 
 
-def save_ply_3dgs(
-    out_file: Path,
-    tensors: SplatModel.ModelTensors,
-    format: Literal["ascii", "binary"] = "ascii",
-):
+def save_ply_3dgs(out_file: Path, tensors: SplatModel.ModelTensors):
     import numpy as np
 
     means, scales, quats, opacities, sh0, shN = tensors
@@ -479,7 +475,7 @@ def save_ply_3dgs(
 
     header = [
         "ply",
-        f"format {'binary_little_endian' if format == 'binary' else 'ascii'} 1.0",
+        f"format binary_little_endian 1.0",
         f"element vertex {M}",
     ]
     header += [f"property {t} {n}" for (n, t) in props]
@@ -496,14 +492,10 @@ def save_ply_3dgs(
         .numpy()
     )
 
-    mode = "wb" if format == "binary" else "w"
-    with out_file.open(mode=mode, newline="\n") as f:
+    with out_file.open(mode="wb") as f:
         if format == "binary":
             f.write(header_str.encode("ascii"))
             f.write(body.astype(np.float32).tobytes())
-        else:
-            f.write(header_str)
-            np.savetxt(f, body.astype(np.float32), fmt="%.6f")
 
 
 @dltype.dltyped()
