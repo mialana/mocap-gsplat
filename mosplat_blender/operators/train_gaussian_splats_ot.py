@@ -90,8 +90,8 @@ class Mosplat_OT_train_gaussian_splats(
         from ..interfaces.splat_interface import (
             GsplatRasterizer,
             SplatModel,
-            scalars_from_xyz,
             train_3dgs,
+            voxel_size_from_means,
         )
 
         script_path, files, (start, end), formatter, options, config = pwargs
@@ -156,11 +156,9 @@ class Mosplat_OT_train_gaussian_splats(
                     device, (H, W), sh_degree=config.sh_degree
                 )
 
-            voxel_size, base_scale = scalars_from_xyz(pct.xyz)
             model = SplatModel.init_from_pointcloud_tensors(
                 pct,
                 device,
-                voxel_size=voxel_size,
                 sh_degree=config.sh_degree,
             )
 
