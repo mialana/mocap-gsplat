@@ -31,11 +31,7 @@ from typing import (
 )
 
 from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
-from .macros import (
-    append_if_not_equals,
-    int_median,
-    try_access_path,
-)
+from .macros import append_if_not_equals, int_median, try_access_path
 
 if TYPE_CHECKING:
     from torchcodec.decoders import VideoStreamMetadata
@@ -387,15 +383,15 @@ class FrameTensorMetadata:
 
 @dataclass(frozen=True)
 class SplatTrainingConfig:
-    steps: int = 30_000
-    lr: float = 1e-2  # learning rate (`EPS` is too slow)
-    sh_degree: int = 0
-    scene_size: int = -1  # cameras per frame
+    steps: int = -1
+    lr: float = -1.0
+    sh_degree: int = -1
+    scene_size: int = -1
 
-    alpha_weight: float = 0.1  # weight of alpha in loss computation
-    depth_weight: float = 0.01  # weight of depth in loss computation
+    alpha_weight: float = -1.0
+    depth_weight: float = -1.0
 
-    save_ply_interval: int = 5000  # i.e. every x steps
+    save_ply_interval: int = -1
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -420,7 +416,7 @@ class ModelInferenceMode(StrEnum):
 
 @dataclass(frozen=True)
 class VGGTModelOptions:
-    confidence_percentile: float
+    confidence_percentile: float = -1.0
     inference_mode: ModelInferenceMode = ModelInferenceMode.POINTMAP
 
     def to_dict(self) -> Dict:
@@ -428,13 +424,10 @@ class VGGTModelOptions:
 
     @classmethod
     def from_dict(cls, d: Dict) -> Self:
-        new_dict = d
-        mode: str = new_dict.get("inference_mode", "")
-        if not mode:
-            raise KeyError("Expected `inference_mode` in options as dictionary.")
-        new_dict.setdefault("inference_mode", ModelInferenceMode(mode))
-
-        return cls(**new_dict)
+        if isinstance(d, dict):
+            mode = d.get("inference_mode")
+            d.setdefault("inference_mode", ModelInferenceMode(mode))
+        return cls(**d)
 
 
 @dataclass(frozen=True)
@@ -470,6 +463,9 @@ class ProcessedFrameRange:
             file_path="", mod_time=-1, file_size=-1
         )
     )
+    applied_model_options: VGGTModelOptions = field(
+        default_factory=lambda: VGGTModelOptions()
+    )
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -479,6 +475,9 @@ class ProcessedFrameRange:
         instance = cls(**d)
         instance.applied_preprocess_script = AppliedPreprocessScript.from_dict(
             cast(Dict, instance.applied_preprocess_script)
+        )
+        instance.applied_model_options = VGGTModelOptions.from_dict(
+            cast(Dict, instance.applied_model_options)
         )
 
         return instance
@@ -630,7 +629,7 @@ class MediaIOMetadata:
             self._load_from_dict(data)
             return f"Cached data successfully loaded from '{json_path}'."
 
-        except (TypeError, json.JSONDecodeError):
+        except (TypeError, json.JSONDecodeError, KeyError):
             json_path.unlink()  # delete the corrupted cached JSON
             return f"The data cache existed at '{json_path}' but could not be loaded. Deleted the file and will build new metadata from scratch."
 

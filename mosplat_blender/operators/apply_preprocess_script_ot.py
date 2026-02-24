@@ -35,7 +35,7 @@ class ProcessKwargs(NamedTuple):
     data: MediaIOMetadata
 
 
-class Mosplat_OT_run_preprocess_script(
+class Mosplat_OT_apply_preprocess_script(
     MosplatOperatorBase[QueueTuple, ProcessKwargs],
 ):
     @classmethod
@@ -161,18 +161,16 @@ class Mosplat_OT_run_preprocess_script(
             if preview:
                 save_images_png_preview(images_0_1, out_file)
                 save_images_png_preview(
-                    images_0_1 * images_alpha_0_1, out_file, ".masked"
+                    images_0_1 * images_alpha_0_1, out_file, "masked"
                 )
             queue.put(("update", f"Finished preprocessing frame '{idx}'", None))
 
         frame_range = data.query_frame_range(start, end - 1)  # inclusive
-        if not frame_range or len(frame_range) > 1:
-            msg = UnexpectedError.make_msg("Poll-guard failed.")
-            queue.put(("error", msg, None))
-            return
-        else:
-            frame_range[0].applied_preprocess_script = script
-            queue.put(("done", f"Ran '{script_path}' on frames '{start}-{end}'", data))
+
+        assert len(frame_range) > 0, "Poll-guard failed"
+
+        frame_range[0].applied_preprocess_script = script
+        queue.put(("done", f"Ran '{script_path}' on frames '{start}-{end}'", data))
 
 
 def _retrieve_preprocess_fn(
@@ -183,13 +181,9 @@ def _retrieve_preprocess_fn(
         preprocess_fn: Callable = get_required_function(
             module, PREPROCESS_SCRIPT_FUNCTION_NAME
         )
-        queue.put(
-            (
-                "update",
-                f"Found and imported function '{preprocess_fn.__qualname__}' from module '{module.__name__}'.",
-                None,
-            )
-        )
+        msg = f"Found and imported function '{preprocess_fn.__qualname__}' from module '{module.__name__}'."
+
+        queue.put(("update", msg, None))
     except ImportError as e:
         msg = UserFacingError.make_msg(
             f"Cannot import selected preprocess script: '${script}'",
@@ -209,4 +203,4 @@ def _retrieve_preprocess_fn(
 
 
 def process_entrypoint(*args, **kwargs):
-    Mosplat_OT_run_preprocess_script._operator_subprocess(*args, **kwargs)
+    Mosplat_OT_apply_preprocess_script._operator_subprocess(*args, **kwargs)

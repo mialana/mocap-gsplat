@@ -35,8 +35,6 @@ class Mosplat_OT_train_gaussian_splats(
             cls._poll_error_msg_list.append("CUDA is required to train splats.")
             return False
 
-        if VGGTInterface().model is None:
-            cls._poll_error_msg_list.append("Model must be initialized.")
         if not pkg.props.was_frame_range_extracted:
             cls._poll_error_msg_list.append("Frame range must be extracted.")
         if not pkg.props.was_frame_range_preprocessed:
@@ -91,7 +89,6 @@ class Mosplat_OT_train_gaussian_splats(
             GsplatRasterizer,
             SplatModel,
             train_3dgs,
-            voxel_size_from_means,
         )
 
         script_path, files, (start, end), formatter, options, config = pwargs

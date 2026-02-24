@@ -46,7 +46,7 @@ class OperatorIDEnum(StrEnum):
     FIT_TIMELINE = auto()
     VALIDATE_FILE_STATUSES = auto()
     EXTRACT_FRAME_RANGE = auto()
-    RUN_PREPROCESS_SCRIPT = auto()
+    APPLY_PREPROCESS_SCRIPT = auto()
     RUN_INFERENCE = auto()
     INSTALL_POINT_CLOUD_PREVIEW = auto()
     TRAIN_GAUSSIAN_SPLATS = auto()

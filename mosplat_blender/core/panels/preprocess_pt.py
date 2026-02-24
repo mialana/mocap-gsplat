@@ -73,7 +73,7 @@ class Mosplat_PT_preprocess(MosplatPanelBase):
         box.row().prop(props, props._meta.frame_range.id)
         box.row().operator(OperatorIDEnum.EXTRACT_FRAME_RANGE)
 
-        column.row().operator(OperatorIDEnum.RUN_PREPROCESS_SCRIPT)
+        column.row().operator(OperatorIDEnum.APPLY_PREPROCESS_SCRIPT)
 
     @staticmethod
     def _overwrite_median_as_status(data: Mosplat_PG_MediaIOMetadata):

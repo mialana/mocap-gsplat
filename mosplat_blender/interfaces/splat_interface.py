@@ -96,7 +96,7 @@ def sh_from_rgb(
 def scales_from_knn_means(
     means: Anno[torch.Tensor, dltype.Float32Tensor["M 3"]],
     neighborhood_size: int,
-    factor: float = 1.0,
+    multiplier: float,
 ) -> Anno[torch.Tensor, dltype.Float32Tensor["M 3"]]:
     """use k nearest neighbors means to initialize scale of splats"""
     # pre-specify tensor types. `NS` = neighborhood_size
@@ -118,7 +118,7 @@ def scales_from_knn_means(
     dists_avg = dists2_avg.sqrt_()
 
     # scales should be in log space
-    scales = torch.log_(dists_avg * factor)
+    scales = torch.log_(dists_avg * multiplier)
 
     return torch.stack([scales, scales, scales], dim=1)
 
@@ -297,9 +297,10 @@ class SplatModel(torch.nn.Module):
         device: torch.device,
         *,
         neighborhood_size: int = 3,  # for `scales` initialization
+        scales_multiplier: float = 1.0,
         sh_degree: int = 0,
         ###
-        fuse_by_voxel: bool = True,
+        fuse_by_voxel: bool = False,
         voxel_size_factor: float = 0.005,  # ~2.0m person * 0.005 = 0.01 meters
         ###
         init_tactics: Literal["custom", "gsplat"] = "gsplat",
@@ -317,7 +318,7 @@ class SplatModel(torch.nn.Module):
 
         M = means.shape[0]
 
-        scales = scales_from_knn_means(means, neighborhood_size)
+        scales = scales_from_knn_means(means, neighborhood_size, scales_multiplier)
 
         if init_tactics == "gsplat":
             quats = torch.rand((M, 4), device=device)
@@ -496,7 +497,7 @@ def save_ply_3dgs(
     )
 
     mode = "wb" if format == "binary" else "w"
-    with out_file.open(mode=mode) as f:
+    with out_file.open(mode=mode, newline="\n") as f:
         if format == "binary":
             f.write(header_str.encode("ascii"))
             f.write(body.astype(np.float32).tobytes())
@@ -579,7 +580,7 @@ def train_3dgs(
                 rgb_loss
                 + config.alpha_weight * alpha_loss
                 + config.depth_weight * depth_loss
-            )
+            )  # TODO: implement PSNR loss
 
         strategy.step_pre_backward(model.params, optimizers, strategy_state, step, meta)
 
@@ -599,7 +600,7 @@ def train_3dgs(
             torch.cuda.synchronize()
             with torch.no_grad():
                 out_file = (
-                    add_suffix_to_path(ply_out_file, f".{step:06d}")
+                    add_suffix_to_path(ply_out_file, f"{step:06d}")
                     if increment_ply_file
                     else ply_out_file
                 )

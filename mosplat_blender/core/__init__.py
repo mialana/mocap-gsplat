@@ -38,15 +38,15 @@ preferences_factory: Tuple[Type[Mosplat_AP_Global], PreregristrationFn] = (
 
 # property groups need to be registered in a bottom-to-top "owning" class order
 properties_registry: List[Type[MosplatPropertyGroupBase]] = [
+    Mosplat_PG_OperatorProgress,
+    Mosplat_PG_LogEntry,
+    Mosplat_PG_LogEntryHub,
+    Mosplat_PG_SplatTrainingConfig,
+    Mosplat_PG_VGGTModelOptions,
     Mosplat_PG_AppliedPreprocessScript,
     Mosplat_PG_ProcessedFrameRange,
     Mosplat_PG_MediaFileStatus,
     Mosplat_PG_MediaIOMetadata,
-    Mosplat_PG_OperatorProgress,
-    Mosplat_PG_LogEntry,
-    Mosplat_PG_LogEntryHub,
-    Mosplat_PG_VGGTModelOptions,
-    Mosplat_PG_SplatTrainingConfig,
     Mosplat_PG_Global,
 ]
 

@@ -1,4 +1,4 @@
-# 2026-02-23 12:53:08.280684
+# 2026-02-24 16:06:38.288265
 # created using 'generate_property_meta_files.py'
 
 
@@ -51,6 +51,7 @@ class Mosplat_PG_ProcessedFrameRange_Meta(NamedTuple):
     start_frame: PropertyMeta
     end_frame: PropertyMeta
     applied_preprocess_script: PropertyMeta
+    applied_model_options: PropertyMeta
 
 
 class Mosplat_PG_MediaFileStatus_Meta(NamedTuple):
@@ -179,6 +180,9 @@ MOSPLAT_PG_PROCESSEDFRAMERANGE_META = Mosplat_PG_ProcessedFrameRange_Meta(
     end_frame=PropertyMeta(id="end_frame", name="End Frame", description=""),
     applied_preprocess_script=PropertyMeta(
         id="applied_preprocess_script", name="Applied Preprocess Script", description=""
+    ),
+    applied_model_options=PropertyMeta(
+        id="applied_model_options", name="Applied Model Options", description=""
     ),
 )
 

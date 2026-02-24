@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import List, Literal, NamedTuple, Tuple, TypeAlias, cast
+from typing import List, Literal, NamedTuple, Optional, Tuple, TypeAlias, cast
 
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     ExportedFileName,
     ExportedTensorKey,
     FrameTensorMetadata,
+    MediaIOMetadata,
     UserAssertionError,
     UserFacingError,
     VGGTModelOptions,
@@ -24,11 +25,17 @@ class ThreadKwargs(NamedTuple):
     ply_file_format: PlyFileFormat
     force: bool
     model_options: VGGTModelOptions
+    data: MediaIOMetadata
 
 
-class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs]):
+class Mosplat_OT_run_inference(
+    MosplatOperatorBase[Tuple[str, str, Optional[MediaIOMetadata]], ThreadKwargs]
+):
     @classmethod
     def _contexted_poll(cls, pkg):
+        props = pkg.props
+        cls._poll_error_msg_list.extend(props.is_valid_media_directory_poll_result)
+        cls._poll_error_msg_list.extend(props.frame_range_poll_result(pkg.prefs))
 
         if VGGTInterface().model is None:
             cls._poll_error_msg_list.append("Model must be initialized.")
@@ -40,9 +47,16 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
         return len(cls._poll_error_msg_list) == 0
 
     def _queue_callback(self, pkg, event, next):
-        status, _ = next
+        status, msg, new_data = next
+        props = pkg.props
+
+        # sync props regardless as the updated dataclass is still valid
+        if new_data:
+            self.data = new_data
+            self.sync_to_props(props)
+
         if status == "done":
-            pkg.props.ran_inference_on_frame_range = True
+            props.ran_inference_on_frame_range = True
 
         return super()._queue_callback(pkg, event, next)
 
@@ -71,6 +85,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                 ply_file_format=ply_file_format,
                 force=bool(pkg.prefs.force_all_operations),
                 model_options=pkg.props.options_accessor.to_dataclass(),
+                data=self.data,
             ),
         )
 
@@ -78,7 +93,6 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
     @staticmethod
     def _operator_thread(queue, cancel_event, *, twargs):
-
         import torch
         from safetensors.torch import save_file
 
@@ -92,8 +106,8 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
 
         INTERFACE = VGGTInterface()
 
-        script_path, files, (start, end), formatter, ply_format, force, options = twargs
-
+        script_path, files, frange, formatter, ply_format, force, options, data = twargs
+        start, end = frange
         pre_file_formatter = ExportedFileName.to_formatter(
             formatter, ExportedFileName.PREPROCESSED
         )
@@ -131,7 +145,7 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
                         pct_out_file, device, pct_metadata, pct_anno_map
                     )
                     msg = f"Previous inference data found on disk for frame '{idx}'/"
-                    queue.put(("update", msg))
+                    queue.put(("update", msg, None))
                     continue  # skip this frame
                 except (OSError, UserAssertionError, UserFacingError) as e:
                     pass  # data on disk is not valid
@@ -157,6 +171,11 @@ class Mosplat_OT_run_inference(MosplatOperatorBase[Tuple[str, str], ThreadKwargs
             else:
                 save_ply_binary(ply_out_file, pct.xyz, pct.rgb_0_255)
 
-            queue.put(("update", f"Ran inference on frame '{idx}'"))
+            queue.put(("update", f"Ran inference on frame '{idx}'", None))
 
-        queue.put(("done", "Inference complete for current frame range."))
+        frame_range = data.query_frame_range(start, end - 1)  # inclusive
+        assert len(frame_range) > 0, "Poll-guard failed"
+
+        frame_range[0].applied_model_options = options
+
+        queue.put(("done", "Inference complete for current frame range.", data))

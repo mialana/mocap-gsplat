@@ -170,13 +170,7 @@ class Mosplat_OT_extract_frame_range(
         data.add_frame_range(new_frame_range)
 
         msg = f"Frames '{start}-{end}' extracted. Images were processed to height of '{crop_geom.new_H}' and width of '{crop_geom.new_W}'."
-        queue.put(
-            (
-                "done",
-                msg,
-                None,
-            )
-        )
+        queue.put(("done", msg, None))
 
 
 def process_entrypoint(*args, **kwargs):

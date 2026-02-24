@@ -89,19 +89,28 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
     self.was_frame_range_extracted = len(ranges) > 0
 
     self.was_frame_range_preprocessed = False
+    self.ran_inference_on_frame_range = False
+
+    # check if any existing ranges have the same applied preprocess script
     if self.was_frame_range_extracted:
-        try:  # check if any existing ranges have the same applied preprocess script
+        try:
             curr_script = AppliedPreprocessScript.from_file_path(
                 prefs.preprocess_media_script_file_
             )
-            matching_ranges = list(
+            applied_before = list(
                 filter(lambda r: r.applied_preprocess_script == curr_script, ranges)
             )
-            self.was_frame_range_preprocessed = len(matching_ranges) > 0
-        except UserFacingError as e:
+            self.was_frame_range_preprocessed = len(applied_before) > 0
+        except UserFacingError:
             pass
 
-    self.ran_inference_on_frame_range = False
+        # check if any existing ranges have the same applied model options
+        if self.was_frame_range_preprocessed:
+            curr_options = self.options_accessor.to_dataclass()
+            ran_before = list(
+                filter(lambda r: r.applied_model_options == curr_options, ranges)
+            )
+            self.ran_inference_on_frame_range = len(ran_before) > 0
 
     poll_result = check_frame_range_poll_result(prefs, self)
     if len(poll_result) > 0:
@@ -270,6 +279,9 @@ class Mosplat_PG_ProcessedFrameRange(MosplatPropertyGroupBase[ProcessedFrameRang
     end_frame: IntProperty(name="End Frame", min=0)
     applied_preprocess_script: PointerProperty(
         name="Applied Preprocess Script", type=Mosplat_PG_AppliedPreprocessScript
+    )
+    applied_model_options: PointerProperty(
+        name="Applied Model Options", type=Mosplat_PG_VGGTModelOptions
     )
 
     @property

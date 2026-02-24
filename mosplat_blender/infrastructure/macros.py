@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 import signal
 import sys
+from enum import Enum
 from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from statistics import median
 from types import ModuleType
 from typing import (
+    Any,
     Callable,
     Iterable,
     List,
@@ -136,3 +138,12 @@ def failed_decorator_import_factory(*args, **kwargs):
         return obj
 
     return decorator
+
+
+def enum_to_value_factory(data: List[Tuple[str, Any]]):
+    def convert_value(obj: Any):
+        if isinstance(obj, Enum):
+            return obj.value
+        return obj
+
+    return {k: convert_value(v) for k, v in data}
