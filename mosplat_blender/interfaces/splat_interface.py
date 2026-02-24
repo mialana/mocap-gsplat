@@ -17,14 +17,15 @@ from ..infrastructure.dl_ops import (
     TensorTypes as TT,
     UInt8Float32Tensor,
     to_0_1,
-    to_channel_as_item,
     to_channel_as_primary,
 )
-from ..infrastructure.schemas import SplatTrainingConfig
+from ..infrastructure.schemas import SplatTrainingConfig, UnexpectedError
 
 HASH_MULTIPLIER_X = 73856093
 HASH_MULTIPLIER_Y = 19349663
 HASH_MULTIPLIER_Z = 83492791
+
+SH_C0 = 0.28209479177387814
 
 EPS: float = 1e-6
 
@@ -77,6 +78,7 @@ def sh_from_rgb(
     device = rgb.device
 
     rgb_0_1 = to_0_1(rgb)
+    rgb_linear = rgb_0_1**2.2
 
     K = (sh_degree + 1) ** 2
     N = rgb.shape[0]
@@ -85,26 +87,36 @@ def sh_from_rgb(
         (N, K, 3), device=device, dtype=torch.float32
     )
 
-    sh[:, 0, :] = rgb_0_1  # fill dimensions with RGB values, skipping `K` dimension
+    # fill dimensions with RGB values, skipping `K` dimension
+    sh[:, 0, :] = rgb_linear / SH_C0
 
     return sh
 
 
 @dltype.dltyped()
-def scales_from_confidence(
-    conf: TT.ConfTensor,
-    *,
-    base_scale: float,
-    scale_mult: float,
+def scales_from_knn_means(
+    means: Anno[torch.Tensor, dltype.Float32Tensor["M 3"]], neighborhood_size=8
 ) -> Anno[torch.Tensor, dltype.Float32Tensor["N 3"]]:
-    """use confidence values to initialize scale of splats"""
+    """use k nearest neighbors means to initialize scale of splats"""
 
-    conf_median = conf.median()
+    N = means.shape[0]
 
-    scale_factor = conf_median / (conf + EPS)
+    # compute pairwise distances
+    dists: Anno[torch.Tensor, dltype.Float32Tensor["M M"]] = torch.cdist(means, means)
 
-    s = base_scale * scale_mult * scale_factor
-    return torch.stack([s, s, s], dim=1)
+    # ignore distances to self
+    dists += torch.eye(N, device=means.device) * 1e6
+
+    # get k nearest neighbors
+    knn_dists: Anno[torch.Tensor, dltype.Float32Tensor["M S"]]
+    knn_dists, _ = torch.topk(dists, k=neighborhood_size, largest=False)
+
+    # use mean neighbor distance
+    scale: Anno[torch.Tensor, dltype.Float32Tensor["M"]] = knn_dists.mean(dim=1).clamp_(
+        min=EPS
+    )
+
+    return torch.log(torch.stack([scale, scale, scale], dim=1))
 
 
 @dltype.dltyped()
@@ -251,8 +263,7 @@ class SplatModel(torch.nn.Module):
             q = self.quats_
             normalize_quat_tensor_(q)
 
-            self.scales_.data.clamp_(min=1e-3)  # prevent shrink to 0
-            self.opacities_.data.clamp_(min=0.05, max=0.99)  # prevent opacity collapse
+            self.opacities_.data.clamp_(min=0.02, max=0.99)  # prevent opacity collapse
 
     @property
     def detached_tensors(self) -> ModelTensors:
@@ -271,9 +282,8 @@ class SplatModel(torch.nn.Module):
         device: torch.device,
         *,
         voxel_size: TT.VoxelTensor,
-        base_scale: float,
+        neighborhood_size: int = 8,
         sh_degree: int = 0,
-        scale_mult: float = 1.0,
     ) -> Self:
         pct.to(device)  # convert to device
         means, rgb_fused, conf_fused = fuse_points_by_voxel(
@@ -281,12 +291,10 @@ class SplatModel(torch.nn.Module):
         )
         M = means.shape[0]
 
-        scales = scales_from_confidence(
-            conf_fused, base_scale=base_scale, scale_mult=scale_mult
-        )
-        quats = normalize_quat_tensor_(quats_identity(M, device))
+        scales = scales_from_knn_means(means, neighborhood_size)
+        quats = quats_identity(M, device)
         opacities: Anno[torch.Tensor, dltype.Float32Tensor["M"]] = conf_fused.clamp(
-            0.0, 1.0
+            EPS, 1.0
         )
         sh = sh_from_rgb(rgb_fused, sh_degree)
 
@@ -390,15 +398,11 @@ class GsplatRasterizer:
 def save_ply_3dgs_binary(
     out_file: Path,
     tensors: SplatModel.ModelTensors,
-    encode_log_of_scale: bool = True,  # convert 'scale' as 'log(scale)'
     encode_opacity_in_logit: bool = True,  # convert 'opacity' 0-1 to unbounded logit space
 ):
     import numpy as np
 
     means, scales, quats, opacities, sh = tensors
-
-    if encode_log_of_scale:
-        scales = scales.log()
 
     if encode_opacity_in_logit:
         x = opacities.clamp(EPS, 1.0 - EPS)
@@ -477,7 +481,10 @@ def train_3dgs(
     ply_out_file: Path,
     config: SplatTrainingConfig,
 ) -> SplatModel:
+    import gc
+
     from gsplat import DefaultStrategy
+    from torch import cuda
 
     device = rasterizer.device
 
@@ -495,13 +502,16 @@ def train_3dgs(
         for name, param in model.params.items()
     }  # gsplat expects one optimizer per parameter
 
-    strategy = DefaultStrategy()
+    strategy = DefaultStrategy(absgrad=True, verbose=True)
     strategy.check_sanity(model.params, optimizers)
     strategy_state = strategy.initialize_state()
 
     S: int = images_0_1.shape[0]
 
     for step in range(config.steps):
+        if model.means_.shape[0] == 0:
+            raise UnexpectedError("All splats were pruned. Stopping training.")
+
         idx = torch.randint(0, S, (config.scene_size,), device=device)
 
         rgb = images_0_1.index_select(0, idx)
@@ -522,19 +532,21 @@ def train_3dgs(
         )
 
         mask = alp > 0.5
-
         if mask.sum() == 0:
-            continue  # if no foreground pixels in batch, skip step
+            # if no foreground pixels in batch, skip step
+            loss = torch.zeros([], device=device, requires_grad=True)
+        else:
+            mask_rgb = mask.expand(-1, 3, -1, -1)
+            rgb_loss = (pred_rgb - rgb).abs()[mask_rgb].mean()
+            alpha_loss = (pred_alpha - alp).abs()[mask].mean()
+            depth_err = (pred_depth - dep).abs()
+            depth_loss = (depth_err * dep_cf)[mask].mean()
 
-        rgb_loss = (pred_rgb - rgb).abs()[mask].mean()
-        alpha_loss = (pred_alpha - alp).abs()[mask].mean()
-        depth_loss = (pred_depth - dep).abs()[mask].mean()
-
-        loss = (
-            rgb_loss
-            + config.alpha_weight * alpha_loss
-            + config.depth_weight * depth_loss
-        )
+            loss = (
+                rgb_loss
+                + config.alpha_weight * alpha_loss
+                + config.depth_weight * depth_loss
+            )
 
         strategy.step_pre_backward(model.params, optimizers, strategy_state, step, meta)
 
@@ -556,4 +568,7 @@ def train_3dgs(
             with torch.no_grad():
                 save_ply_3dgs_binary(ply_out_file, model.detached_tensors)
 
+    cuda.synchronize()
+    cuda.empty_cache()
+    gc.collect()
     return model

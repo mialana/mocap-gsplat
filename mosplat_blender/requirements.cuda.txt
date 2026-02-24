@@ -30,6 +30,8 @@ dltype
 # `gsplat` dependencies
 jaxtyping
 rich
+# `ninja` should be installed globally for pytorch
+# ninja
 
 torch; sys_platform == "darwin" # get whatever poor macos users are offered
 torchvision; sys_platform == "darwin"

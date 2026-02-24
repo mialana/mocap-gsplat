@@ -433,7 +433,8 @@ def main():
     )
     _()  # skip a line
 
-    build_cuda(ctx, args.clean, args.dev)
+    if args.cuda:
+        build_cuda(ctx, args.clean, args.dev)
 
     _()  # skip a line
 

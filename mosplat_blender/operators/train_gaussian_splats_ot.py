@@ -161,7 +161,6 @@ class Mosplat_OT_train_gaussian_splats(
                 pct,
                 device,
                 voxel_size=voxel_size,
-                base_scale=base_scale,
                 sh_degree=config.sh_degree,
             )
 
