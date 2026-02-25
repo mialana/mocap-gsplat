@@ -320,7 +320,7 @@ class SplatModel(torch.nn.Module):
         scales_multiplier: float = 1.5,
         sh_degree: int = 0,
         ###
-        fuse_by_voxel: bool = True,
+        fuse_by_voxel: bool = False,
         voxel_size_factor: float = 0.005,  # ~2.0m person * 0.005 = 0.01 meters
         ###
         init_tactics: Literal["custom", "gsplat"] = "custom",
@@ -628,7 +628,7 @@ def train_3dgs(
             torch.cuda.synchronize()
             with torch.no_grad():
                 out_file = (
-                    add_suffix_to_path(ply_out_file, f"{step:06d}")
+                    add_suffix_to_path(ply_out_file, f".{step:06d}")
                     if config.increment_ply_file
                     else ply_out_file
                 )
@@ -643,5 +643,5 @@ def train_3dgs(
                 opacity_loss=opacity_loss_item,
                 total_loss=loss.item(),
             )
-            queue.put(("update", f"Current Stats:\n{str(stats)}"))
+            queue.put(("update", f"Current Training Stats:\n{str(stats)}"))
     return model

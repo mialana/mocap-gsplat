@@ -12,11 +12,11 @@ from ..infrastructure.macros import (
 )
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
+    CropGeometry,
     ExportedFileName,
     ExportedTensorKey,
     FrameTensorMetadata,
     MediaIOMetadata,
-    UnexpectedError,
     UserAssertionError,
     UserFacingError,
 )
@@ -31,6 +31,7 @@ class ProcessKwargs(NamedTuple):
     frame_range: Tuple[int, int]
     exported_file_formatter: str
     create_preview_images: bool
+    median_HW: Tuple[int, int]
     force: bool
     data: MediaIOMetadata
 
@@ -70,6 +71,7 @@ class Mosplat_OT_apply_preprocess_script(
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formattter,
                 create_preview_images=bool(prefs.create_preview_images),
+                median_HW=pkg.props.media_io_accessor.median_HW,
                 force=bool(prefs.force_all_operations),
                 data=self.data,
             ),
@@ -95,6 +97,7 @@ class Mosplat_OT_apply_preprocess_script(
 
         from ..infrastructure.dl_ops import (
             TensorTypes as TensorTypes,
+            crop_tensor,
             load_safetensors,
             save_images_png_preview,
             save_images_safetensors,
@@ -102,7 +105,7 @@ class Mosplat_OT_apply_preprocess_script(
             validate_preprocess_script_output,
         )
 
-        script_path, files, (start, end), formatter, preview, force, data = pwargs
+        script_path, files, frange, formatter, preview, (H, W), force, data = pwargs
 
         raw_file_formatter = ExportedFileName.to_formatter(
             formatter, ExportedFileName.RAW
@@ -119,12 +122,15 @@ class Mosplat_OT_apply_preprocess_script(
 
         script = AppliedPreprocessScript.from_file_path(script_path)
 
+        crop_geom = CropGeometry.from_image_dims(H=H, W=W)
+
         raw_metadata = FrameTensorMetadata(-1, files, None, None)
         pre_metadata = FrameTensorMetadata(-1, files, script, None)
 
         raw_anno_map = TensorTypes.raw_annotation_map()
         pre_anno_map = TensorTypes.preprocessed_annotation_map()
 
+        start, end = frange
         for idx in range(start, end):
             if cancel_event.is_set():
                 return
@@ -153,6 +159,9 @@ class Mosplat_OT_apply_preprocess_script(
             images_0_1, images_alpha_0_1 = validate_preprocess_script_output(
                 output, raw_images_0_1
             )
+            # crop tensors after preprocessing
+            images_0_1 = crop_tensor(images_0_1, crop_geom)
+            images_alpha_0_1 = crop_tensor(images_alpha_0_1, crop_geom)
 
             save_images_safetensors(
                 out_file, pre_metadata, images_0_1, images_alpha_0_1
@@ -161,9 +170,17 @@ class Mosplat_OT_apply_preprocess_script(
             if preview:
                 save_images_png_preview(images_0_1, out_file)
                 save_images_png_preview(
-                    images_0_1 * images_alpha_0_1, out_file, "masked"
+                    images_0_1 * images_alpha_0_1, out_file, ".masked"
                 )
-            queue.put(("update", f"Finished preprocessing frame '{idx}'", None))
+
+            msg = f"Finished apply preprocess script to frame '{idx}'. Additionally, images were interpolated to height of '{crop_geom.new_H}' and width of '{crop_geom.new_W}' afterwards for better model inference results."
+            queue.put(
+                (
+                    "update",
+                    msg,
+                    None,
+                )
+            )
 
         frame_range = data.query_frame_range(start, end - 1)  # inclusive
 

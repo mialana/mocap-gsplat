@@ -1,4 +1,4 @@
-# 2026-02-23 13:21:18.122867
+# 2026-02-25 01:11:02.397207
 # created using 'generate_property_meta_files.py'
 
 
@@ -74,7 +74,7 @@ MOSPLAT_AP_GLOBAL_META = Mosplat_AP_Global_Meta(
     force_all_operations=PropertyMeta(
         id="force_all_operations",
         name="Force All Operations",
-        description="Force all operations to execute, overwriting pre-existing data found on disk.",
+        description="Force all operations to execute, overwriting any existing data found on disk.",
     ),
     json_log_filename_format=PropertyMeta(
         id="json_log_filename_format",

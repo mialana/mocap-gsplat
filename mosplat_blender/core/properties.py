@@ -219,7 +219,7 @@ class Mosplat_PG_VGGTModelOptions(MosplatPropertyGroupBase[VGGTModelOptions]):
     confidence_percentile: FloatProperty(
         name="Confidence",
         description="Minimum percentile for model-inferred confidence",
-        default=97.5,
+        default=96.5,
     )
     inference_mode: EnumProperty(
         name="Inference Mode",
@@ -241,6 +241,27 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
         precision=6,
     )
     sh_degree: IntProperty(name="Spherical Harmonics Degree", default=2)
+    fuse_by_voxel: BoolProperty(
+        name="Fuse By Voxel",
+        description="Whether to cull initial point cloud points to a representative per voxel.",
+        default=False,
+    )
+    init_tactics: EnumProperty(
+        name="Initialization Tactics",
+        items=(
+            (
+                "custom",
+                "CUSTOM",
+                "Use custom tactics to initialize `quats` and `opacities` parameters in training.",
+            ),
+            (
+                "gsplat",
+                "GSPLAT",
+                "Use tactics from `gsplat` example trainer code to initialize `quats` and `opacities` parameters.",
+            ),
+        ),
+        default="custom",
+    )
     scene_size: IntProperty(
         name="Scene Size",
         description="Number of cameras capturing the scene (read-only)",

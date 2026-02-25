@@ -54,6 +54,11 @@ class Mosplat_OT_run_inference(
         if new_data:
             self.data = new_data
             self.sync_to_props(props)
+        if status == "update":
+            scene = pkg.context.scene
+            if scene:
+                frame_current = scene.frame_current
+                scene.frame_set(frame_current)  # trigger a frame change
 
         if status == "done":
             props.ran_inference_on_frame_range = True

@@ -144,7 +144,7 @@ class Mosplat_AP_Global(AddonPreferences, EnforceAttributesMixin):
 
     force_all_operations: BoolProperty(
         name="Force All Operations",
-        description="Force all operations to execute, overwriting pre-existing data found on disk.",
+        description="Force all operations to execute, overwriting any existing data found on disk.",
         default=False,
     )
 

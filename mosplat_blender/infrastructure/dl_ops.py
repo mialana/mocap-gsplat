@@ -199,7 +199,8 @@ def save_images_png_preview(
 
     images_0_1 = to_0_1(images)
 
-    preview_png_file = add_suffix_to_path(tensor_out_file, suffix)
+    # add suffix if necessary, replace extension with `png`
+    preview_png_file = add_suffix_to_path(tensor_out_file, suffix).with_suffix(".png")
 
     save_image(images_0_1, preview_png_file, nrow=4)
 

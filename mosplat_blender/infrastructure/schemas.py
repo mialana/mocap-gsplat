@@ -20,6 +20,7 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Literal,
     NamedTuple,
     Optional,
     Protocol,
@@ -385,6 +386,8 @@ class FrameTensorMetadata:
 class SplatTrainingConfig:
     steps: int = -1
     lr: List[float] = field(default_factory=list)
+    fuse_by_voxel: bool = False
+    init_tactics: Literal["custom", "gsplat"] = "custom"
     sh_degree: int = -1
     scene_size: int = -1
 

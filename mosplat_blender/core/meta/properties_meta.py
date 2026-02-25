@@ -1,4 +1,4 @@
-# 2026-02-25 00:50:18.114214
+# 2026-02-25 01:29:35.804010
 # created using 'generate_property_meta_files.py'
 
 
@@ -35,6 +35,8 @@ class Mosplat_PG_SplatTrainingConfig_Meta(NamedTuple):
     steps: PropertyMeta
     lr: PropertyMeta
     sh_degree: PropertyMeta
+    fuse_by_voxel: PropertyMeta
+    init_tactics: PropertyMeta
     scene_size: PropertyMeta
     alpha_lambda: PropertyMeta
     opacity_lambda: PropertyMeta
@@ -157,6 +159,14 @@ MOSPLAT_PG_SPLATTRAININGCONFIG_META = Mosplat_PG_SplatTrainingConfig_Meta(
     ),
     sh_degree=PropertyMeta(
         id="sh_degree", name="Spherical Harmonics Degree", description=""
+    ),
+    fuse_by_voxel=PropertyMeta(
+        id="fuse_by_voxel",
+        name="Fuse By Voxel",
+        description="Whether to cull initial point cloud points to a representative per voxel.",
+    ),
+    init_tactics=PropertyMeta(
+        id="init_tactics", name="Initialization Tactics", description=""
     ),
     scene_size=PropertyMeta(
         id="scene_size",

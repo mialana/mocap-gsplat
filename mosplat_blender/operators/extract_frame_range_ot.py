@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, cast
 
 from ..infrastructure.schemas import (
-    CropGeometry,
     ExportedFileName,
     FrameTensorMetadata,
     MediaIOMetadata,
@@ -22,7 +21,6 @@ class ProcessKwargs(NamedTuple):
     frame_range: Tuple[int, int]
     exported_file_formatter: str
     create_preview_images: bool
-    median_HW: Tuple[int, int]
     force: bool
     data: MediaIOMetadata
 
@@ -59,7 +57,6 @@ class Mosplat_OT_extract_frame_range(
                 updated_media_files=self._media_files,
                 frame_range=self._frame_range,
                 exported_file_formatter=self._exported_file_formatter,
-                median_HW=props.media_io_accessor.median_HW,
                 create_preview_images=bool(prefs.create_preview_images),
                 force=bool(prefs.force_all_operations),
                 data=self.data,
@@ -90,14 +87,13 @@ class Mosplat_OT_extract_frame_range(
 
         from ..infrastructure.dl_ops import (
             TensorTypes as TensorTypes,
-            crop_tensor,
             load_safetensors,
             save_images_png_preview,
             save_images_safetensors,
             to_0_1,
         )
 
-        files, (start, end), formatter, preview, (H, W), force, data = pwargs
+        files, (start, end), formatter, preview, force, data = pwargs
 
         raw_file_formatter = ExportedFileName.to_formatter(
             formatter, ExportedFileName.RAW
@@ -121,8 +117,6 @@ class Mosplat_OT_extract_frame_range(
         # create a new frame range with both limits at start
         new_frame_range = ProcessedFrameRange(start_frame=start, end_frame=start)
         data.add_frame_range(new_frame_range)
-
-        crop_geom = CropGeometry.from_image_dims(H=H, W=W)
 
         metadata = FrameTensorMetadata(-1, files, None, None)
 
@@ -152,9 +146,9 @@ class Mosplat_OT_extract_frame_range(
 
             images_list = [dec[cast(Integral, idx)].to(device) for dec in decoders]
 
-            images_0_1: TensorTypes.ImagesTensor_0_1 = crop_tensor(
-                to_0_1(torch.stack(images_list, dim=0)), crop_geom
-            )  # crop tensors as soon as possible
+            images_0_1: TensorTypes.ImagesTensor_0_1 = to_0_1(
+                torch.stack(images_list, dim=0)
+            )
 
             save_images_safetensors(out_file, metadata, images_0_1, None)
 
@@ -169,7 +163,7 @@ class Mosplat_OT_extract_frame_range(
 
         data.add_frame_range(new_frame_range)
 
-        msg = f"Frames '{start}-{end}' extracted. Images were processed to height of '{crop_geom.new_H}' and width of '{crop_geom.new_W}'."
+        msg = f"Frames '{start}-{end}' extracted."
         queue.put(("done", msg, None))
 
 

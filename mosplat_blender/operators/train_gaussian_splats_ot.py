@@ -156,6 +156,8 @@ class Mosplat_OT_train_gaussian_splats(
                 pct,
                 device,
                 sh_degree=config.sh_degree,
+                fuse_by_voxel=config.fuse_by_voxel,
+                init_tactics=config.init_tactics,
             )
 
             train_3dgs(
