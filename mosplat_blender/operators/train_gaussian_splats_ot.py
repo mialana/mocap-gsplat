@@ -11,7 +11,6 @@ from ..infrastructure.schemas import (
     UserFacingError,
     VGGTModelOptions,
 )
-from ..interfaces.vggt_interface import VGGTInterface
 from .base_ot import MosplatOperatorBase
 
 
@@ -160,7 +159,14 @@ class Mosplat_OT_train_gaussian_splats(
             )
 
             train_3dgs(
-                model, rasterizer, pct, images, images_alpha, ply_out_file, config
+                model,
+                rasterizer,
+                pct,
+                images,
+                images_alpha,
+                ply_out_file,
+                config,
+                queue,
             )
             msg = f"'{ply_out_file}' exported from trained 3DGS data for frame '{idx}'."
             queue.put(("update", msg))

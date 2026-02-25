@@ -9,8 +9,18 @@ try to keep as lazy import as there is top-level import of `dltype` and `torch`
 
 from __future__ import annotations
 
+from multiprocessing import Queue
 from pathlib import Path
-from typing import Annotated as Anno, Dict, Literal, NamedTuple, Self, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Annotated as Anno,
+    Dict,
+    Literal,
+    NamedTuple,
+    Self,
+    Tuple,
+    TypeAlias,
+)
 
 from ..infrastructure.dl_ops import (
     PointCloudTensors,
@@ -20,7 +30,11 @@ from ..infrastructure.dl_ops import (
     to_channel_as_primary,
 )
 from ..infrastructure.macros import add_suffix_to_path
-from ..infrastructure.schemas import SplatTrainingConfig, UnexpectedError
+from ..infrastructure.schemas import (
+    SplatTrainingConfig,
+    SplatTrainingStats,
+    UnexpectedError,
+)
 
 HASH_MULTIPLIER_X = 73856093
 HASH_MULTIPLIER_Y = 19349663
@@ -29,9 +43,15 @@ HASH_MULTIPLIER_Z = 83492791
 SH_C0 = 0.28209479177387814
 
 EPS: float = 1e-6
+INF: float = float(1e10)  # effectively infinity for our purposes
 
 import dltype
 import torch
+
+if TYPE_CHECKING:
+    TrainingQueueType: TypeAlias = Queue[Tuple[str, str]]
+else:
+    TrainingQueueType: TypeAlias = Queue
 
 
 @dltype.dltyped()
@@ -108,7 +128,7 @@ def scales_from_knn_means(
     pairs = torch.cdist(means, means)
 
     # ignore distances to self by adding a large value to diagonals
-    pairs.fill_diagonal_(float(1e10))
+    pairs.fill_diagonal_(float(INF))
 
     # get k nearest neighbors.
     knn_dists, _ = torch.topk(pairs, k=neighborhood_size, largest=False)
@@ -300,11 +320,11 @@ class SplatModel(torch.nn.Module):
         scales_multiplier: float = 1.5,
         sh_degree: int = 0,
         ###
-        fuse_by_voxel: bool = False,
+        fuse_by_voxel: bool = True,
         voxel_size_factor: float = 0.005,  # ~2.0m person * 0.005 = 0.01 meters
         ###
-        init_tactics: Literal["custom", "gsplat"] = "gsplat",
-        opacity_initial: float = 0.7,  # if `init_tactics` is `gsplat`
+        init_tactics: Literal["custom", "gsplat"] = "custom",
+        opacity_initial: float = 0.1,  # if `init_tactics` is `gsplat`
     ) -> Self:
         pct.to(device)  # convert all tensors to device
 
@@ -408,6 +428,7 @@ class GsplatRasterizer:
             packed=self.packed,
             render_mode="RGB+ED",
             absgrad=self.absgrad,
+            rasterize_mode="antialiased",
         )
 
         # render_colors are (S,H,W,4) in `RGB+ED`, where last dimension is RGB + depth
@@ -493,9 +514,8 @@ def save_ply_3dgs(out_file: Path, tensors: SplatModel.ModelTensors):
     )
 
     with out_file.open(mode="wb") as f:
-        if format == "binary":
-            f.write(header_str.encode("ascii"))
-            f.write(body.astype(np.float32).tobytes())
+        f.write(header_str.encode("ascii"))
+        f.write(body.astype(np.float32).tobytes())
 
 
 @dltype.dltyped()
@@ -507,9 +527,9 @@ def train_3dgs(
     images_alpha: TT.ImagesAlphaTensorLike,
     ply_out_file: Path,
     config: SplatTrainingConfig,
+    queue: TrainingQueueType,
     *,
     verbose: bool = True,
-    increment_ply_file: bool = True,
 ) -> SplatModel:
     from gsplat import DefaultStrategy
 
@@ -523,23 +543,41 @@ def train_3dgs(
     pct.to(device)
     viewmats = w2c_3x4_to_viewmats_4x4(pct.extrinsic)
     intrinsic = pct.intrinsic
-    depth = to_channel_as_primary(pct.depth)
-    depth_conf = pct.depth_conf.unsqueeze(1)
 
     mask = images_alpha_0_1 > 0.5
+    bg_mask = ~mask
 
-    # TODO: set different learning rates per parameter
+    # use different learning rates per parameter
     optimizers: Dict[str, torch.optim.Optimizer] = {
-        name: torch.optim.Adam([param], lr=config.lr)
-        for name, param in model.params.items()
+        name: torch.optim.Adam([param], lr=config.lr[idx])
+        for idx, (name, param) in enumerate(model.params.named_parameters())
     }  # gsplat expects one optimizer per parameter
 
-    strategy = DefaultStrategy(absgrad=absgrad, verbose=verbose)
+    strategy = DefaultStrategy(
+        absgrad=absgrad,
+        verbose=verbose,
+        grow_grad2d=config.refine_grow_threshold,
+        refine_start_iter=(
+            int(INF) if config.refine_start_step == -1 else config.refine_start_step
+        ),
+        refine_stop_iter=config.refine_end_step,
+        refine_every=config.refine_interval,
+        reset_every=(
+            int(INF)
+            if config.reset_opacity_interval == -1
+            else config.reset_opacity_interval
+        ),
+        revised_opacity=config.revised_opacities_heuristic,
+    )
     strategy.check_sanity(model.params, optimizers)
     strategy_state = strategy.initialize_state()
 
     S: int = images_0_1.shape[0]
 
+    msg = f"Beginning training with '{model.means_.shape[0]}' initial splats."
+    queue.put(("update", msg))
+
+    opacity_loss_item = None
     for step in range(config.steps):
         if model.means_.shape[0] == 0:
             raise UnexpectedError("All splats were pruned. Stopping training.")
@@ -547,32 +585,30 @@ def train_3dgs(
         idx = torch.randint(0, S, (config.scene_size,), device=device)
 
         rgb = images_0_1.index_select(0, idx)
-        alp = images_alpha_0_1.index_select(0, idx)
         view = viewmats.index_select(0, idx)
         intri = intrinsic.index_select(0, idx)
-        dep = depth.index_select(0, idx)
-        dep_cf = depth_conf.index_select(0, idx)
 
         pred_rgb, pred_depth, pred_alpha, meta = rasterizer.render(model, view, intri)
 
         msk = mask.index_select(0, idx)
-        if msk.sum() == 0:
-            # if no foreground pixels in batch, skip step
-            loss = torch.zeros([], device=device, requires_grad=True)
-        else:
-            msk_rgb = msk.expand(-1, 3, -1, -1)
-            rgb_loss = (pred_rgb - rgb).abs()[msk_rgb].mean()
+        bg_msk = bg_mask.index_select(0, idx)
 
-            alpha_loss = (pred_alpha - alp).abs()[msk].mean()
+        msk_rgb = msk.expand(-1, 3, -1, -1)
+        rgb_loss = (pred_rgb - rgb)[msk_rgb].abs().mean()
 
-            depth_err = (pred_depth - dep).abs()
-            depth_loss = (depth_err * dep_cf)[msk].mean()
+        loss = rgb_loss  # TODO: implement PSNR loss and eval method
 
-            loss = (
-                rgb_loss
-                + config.alpha_weight * alpha_loss
-                + config.depth_weight * depth_loss
-            )  # TODO: implement PSNR loss
+        # penalize alpha values within background
+        alpha_loss = pred_alpha[bg_msk].mean()
+        loss += alpha_loss * config.alpha_lambda
+
+        if not config.revised_opacities_heuristic:
+            # penalize opacities for being far from either 0 or 1
+            opa_normalized = model.opacities_.sigmoid()
+            opacity_loss = (opa_normalized.mul(torch.sub(1.0, opa_normalized))).mean()
+            opacity_loss_item = opacity_loss.item()
+
+            loss += opacity_loss * config.opacity_lambda
 
         strategy.step_pre_backward(model.params, optimizers, strategy_state, step, meta)
 
@@ -593,8 +629,19 @@ def train_3dgs(
             with torch.no_grad():
                 out_file = (
                     add_suffix_to_path(ply_out_file, f"{step:06d}")
-                    if increment_ply_file
+                    if config.increment_ply_file
                     else ply_out_file
                 )
                 save_ply_3dgs(out_file, model.detached_tensors)
+
+        if step % 1000 == 0 or step == config.steps - 1:
+            stats = SplatTrainingStats(
+                step=step,
+                num_splats=model.means_.shape[0],
+                rgb_loss=rgb_loss.item(),
+                alpha_loss=alpha_loss.item(),
+                opacity_loss=opacity_loss_item,
+                total_loss=loss.item(),
+            )
+            queue.put(("update", f"Current Stats:\n{str(stats)}"))
     return model

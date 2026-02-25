@@ -27,7 +27,7 @@ PLAYER_NAME = "PointCloudPlaybackManager"
 GN_MODIFIER_NAME = "PointCloudGN"
 GN_TREE_NAME = "PointCloudGNGroup"
 MATERIAL_NAME = "PointCloudMaterial"
-DEFAULT_POINT_RADIUS = 0.15
+DEFAULT_POINT_RADIUS = 0.1
 
 PLY_FILE_FORMATTER = None
 

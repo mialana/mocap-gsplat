@@ -384,14 +384,22 @@ class FrameTensorMetadata:
 @dataclass(frozen=True)
 class SplatTrainingConfig:
     steps: int = -1
-    lr: float = -1.0
+    lr: List[float] = field(default_factory=list)
     sh_degree: int = -1
     scene_size: int = -1
 
-    alpha_weight: float = -1.0
-    depth_weight: float = -1.0
+    alpha_lambda: float = -1.0
+    opacity_lambda: float = -1.0
+
+    refine_start_step: int = -1
+    refine_end_step: int = -1
+    refine_interval: int = -1
+    refine_grow_threshold: float = -1.0
+    reset_opacity_interval: int = -1
+    revised_opacities_heuristic: bool = True
 
     save_ply_interval: int = -1
+    increment_ply_file: bool = True
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -399,6 +407,20 @@ class SplatTrainingConfig:
     @classmethod
     def from_dict(cls, d: Dict) -> Self:
         return cls(**d)
+
+
+@dataclass(frozen=True)
+class SplatTrainingStats:
+    step: int
+    num_splats: int
+
+    rgb_loss: float
+    alpha_loss: float
+    opacity_loss: Optional[float]
+    total_loss: float
+
+    def __str__(self):
+        return json.dumps(asdict(self), indent=2)
 
 
 class ModelInferenceMode(StrEnum):

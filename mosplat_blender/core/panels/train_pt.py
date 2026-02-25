@@ -20,17 +20,25 @@ class Mosplat_PT_train(MosplatPanelBase):
     def draw_with_layout(self, pkg, layout):
         props = pkg.props
         config = props.config_accessor
+        meta = config._meta
 
-        layout.prop(config, config._meta.steps.id)
-        layout.prop(config, config._meta.lr.id)
-        layout.prop(config, config._meta.sh_degree.id)
+        layout.prop(config, meta.steps.id)
+        layout.prop(config, meta.lr.id)
+        layout.prop(config, meta.sh_degree.id)
 
         row = layout.row()
         row.enabled = False
-        row.prop(config, config._meta.scene_size.id)
+        row.prop(config, meta.scene_size.id)
 
-        layout.prop(config, config._meta.alpha_weight.id)
-        layout.prop(config, config._meta.depth_weight.id)
-        layout.prop(config, config._meta.save_ply_interval.id)
+        layout.prop(config, meta.alpha_lambda.id)
+        layout.prop(config, meta.opacity_lambda.id)
+        layout.prop(config, meta.refine_start_step.id)
+        layout.prop(config, meta.refine_end_step.id)
+        layout.prop(config, meta.refine_interval.id)
+        layout.prop(config, meta.refine_grow_threshold.id)
+        layout.prop(config, meta.reset_opacity_interval.id)
+        layout.prop(config, meta.revised_opacities_heuristic.id)
+        layout.prop(config, meta.save_ply_interval.id)
+        layout.prop(config, meta.increment_ply_file.id)
 
         layout.row().operator(OperatorIDEnum.TRAIN_GAUSSIAN_SPLATS)

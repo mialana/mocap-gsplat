@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Generic, List, Tuple, TypeAlias
+from typing import TYPE_CHECKING, Any, Final, Generic, List, Tuple
 
 from bpy.props import (
     BoolProperty,
     CollectionProperty,
     EnumProperty,
     FloatProperty,
+    FloatVectorProperty,
     IntProperty,
     IntVectorProperty,
     PointerProperty,
@@ -232,28 +233,78 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
     __dataclass_type__ = SplatTrainingConfig
 
     steps: IntProperty(name="Steps", default=30_000)
-    lr: FloatProperty(name="Learning Rate", default=1e-2)
-    sh_degree: IntProperty(name="Spherical Harmonics Degree", default=0)
+    lr: FloatVectorProperty(
+        name="Learning Rates",
+        size=6,
+        description="Learning rates of model parameters defined in the following order: `means`, `scales`, `quats`, `opacities`, `sh0`, `shN`",
+        default=(1e-4, 5e-3, 1e-3, 5e-3, 2.5e-3, 2.5e-3 / 10),
+        precision=6,
+    )
+    sh_degree: IntProperty(name="Spherical Harmonics Degree", default=2)
     scene_size: IntProperty(
         name="Scene Size",
         description="Number of cameras capturing the scene (read-only)",
         default=-1,
     )
-    alpha_weight: FloatProperty(
-        name="Alpha Weight",
+    alpha_lambda: FloatProperty(
+        name="Alpha Lambda",
         description="Weighting of alpha values in loss computation",
-        default=0.1,
+        default=0.3,
+        precision=3,
     )
-    depth_weight: FloatProperty(
-        name="Depth Weight",
-        description="Weighting of depth values in loss computation",
+    opacity_lambda: FloatProperty(
+        name="Opacity Lambda",
+        description="Weighting of opacity values in loss computation. Ineffective if using `revised_opacities_heuristic`.",
         default=0.01,
+        precision=3,
+    )
+    refine_start_step: IntProperty(
+        name="Refine Start Step",
+        description="Step to begin refining the model through densification and pruning. Set to -1 to disable all densification and pruning.",
+        default=-1,
+    )
+    refine_end_step: IntProperty(
+        name="Refine End Step",
+        description="Step to stop refining the model through densification and pruning.",
+        default=15_000,
+    )
+    refine_interval: IntProperty(
+        name="Refine Interval",
+        description="The amount of steps in between each refinement",
+        default=6_000,
+    )
+    refine_grow_threshold: FloatProperty(
+        name="Refine Grow Threshold",
+        description="Splats with image plane gradient above this value will be split/duplicated.",
+        min=0.003,
+        default=0.006,
+        precision=4,
+    )
+    reset_opacity_interval: IntProperty(
+        name="Reset Opacity Interval",
+        description="The amount of steps in between resetting the splat `opacities` parameter. Set to -1 to disable.",
+        default=-1,
+    )
+    revised_opacities_heuristic: BoolProperty(
+        name="Revised Opacity Heuristic",
+        description="Whether to use revised `opacities` heuristic from arXiv:2404.06109",
+        default=True,
     )
     save_ply_interval: IntProperty(
         name="Save to PLY Interval",
         description="The amount of steps in between saving an evaluated PLY file to disk.",
-        default=1000,
+        default=5000,
     )
+    increment_ply_file: BoolProperty(
+        name="Increment PLY file",
+        description="Whether to save separate PLY files with file names incremented by step number.",
+        default=True,
+    )
+
+    def convert_property_to_field(self, prop: Any) -> Any:
+        if prop == self.lr:
+            return list(prop)
+        return super().convert_property_to_field(prop)
 
 
 class Mosplat_PG_AppliedPreprocessScript(

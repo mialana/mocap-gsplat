@@ -5,10 +5,11 @@ from __future__ import annotations
 import inspect
 import logging
 import os
-from dataclasses import fields
+from dataclasses import Field, fields
 from functools import partial
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     ClassVar,
     Generic,
@@ -21,10 +22,7 @@ from typing import (
 )
 
 from .constants import _MISSING_
-from .protocols import (
-    SupportsCollectionProperty,
-    SupportsDataclass,
-)
+from .protocols import SupportsCollectionProperty, SupportsDataclass
 from .schemas import DeveloperError, EnvVariableEnum, UserAssertionError
 
 S = TypeVar("S")
@@ -156,6 +154,15 @@ class DataclassInteropMixin(Generic[D]):
     # will be enforced before registration.
     __dataclass_type__: Optional[Type[D]] = _MISSING_
 
+    def convert_property_to_field(self, prop: Any) -> Any:
+        """overrideable"""
+        if isinstance(prop, DataclassInteropMixin):
+            return prop.to_dataclass()
+        elif isinstance(prop, SupportsCollectionProperty):
+            return self.collection_property_to_dataclass_list(prop)
+        else:
+            return prop
+
     def to_dataclass(self) -> D:
         d_cls = self.__dataclass_type__
         if d_cls is None:
@@ -164,14 +171,40 @@ class DataclassInteropMixin(Generic[D]):
 
         kwargs = {}
         for fld in fields(d_cls):
-            value = getattr(self, fld.name)
-            if isinstance(value, DataclassInteropMixin):
-                value = value.to_dataclass()
-            elif isinstance(value, SupportsCollectionProperty):
-                value = self.collection_property_to_dataclass_list(value)
-            kwargs[fld.name] = value
+            prop = getattr(self, fld.name, None)
+            if prop is None:
+                raise NotImplementedError
+            kwargs[fld.name] = self.convert_property_to_field(prop)
 
         return d_cls(**kwargs)
+
+    def convert_field_to_property(
+        self, fld_name: str, fld_value: Any, prop: Any
+    ) -> None:
+        """overrideable"""
+        from bpy.types import bpy_prop_array
+
+        if isinstance(prop, DataclassInteropMixin):
+            prop.from_dataclass(fld_value)
+        elif isinstance(prop, SupportsCollectionProperty):
+            prop.clear()  # clear out the old collection property
+            for fld_item in fld_value:  # items within the field
+                prop_item = prop.add()  # create an item within the prop
+                if isinstance(prop_item, DataclassInteropMixin):
+                    prop_item.from_dataclass(fld_item)
+                else:
+                    raise NotImplementedError
+        elif isinstance(prop, bpy_prop_array):
+            setattr(self, fld_name, tuple(fld_value))
+        else:
+            try:
+                setattr(self, fld_name, fld_value)
+            except TypeError:
+                raise UserAssertionError(
+                    f"Cannot create from dataclass due to type mismatch in field '{fld_name}'.",
+                    expected=type(prop),
+                    actual=type(fld_value),
+                )
 
     def from_dataclass(self, data: D) -> None:
         data_cls = self.__dataclass_type__
@@ -180,27 +213,11 @@ class DataclassInteropMixin(Generic[D]):
             raise DeveloperError(f"No dataclass interop exists for {cls.__qualname__}.")
 
         for fld in fields(data):
-            value = getattr(data, fld.name)
-            target = getattr(self, fld.name, None)
-            if isinstance(target, DataclassInteropMixin):
-                target.from_dataclass(value)
-            elif isinstance(target, SupportsCollectionProperty):
-                target.clear()  # clear out the old collection property
-                for item_dc in value:
-                    item_pg = target.add()
-                    if isinstance(item_pg, DataclassInteropMixin):
-                        item_pg.from_dataclass(item_dc)
-                    else:
-                        raise NotImplementedError
-            else:
-                try:
-                    setattr(self, fld.name, value)
-                except TypeError:
-                    raise UserAssertionError(
-                        f"Cannot create from dataclass due to type mismatch in field '{fld.name}'.",
-                        expected=type(target),
-                        actual=type(value),
-                    )
+            fld_value = getattr(data, fld.name)
+            prop = getattr(self, fld.name, None)
+            if prop is None:
+                raise NotImplementedError
+            self.convert_field_to_property(fld.name, fld_value, prop)
 
     @staticmethod
     def collection_property_to_dataclass_list(

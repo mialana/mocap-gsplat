@@ -37,9 +37,9 @@ class Mosplat_PT_preprocess(MosplatPanelBase):
             statuses.append(_median_as_status)
 
         for s in statuses:
-            _media_filename = Path(s.filepath).name
-            _icon = "CON_TRANSFORM_CACHE" if s is _median_as_status else "FILE_MOVIE"
-            column_factory(grid, _media_filename, not s.is_valid, icon=_icon)
+            media_filename = Path(s.filepath).name
+            icon = "CON_TRANSFORM_CACHE" if s is _median_as_status else "FILE_MOVIE"
+            column_factory(grid, media_filename, not s.is_valid, icon=icon)
 
             fc_matches, w_matches, h_matches = s.matches_metadata(media_io)
 

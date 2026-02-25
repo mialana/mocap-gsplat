@@ -1,4 +1,4 @@
-# 2026-02-24 16:06:38.288265
+# 2026-02-25 00:50:18.114214
 # created using 'generate_property_meta_files.py'
 
 
@@ -36,9 +36,16 @@ class Mosplat_PG_SplatTrainingConfig_Meta(NamedTuple):
     lr: PropertyMeta
     sh_degree: PropertyMeta
     scene_size: PropertyMeta
-    alpha_weight: PropertyMeta
-    depth_weight: PropertyMeta
+    alpha_lambda: PropertyMeta
+    opacity_lambda: PropertyMeta
+    refine_start_step: PropertyMeta
+    refine_end_step: PropertyMeta
+    refine_interval: PropertyMeta
+    refine_grow_threshold: PropertyMeta
+    reset_opacity_interval: PropertyMeta
+    revised_opacities_heuristic: PropertyMeta
     save_ply_interval: PropertyMeta
+    increment_ply_file: PropertyMeta
 
 
 class Mosplat_PG_AppliedPreprocessScript_Meta(NamedTuple):
@@ -143,7 +150,11 @@ MOSPLAT_PG_VGGTMODELOPTIONS_META = Mosplat_PG_VGGTModelOptions_Meta(
 
 MOSPLAT_PG_SPLATTRAININGCONFIG_META = Mosplat_PG_SplatTrainingConfig_Meta(
     steps=PropertyMeta(id="steps", name="Steps", description=""),
-    lr=PropertyMeta(id="lr", name="Learning Rate", description=""),
+    lr=PropertyMeta(
+        id="lr",
+        name="Learning Rates",
+        description="Learning rates of model parameters defined in the following order: `means`, `scales`, `quats`, `opacities`, `sh0`, `shN`",
+    ),
     sh_degree=PropertyMeta(
         id="sh_degree", name="Spherical Harmonics Degree", description=""
     ),
@@ -152,20 +163,55 @@ MOSPLAT_PG_SPLATTRAININGCONFIG_META = Mosplat_PG_SplatTrainingConfig_Meta(
         name="Scene Size",
         description="Number of cameras capturing the scene (read-only)",
     ),
-    alpha_weight=PropertyMeta(
-        id="alpha_weight",
-        name="Alpha Weight",
+    alpha_lambda=PropertyMeta(
+        id="alpha_lambda",
+        name="Alpha Lambda",
         description="Weighting of alpha values in loss computation",
     ),
-    depth_weight=PropertyMeta(
-        id="depth_weight",
-        name="Depth Weight",
-        description="Weighting of depth values in loss computation",
+    opacity_lambda=PropertyMeta(
+        id="opacity_lambda",
+        name="Opacity Lambda",
+        description="Weighting of opacity values in loss computation. Ineffective if using `revised_opacities_heuristic`.",
+    ),
+    refine_start_step=PropertyMeta(
+        id="refine_start_step",
+        name="Refine Start Step",
+        description="Step to begin refining the model through densification and pruning. Set to -1 to disable all densification and pruning.",
+    ),
+    refine_end_step=PropertyMeta(
+        id="refine_end_step",
+        name="Refine End Step",
+        description="Step to stop refining the model through densification and pruning.",
+    ),
+    refine_interval=PropertyMeta(
+        id="refine_interval",
+        name="Refine Interval",
+        description="The amount of steps in between each refinement",
+    ),
+    refine_grow_threshold=PropertyMeta(
+        id="refine_grow_threshold",
+        name="Refine Grow Threshold",
+        description="Splats with image plane gradient above this value will be split/duplicated.",
+    ),
+    reset_opacity_interval=PropertyMeta(
+        id="reset_opacity_interval",
+        name="Reset Opacity Interval",
+        description="The amount of steps in between resetting the splat `opacities` parameter. Set to -1 to disable.",
+    ),
+    revised_opacities_heuristic=PropertyMeta(
+        id="revised_opacities_heuristic",
+        name="Revised Opacity Heuristic",
+        description="Whether to use revised `opacities` heuristic from arXiv:2404.06109",
     ),
     save_ply_interval=PropertyMeta(
         id="save_ply_interval",
         name="Save to PLY Interval",
         description="The amount of steps in between saving an evaluated PLY file to disk.",
+    ),
+    increment_ply_file=PropertyMeta(
+        id="increment_ply_file",
+        name="Increment PLY file",
+        description="Whether to save separate PLY files with file names incremented by step number.",
     ),
 )
 

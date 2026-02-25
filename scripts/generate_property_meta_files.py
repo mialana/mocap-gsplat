@@ -20,6 +20,7 @@ BLENDER_PROPERTY_TYPES = {
     "PointerProperty",
     "CollectionProperty",
     "IntVectorProperty",
+    "FloatVectorProperty",
 }
 
 pyproject_toml_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
