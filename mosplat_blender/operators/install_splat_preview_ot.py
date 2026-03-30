@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
@@ -228,7 +229,7 @@ def process_imported_ply(obj: Object) -> Optional[Mesh]:
 
     mat = apply_material("KIRI_3DGS_Render_Material", obj)
 
-    render_mod["Socket_50"] = 2
+    render_mod["Socket_50"] = 0
     render_mod["Socket_51"] = 0.001  # TODO: expose as property]
     render_mod.show_viewport = True
     color_adjust_mod.show_viewport = True
@@ -250,6 +251,9 @@ def process_imported_ply(obj: Object) -> Optional[Mesh]:
     if bpy.context and bpy.context.screen:
         for area in bpy.context.screen.areas:
             area.tag_redraw()
+
+    align_op = getattr(bpy.ops, "sna.dgs_render_align_active_to_view_30b13")
+    align_op()
 
     return
 
