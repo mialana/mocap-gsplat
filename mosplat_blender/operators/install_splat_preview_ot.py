@@ -226,7 +226,30 @@ def process_imported_ply(obj: Object) -> Optional[Mesh]:
     merger_mod = apply_modifier_from_node_group("KIRI_3DGS_Write F_DC_And_Merge", obj)
     # TODO: set properties of modifiers
 
-    apply_material("KIRI_3DGS_Render_Material", obj)
+    mat = apply_material("KIRI_3DGS_Render_Material", obj)
+
+    render_mod["Socket_50"] = 2
+    render_mod["Socket_51"] = 0.001  # TODO: expose as property]
+    render_mod.show_viewport = True
+    color_adjust_mod.show_viewport = True
+    merger_mod.show_viewport = False
+    merger_mod.show_render = False
+    kiri_properties = getattr(obj, "sna_dgs_object_properties")
+    kiri_properties.update_mode = "Show As Point Cloud"
+
+    material_render_method = mat.surface_render_method
+
+    logger.debug(f"Material render method: '{material_render_method}'")
+
+    sorter_mod.show_viewport = material_render_method == "BLENDED"
+    sorter_mod.show_render = material_render_method == "BLENDED"
+    render_mod["Socket_61"] = mat
+
+    obj.update_tag(refresh={"OBJECT", "DATA"})
+
+    if bpy.context and bpy.context.screen:
+        for area in bpy.context.screen.areas:
+            area.tag_redraw()
 
     return
 
