@@ -128,10 +128,10 @@ class PointCloudTensors:
         field_hints = get_type_hints(cls, include_extras=True)
         return {name: get_args(hint)[1] for name, hint in field_hints.items()}
 
-    def to(self, device: torch.device):
-        for fld in fields(self):
-            tensor: torch.Tensor = getattr(self, fld.name)
-            tensor.to(device)
+    def to(self, device: torch.device) -> Self:
+        return self.__class__(
+            **{fld.name: getattr(self, fld.name).to(device) for fld in fields(self)}
+        )
 
 
 class VGGTPredictions(NamedTuple):
@@ -231,7 +231,7 @@ def save_images_safetensors(
 def load_safetensors(
     in_file: Path,
     device: torch.device,
-    expected_metadata: FrameTensorMetadata,
+    expected_metadata: Optional[FrameTensorMetadata],
     annotation_map: Dict[str, dltype.TensorTypeBase],  # keys to type annotations
 ) -> Dict[str, torch.Tensor]:
     from safetensors import SafetensorError, safe_open
@@ -269,7 +269,8 @@ def load_safetensors(
                 e,
             ) from e
 
-    expected_metadata.compare(metadata)  # raises `UserAssertionError` on failure
+    if expected_metadata:
+        expected_metadata.compare(metadata)  # raises `UserAssertionError` on failure
 
     return tensors
 

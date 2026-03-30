@@ -326,7 +326,7 @@ class SplatModel(torch.nn.Module):
         init_tactics: Literal["custom", "gsplat"] = "custom",
         opacity_initial: float = 0.1,  # if `init_tactics` is `gsplat`
     ) -> Self:
-        pct.to(device)  # convert all tensors to device
+        pct = pct.to(device)  # convert all tensors to device
 
         means = pct.xyz
         rgb = to_0_1(pct.rgb_0_255)
@@ -540,7 +540,7 @@ def train_3dgs(
     images_0_1 = to_0_1(images)
     images_alpha_0_1 = to_0_1(images_alpha)
 
-    pct.to(device)
+    pct = pct.to(device)
     viewmats = w2c_3x4_to_viewmats_4x4(pct.extrinsic)
     intrinsic = pct.intrinsic
 

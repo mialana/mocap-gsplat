@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
@@ -77,7 +78,10 @@ class Mosplat_OT_install_splat_preview(MosplatOperatorBase):
 
         # prevent duplicate registration of handler
         for idx, handler in enumerate(bpy.app.handlers.frame_change_pre):
-            if handler.__name__ == mosplat_on_frame_change_splat.__name__:
+            name = getattr(handler, "__name__", None) or (
+                handler.func.__name__ if isinstance(handler, partial) else ""
+            )
+            if name == mosplat_on_frame_change_splat.__name__:
                 bpy.app.handlers.frame_change_pre.pop(idx)
 
         bpy.app.handlers.frame_change_pre.append(mosplat_on_frame_change_splat)

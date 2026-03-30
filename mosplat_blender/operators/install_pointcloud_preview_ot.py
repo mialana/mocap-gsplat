@@ -4,9 +4,15 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Set, Tuple, cast
 
+from ..infrastructure.dl_ops import PointCloudTensors, load_safetensors
 from ..infrastructure.macros import is_path_accessible
 from ..infrastructure.mixins import CtxPackage
-from ..infrastructure.schemas import ExportedFileName, UnexpectedError
+from ..infrastructure.schemas import (
+    ExportedFileFormatterPartial,
+    ExportedFileName,
+    UserFacingError,
+)
+from ..interfaces.logging_interface import LoggingInterface
 from .base_ot import MosplatOperatorBase
 
 if TYPE_CHECKING:
@@ -21,6 +27,7 @@ if TYPE_CHECKING:
         Object,
         Scene,
     )
+    from mathutils import Matrix
 
 MESH_NAME = "pc_mesh"
 PLAYER_NAME = "PointCloudPlaybackManager"
@@ -28,8 +35,11 @@ GN_MODIFIER_NAME = "PointCloudGN"
 GN_TREE_NAME = "PointCloudGNGroup"
 MATERIAL_NAME = "PointCloudMaterial"
 DEFAULT_POINT_RADIUS = 0.1
+CAMERA_COLLECTION_NAME = "pc_cameras"
+CAMERA_NAME_FORMATTER = "pc_camera_{cam_id}"
+CAMERA_DISPLAY_SIZE = 0.15
 
-PLY_FILE_FORMATTER = None
+logger = LoggingInterface.configure_logger_instance(__name__)
 
 
 class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
@@ -42,18 +52,22 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
         return len(cls._poll_error_msg_list) == 0
 
     def _contexted_invoke(self, pkg, event):
-        global PLY_FILE_FORMATTER
-
         prefs = pkg.prefs
         props = pkg.props
 
         self._frame_range: Tuple[int, int] = props.frame_range_
         self._exported_file_formatter: str = props.exported_file_formatter(prefs)
 
-        PLY_FILE_FORMATTER = ExportedFileName.to_formatter(
+        self._ply_file_formatter = ExportedFileName.to_formatter(
             self._exported_file_formatter,
             file_name=ExportedFileName.POINT_CLOUD,
             file_ext="ply",
+        )
+
+        self._pct_file_formatter = ExportedFileName.to_formatter(
+            self._exported_file_formatter,
+            file_name=ExportedFileName.POINT_CLOUD_TENSORS,
+            file_ext="safetensors",
         )
 
         return self.execute_with_package(pkg)
@@ -64,7 +78,11 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 
         scene = pkg.context.scene
         if scene:
-            mosplat_on_frame_change_pc(scene)  # initial execution
+            mosplat_on_frame_change_pc(
+                scene,
+                ply_file_formatter=self._ply_file_formatter,
+                pct_file_formatter=self._pct_file_formatter,
+            )  # initial execution
 
         return "RUNNING_MODAL"
 
@@ -77,10 +95,19 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 
         # prevent duplicate registration of handler
         for idx, handler in enumerate(bpy.app.handlers.frame_change_pre):
-            if handler.__name__ == mosplat_on_frame_change_pc.__name__:
+            name = getattr(handler, "__name__", None) or (
+                handler.func.__name__ if isinstance(handler, partial) else ""
+            )
+            if name == mosplat_on_frame_change_pc.__name__:
                 bpy.app.handlers.frame_change_pre.pop(idx)
 
-        bpy.app.handlers.frame_change_pre.append(mosplat_on_frame_change_pc)
+        bpy.app.handlers.frame_change_pre.append(
+            partial(
+                mosplat_on_frame_change_pc,
+                ply_file_formatter=self._ply_file_formatter,
+                pct_file_formatter=self._pct_file_formatter,
+            )
+        )
 
         self.logger.debug("Installation complete.")
 
@@ -191,16 +218,44 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 
 
 # prefix function name to prevent any collision with other addons' handlers
-def mosplat_on_frame_change_pc(scene: Scene):
+def mosplat_on_frame_change_pc(
+    scene: Scene,
+    *,
+    ply_file_formatter: ExportedFileFormatterPartial,
+    pct_file_formatter: ExportedFileFormatterPartial,
+):
     import bpy
+    import mathutils
 
     obj: Optional[Object] = bpy.data.objects.get(PLAYER_NAME)
     if obj is None:
         return
 
-    mesh = import_ply_mesh_for_frame(scene.frame_current)
+    TRANSFORM_MATRIX = mathutils.Matrix(
+        (
+            (1, 0, 0, 0),
+            (0, 0, 1, 0),
+            (0, -1, 0, 0),
+            (0, 0, 0, 1),
+        )
+    )
+    SCALE_MATRIX = mathutils.Matrix.Scale(100.0, 4)
+
+    mesh = import_ply_mesh_for_frame(
+        scene.frame_current,
+        TRANSFORM_MATRIX,
+        SCALE_MATRIX,
+        ply_file_formatter=ply_file_formatter,
+    )
     if mesh is None:
         return
+
+    import_cameras_for_frame(
+        scene.frame_current,
+        TRANSFORM_MATRIX,
+        SCALE_MATRIX,
+        pct_file_formatter=pct_file_formatter,
+    )
 
     old_mesh: Mesh = cast(bpy.types.Mesh, obj.data)
     obj.data = mesh
@@ -210,14 +265,16 @@ def mosplat_on_frame_change_pc(scene: Scene):
         bpy.data.meshes.remove(old_mesh)
 
 
-def import_ply_mesh_for_frame(curr_frame: int) -> Optional[Mesh]:
+def import_ply_mesh_for_frame(
+    curr_frame: int,
+    transform_mat: Matrix,
+    scale_mat: Matrix,
+    *,
+    ply_file_formatter: ExportedFileFormatterPartial,
+) -> Optional[Mesh]:
     import bpy
-    import mathutils
 
-    if not PLY_FILE_FORMATTER:
-        raise UnexpectedError(f"Global PLY file formatter string no longer in scope.")
-
-    ply_filepath: str = PLY_FILE_FORMATTER(frame_idx=curr_frame)
+    ply_filepath: str = ply_file_formatter(frame_idx=curr_frame)
 
     if not is_path_accessible(Path(ply_filepath)):
         return None
@@ -226,7 +283,6 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Optional[Mesh]:
 
     bpy.ops.wm.ply_import(filepath=ply_filepath)
 
-    #
     after: Set[Object] = set(bpy.data.objects)
     created_obj: Object = list(after - before)[0]
 
@@ -234,20 +290,95 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Optional[Mesh]:
 
     new_mesh: Mesh = cast(bpy.types.Mesh, created_obj.data.copy())
 
-    PLY_TRANSFORM_MATRIX = mathutils.Matrix(
-        (
-            (1, 0, 0, 0),
-            (0, 0, 1, 0),
-            (0, -1, 0, 0),
-            (0, 0, 0, 1),
-        )
-    )
-
-    PLY_SCALE_MATRIX = mathutils.Matrix.Scale(100.0, 4)
-
-    new_mesh.transform(PLY_SCALE_MATRIX @ PLY_TRANSFORM_MATRIX)
+    new_mesh.transform(scale_mat @ transform_mat)
     new_mesh.update()
 
     bpy.data.objects.remove(created_obj, do_unlink=True)
 
     return new_mesh
+
+
+def import_cameras_for_frame(
+    curr_frame: int,
+    transform_mat: Matrix,
+    scale_mat: Matrix,
+    *,
+    pct_file_formatter: ExportedFileFormatterPartial,
+):
+    import mathutils
+
+    import torch
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pct_filepath: Path = Path(pct_file_formatter(frame_idx=curr_frame))
+    pct_anno_map = PointCloudTensors.annotation_map()
+
+    try:
+        pct_dict = load_safetensors(pct_filepath, device, None, pct_anno_map)
+    except Exception as e:
+        msg = UserFacingError.make_msg(
+            f"Unable to load safetensor data from '{pct_filepath}' to extract camera data for frame '{curr_frame}'.",
+            e,
+        )
+        logger.error(msg)
+        return
+
+    pct: PointCloudTensors = PointCloudTensors.from_dict(pct_dict)
+
+    extrinsic = pct.extrinsic
+    intrinsic = pct.intrinsic
+    num_cams = extrinsic.shape[0]
+
+    for cam_id in range(num_cams):
+        cam_obj = ensure_camera(cam_id)
+
+        extri = extrinsic[cam_id].tolist()  # move to a cpu list
+        intri = intrinsic[cam_id].tolist()
+
+        world_cam = mathutils.Matrix(
+            (
+                (extri[0][0], extri[0][1], extri[0][2], extri[0][3]),
+                (extri[1][0], extri[1][1], extri[1][2], extri[1][3]),
+                (extri[2][0], extri[2][1], extri[2][2], extri[2][3]),
+                (0, 0, 0, 1),
+            )
+        )
+        cam_world = world_cam.inverted()
+        cam_world = scale_mat @ transform_mat @ cam_world
+
+        cam_obj.matrix_world = cam_world  # assign transform to camera
+
+        cam_obj.data.display_size = CAMERA_DISPLAY_SIZE
+
+
+def ensure_camera(cam_id: int):
+    import bpy
+
+    name = CAMERA_NAME_FORMATTER.format(cam_id=cam_id)
+    obj = bpy.data.objects.get(name)
+
+    if obj is None:
+        cam_data = bpy.data.cameras.new(name)
+        obj = bpy.data.objects.new(name, cam_data)
+        if not bpy.context.scene or not bpy.context.scene.collection:
+            logger.warning(f"Unable to link camera '{cam_id}' to scene")
+        else:
+            collection = ensure_camera_collection(CAMERA_COLLECTION_NAME)
+            collection.objects.link(obj)
+
+    return obj
+
+
+def ensure_camera_collection(name: str):
+    import bpy
+
+    collection = bpy.data.collections.get(name)
+
+    if collection is None:
+        collection = bpy.data.collections.new(name)
+        if not bpy.context.scene or not bpy.context.scene.collection:
+            logger.warning("Unable to link camera collection to scene")
+        else:
+            bpy.context.scene.collection.children.link(collection)
+
+    return collection
