@@ -17,7 +17,7 @@ from bpy.props import (
 )
 from bpy.types import Context, PropertyGroup
 
-from ..infrastructure.constants import PER_FRAME_DIRNAME
+from ..infrastructure.constants import PER_FRAME_DIRECTORY_FORMATTER
 from ..infrastructure.identifiers import OperatorIDEnum
 from ..infrastructure.mixins import (
     D,
@@ -128,6 +128,7 @@ def update_frame_range(self: Mosplat_PG_Global, context: Context):
         OperatorIDEnum.run(OperatorIDEnum.FIT_TIMELINE)
 
     OperatorIDEnum.run(OperatorIDEnum.INSTALL_POINT_CLOUD_PREVIEW, "INVOKE_DEFAULT")
+    OperatorIDEnum.run(OperatorIDEnum.INSTALL_SPLAT_PREVIEW, "INVOKE_DEFAULT")
 
     self.logger.info(f"Frame range updated to '{start}-{end}'.")
 
@@ -319,7 +320,7 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
     increment_ply_file: BoolProperty(
         name="Increment PLY file",
         description="Whether to save separate PLY files with file names incremented by step number.",
-        default=True,
+        default=False,
     )
 
     def convert_property_to_field(self, prop: Any) -> Any:
@@ -566,4 +567,4 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
 
     def exported_file_formatter(self, prefs: Mosplat_AP_Global) -> str:
         data_dir = check_media_output_dir(prefs, self)
-        return str(data_dir / PER_FRAME_DIRNAME / "{file_name}.{file_ext}")
+        return str(data_dir / PER_FRAME_DIRECTORY_FORMATTER / "{file_name}.{file_ext}")

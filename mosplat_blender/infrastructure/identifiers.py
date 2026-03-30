@@ -50,6 +50,7 @@ class OperatorIDEnum(StrEnum):
     RUN_INFERENCE = auto()
     INSTALL_POINT_CLOUD_PREVIEW = auto()
     TRAIN_GAUSSIAN_SPLATS = auto()
+    INSTALL_SPLAT_PREVIEW = auto()
 
 
 class PanelIDEnum(StrEnum):

@@ -50,8 +50,8 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
         self._frame_range: Tuple[int, int] = props.frame_range_
         self._exported_file_formatter: str = props.exported_file_formatter(prefs)
 
-        PLY_FILE_FORMATTER = partial(
-            self._exported_file_formatter.format,
+        PLY_FILE_FORMATTER = ExportedFileName.to_formatter(
+            self._exported_file_formatter,
             file_name=ExportedFileName.POINT_CLOUD,
             file_ext="ply",
         )
@@ -221,6 +221,7 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Optional[Mesh]:
 
     bpy.ops.wm.ply_import(filepath=ply_filepath)
 
+    #
     after: Set[Object] = set(bpy.data.objects)
     created_obj: Object = list(after - before)[0]
 

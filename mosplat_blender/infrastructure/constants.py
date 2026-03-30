@@ -43,10 +43,14 @@ COLORED_FORMATTER_LEVEL_STYLES = {
     },
 }
 
-PER_FRAME_DIRNAME: Final[str] = "frame_{frame_idx:04d}"
+PER_FRAME_DIRECTORY_FORMATTER: Final[str] = "frame_{frame_idx:04d}"
 
 DEFAULT_MAX_LOG_ENTRIES: Final[int] = 24
 DEFAULT_LOG_ENTRY_ROWS: Final[int] = 8
+
+SPLAT_RENDER_HELPER_SCENE: Final[Path] = (
+    Path(__file__).resolve().parents[1] / "bin" / "splat_render_helper.blend"
+)
 
 # path location of the shipped preprocess script
 DEFAULT_PREPROCESS_SCRIPT: Final[str] = str(
@@ -58,11 +62,6 @@ PENN_DEFAULT_PREPROCESS_SCRIPT: Final[str] = str(
 )
 # target function in script
 PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
-
-# path location of hf model download via subprocess script
-DOWNLOAD_HF_WITH_PROGRESS_SCRIPT: Final[Path] = (
-    Path(__file__).resolve().parents[1] / "lib" / "download_hf_with_progress.py"
-)
 
 VGGT_MAX_IMAGE_SIZE = 518  # expected max size of input images to VGGT model
 VGGT_IMAGE_DIMS_FACTOR = 14  # expected divisible factor of both height & width

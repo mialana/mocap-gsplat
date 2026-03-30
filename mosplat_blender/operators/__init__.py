@@ -9,6 +9,7 @@ from .extract_frame_range_ot import Mosplat_OT_extract_frame_range
 from .fit_timeline_ot import Mosplat_OT_fit_timeline
 from .initialize_model_ot import Mosplat_OT_initialize_model
 from .install_pointcloud_preview_ot import Mosplat_OT_install_point_cloud_preview
+from .install_splat_preview_ot import Mosplat_OT_install_splat_preview
 from .open_addon_preferences_ot import Mosplat_OT_open_addon_preferences
 from .run_inference_ot import Mosplat_OT_run_inference
 from .train_gaussian_splats_ot import Mosplat_OT_train_gaussian_splats
@@ -55,6 +56,10 @@ operator_registry: Dict[
     Mosplat_OT_train_gaussian_splats: MosplatOperatorMetadata(
         bl_idname=OperatorIDEnum.TRAIN_GAUSSIAN_SPLATS,
         bl_description="Train a model to generate a gaussian splat representation of the scene from point cloud tensors.",
+    ),
+    Mosplat_OT_install_splat_preview: MosplatOperatorMetadata(
+        bl_idname=OperatorIDEnum.INSTALL_SPLAT_PREVIEW,
+        bl_description="Installs a handler that runs before animation frame changes and imports the corresponding exported 3DGS PLY file for the frame.",
     ),
 }
 

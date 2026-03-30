@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, List, Literal, Optional, Set, TypeAlias
+from typing import TYPE_CHECKING, Literal, Optional, Set, TypeAlias
 
 from bpy.types import Context, Panel, UILayout, UIList
 
 from ...infrastructure.identifiers import PanelIDEnum
 from ...infrastructure.mixins import ContextAccessorMixin, CtxPackage
 from ...infrastructure.schemas import UnexpectedError, UserFacingError
-from ..checks import check_addonpreferences, check_propertygroup
 
 if TYPE_CHECKING:
     from bpy.stub_internal.rna_enums import IconItems
