@@ -251,8 +251,8 @@ def apply_material(name: str, obj: Object) -> Material:
     assert mesh and isinstance(mesh, bpy.types.Mesh)
 
     mat: Material
-    if name in mesh.materials:
-        mat = mesh.materials[name]
+    if name in bpy.data.materials:
+        mat = bpy.data.materials[name]
     else:
         while len(obj.material_slots) > 0:
             obj.active_material_index = 0
@@ -263,8 +263,11 @@ def apply_material(name: str, obj: Object) -> Material:
                     f"Could not clear materials from object '{obj.name}'", str(e)
                 )
                 continue  # try to continue execution for now
-        mat = mesh.materials.new(name=name)
-    mat.use_nodes = True
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+
+    if name not in mesh.materials:
+        mesh.materials.append(mat)
 
     return mat
 
