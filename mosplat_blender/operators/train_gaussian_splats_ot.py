@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List, NamedTuple, Tuple
 
+from ..infrastructure.macros import add_suffix_to_path
 from ..infrastructure.schemas import (
     AppliedPreprocessScript,
     ExportedFileName,
@@ -170,7 +171,7 @@ class Mosplat_OT_train_gaussian_splats(
                 config,
                 queue,
             )
-            msg = f"'{ply_out_file}' exported from trained 3DGS data for frame '{idx}'."
+            msg = f"'Exported 3DGS training data for frame '{idx}'."
             queue.put(("update", msg))
 
         queue.put(("done", "Training complete for current frame range."))

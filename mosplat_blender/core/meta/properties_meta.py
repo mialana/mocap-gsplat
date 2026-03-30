@@ -1,4 +1,4 @@
-# 2026-03-30 03:44:50.873684
+# 2026-03-30 04:13:59.152010
 # created using 'generate_property_meta_files.py'
 
 
@@ -76,7 +76,7 @@ class Mosplat_PG_MediaFileStatus_Meta(NamedTuple):
 class Mosplat_PG_MediaIOMetadata_Meta(NamedTuple):
     base_directory: PropertyMeta
     is_valid_media_directory: PropertyMeta
-    median_frame_count: PropertyMeta
+    min_frame_count: PropertyMeta
     median_width: PropertyMeta
     median_height: PropertyMeta
     media_file_statuses: PropertyMeta
@@ -263,10 +263,10 @@ MOSPLAT_PG_MEDIAIOMETADATA_META = Mosplat_PG_MediaIOMetadata_Meta(
     is_valid_media_directory=PropertyMeta(
         id="is_valid_media_directory", name="Is Valid Media Directory", description=""
     ),
-    median_frame_count=PropertyMeta(
-        id="median_frame_count",
-        name="Median Frame Count",
-        description="Median frame count for all media files within the selected media directory.",
+    min_frame_count=PropertyMeta(
+        id="min_frame_count",
+        name="Min Frame Count",
+        description="Minimum frame count for all media files within the selected media directory.",
     ),
     median_width=PropertyMeta(
         id="median_width",

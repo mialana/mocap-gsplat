@@ -102,6 +102,9 @@ def update_splat_render_mode(self: Mosplat_PG_Global, context: Context):
 
 
 def update_frame_range(self: Mosplat_PG_Global, context: Context):
+    if not (len(self.is_valid_media_directory_poll_result) == 0):
+        return  # exit early
+
     prefs = check_addonpreferences(context.preferences)
 
     media_io = self.media_io_accessor.to_dataclass()
@@ -266,7 +269,7 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
     fuse_by_voxel: BoolProperty(
         name="Fuse By Voxel",
         description="Whether to cull initial point cloud points to a representative per voxel.",
-        default=False,
+        default=True,
     )
     init_tactics: EnumProperty(
         name="Initialization Tactics",
@@ -330,7 +333,7 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
     increment_ply_file: BoolProperty(
         name="Increment PLY file",
         description="Whether to save separate PLY files with file names incremented by step number.",
-        default=False,
+        default=True,
     )
 
     def convert_property_to_field(self, prop: Any) -> Any:
@@ -405,9 +408,9 @@ class Mosplat_PG_MediaIOMetadata(MosplatPropertyGroupBase[MediaIOMetadata]):
         default=False,
     )
 
-    median_frame_count: IntProperty(
-        name="Median Frame Count",
-        description="Median frame count for all media files within the selected media directory.",
+    min_frame_count: IntProperty(
+        name="Min Frame Count",
+        description="Minimum frame count for all media files within the selected media directory.",
         default=-1,
     )
 
@@ -468,7 +471,7 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         name="Frame Range",
         description="Start and end (exclusive) frame of data to be processed.",
         size=2,
-        default=(0, 3),
+        default=(0, 60),
         min=0,
         options={"SKIP_SAVE"},
         update=update_frame_range,

@@ -66,6 +66,8 @@ PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
 VGGT_MAX_IMAGE_SIZE = 518  # expected max size of input images to VGGT model
 VGGT_IMAGE_DIMS_FACTOR = 14  # expected divisible factor of both height & width
 
+FRAME_VALIDATION_EPSILON = 2  # amount of variation allowed in frame counts of media
+
 SPLAT_PLAYER_OBJ_NAME = "SplatPlaybackManager"
 SPLAT_ATTRIBUTES = [
     "f_dc_0",

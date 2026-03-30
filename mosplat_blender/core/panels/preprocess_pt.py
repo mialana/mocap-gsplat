@@ -80,7 +80,7 @@ class Mosplat_PT_preprocess(MosplatPanelBase):
         global _median_as_status
         _median_as_status.overwrite(
             is_valid=data.is_valid_media_directory,
-            frame_count=data.median_frame_count,
+            frame_count=data.min_frame_count,
             width=data.median_width,
             height=data.median_height,
             mod_time=-1,

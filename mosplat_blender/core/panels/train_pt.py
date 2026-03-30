@@ -30,6 +30,9 @@ class Mosplat_PT_train(MosplatPanelBase):
         row.enabled = False
         row.prop(config, meta.scene_size.id)
 
+        layout.prop(config, meta.fuse_by_voxel.id)
+        layout.prop(config, meta.init_tactics.id)
+
         layout.prop(config, meta.alpha_lambda.id)
         layout.prop(config, meta.opacity_lambda.id)
         layout.prop(config, meta.refine_start_step.id)

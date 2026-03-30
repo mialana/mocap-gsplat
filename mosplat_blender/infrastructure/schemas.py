@@ -31,7 +31,11 @@ from typing import (
     cast,
 )
 
-from .constants import VGGT_IMAGE_DIMS_FACTOR, VGGT_MAX_IMAGE_SIZE
+from .constants import (
+    FRAME_VALIDATION_EPSILON,
+    VGGT_IMAGE_DIMS_FACTOR,
+    VGGT_MAX_IMAGE_SIZE,
+)
 from .macros import append_if_not_equals, int_median, try_access_path
 
 if TYPE_CHECKING:
@@ -607,7 +611,8 @@ class MediaFileStatus:
         self, metadata: Union[Mosplat_PG_MediaIOMetadata, MediaIOMetadata]
     ) -> Tuple[bool, bool, bool]:
         return (
-            self.frame_count == metadata.median_frame_count,
+            abs(self.frame_count - metadata.min_frame_count)
+            <= FRAME_VALIDATION_EPSILON,
             self.width == metadata.median_width,
             self.height == metadata.median_height,
         )
@@ -621,7 +626,7 @@ class MediaFileStatus:
 class MediaIOMetadata:
     base_directory: str
     is_valid_media_directory: bool = False
-    median_frame_count: int = -1
+    min_frame_count: int = -1
     median_width: int = -1
     median_height: int = -1
     media_file_statuses: List[MediaFileStatus] = field(default_factory=list)
@@ -637,7 +642,7 @@ class MediaIOMetadata:
         """mutates an instance with data from a dict"""
         self.base_directory = d["base_directory"]
         self.is_valid_media_directory = d["is_valid_media_directory"]
-        self.median_frame_count = d["median_frame_count"]
+        self.min_frame_count = d["min_frame_count"]
         self.median_width = d["median_width"]
         self.median_height = d["median_height"]
 
@@ -692,7 +697,7 @@ class MediaIOMetadata:
         load_msg = instance.load_from_JSON(json_path=json_path)
         return (instance, load_msg)
 
-    def synchronize_to_medians(self):
+    def synchronize_statistics(self):
         _frame_counts: List[int] = []
         _widths: List[int] = []
         _heights: List[int] = []
@@ -702,18 +707,19 @@ class MediaIOMetadata:
             append_if_not_equals(_widths, item=status.width, target=-1)
             append_if_not_equals(_heights, item=status.height, target=-1)
 
-        self.median_frame_count = int_median(_frame_counts)
+        self.min_frame_count = min(_frame_counts) if _frame_counts else -1
         self.median_width = int_median(_widths)
         self.median_height = int_median(_heights)
 
     def _accumulate_media_status(self, status: MediaFileStatus) -> None:
         self.media_file_statuses.append(status)
-        self.synchronize_to_medians()
+        self.synchronize_statistics()
 
         self.is_valid_media_directory = (
             self.is_valid_media_directory
             and status.is_valid
-            and self.median_frame_count == status.frame_count
+            and abs(self.min_frame_count - status.frame_count)
+            <= FRAME_VALIDATION_EPSILON
             and self.median_width == status.width
             and self.median_height == status.height
         )

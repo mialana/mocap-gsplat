@@ -320,7 +320,7 @@ class SplatModel(torch.nn.Module):
         scales_multiplier: float = 1.5,
         sh_degree: int = 0,
         ###
-        fuse_by_voxel: bool = False,
+        fuse_by_voxel: bool = True,
         voxel_size_factor: float = 0.005,  # ~2.0m person * 0.005 = 0.01 meters
         ###
         init_tactics: Literal["custom", "gsplat"] = "custom",
@@ -625,14 +625,17 @@ def train_3dgs(
             opt.step()
 
         if step % config.save_ply_interval == 0 or step == config.steps - 1:
+            out_file = (
+                add_suffix_to_path(ply_out_file, f".{step:06d}")
+                if config.increment_ply_file
+                else ply_out_file
+            )
             torch.cuda.synchronize()
             with torch.no_grad():
-                out_file = (
-                    add_suffix_to_path(ply_out_file, f".{step:06d}")
-                    if config.increment_ply_file
-                    else ply_out_file
-                )
                 save_ply_3dgs(out_file, model.detached_tensors)
+            queue.put(
+                ("update", f"Saved current 3DGS pointcloud to '{str(out_file)}'.")
+            )
 
         if step % 1000 == 0 or step == config.steps - 1:
             stats = SplatTrainingStats(
