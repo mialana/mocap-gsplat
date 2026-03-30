@@ -1,4 +1,4 @@
-# 2026-03-30 01:05:02.047169
+# 2026-03-30 03:44:50.873684
 # created using 'generate_property_meta_files.py'
 
 
@@ -90,6 +90,7 @@ class Mosplat_PG_Global_Meta(NamedTuple):
     was_frame_range_preprocessed: PropertyMeta
     ran_inference_on_frame_range: PropertyMeta
     splat_render_mode: PropertyMeta
+    splat_point_radius: PropertyMeta
     operator_progress: PropertyMeta
     log_entry_hub: PropertyMeta
     vggt_model_options: PropertyMeta
@@ -313,6 +314,9 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
     ),
     splat_render_mode=PropertyMeta(
         id="splat_render_mode", name="Splat Render Mode", description=""
+    ),
+    splat_point_radius=PropertyMeta(
+        id="splat_point_radius", name="Splat Point Radius", description=""
     ),
     operator_progress=PropertyMeta(
         id="operator_progress", name="Operator Progress", description=""

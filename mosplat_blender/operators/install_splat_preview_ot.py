@@ -24,6 +24,8 @@ SPLAT_PLAYER_MESH_NAME = "splat_mesh"
 
 SH_C0 = 0.28209479177387814
 
+UNIFORM_SCALE = 100.0
+
 PLY_FILE_FORMATTER = None
 
 # categories that should be imported from helper scene
@@ -152,8 +154,6 @@ def import_ply_mesh_for_frame(curr_frame: int) -> Optional[Mesh]:
 def process_imported_ply(obj: Object) -> Optional[Mesh]:
     import bpy
 
-    import numpy as np
-
     assert obj.data and isinstance(obj.data, bpy.types.Mesh)
 
     mesh: bpy.types.Mesh = obj.data.copy()
@@ -167,6 +167,15 @@ def process_imported_ply(obj: Object) -> Optional[Mesh]:
             if mesh.users == 0:
                 bpy.data.meshes.remove(mesh)
             return
+
+    transform_mesh(mesh)
+    handle_mesh_color_from_sh(mesh)
+
+    return mesh
+
+
+def handle_mesh_color_from_sh(mesh: Mesh):
+    import numpy as np
 
     point_count = len(mesh.vertices)
 
@@ -203,7 +212,45 @@ def process_imported_ply(obj: Object) -> Optional[Mesh]:
 
     mesh.color_attributes.active_color = col_attr
 
-    return mesh
+
+def transform_mesh(mesh: Mesh):
+    import math
+
+    import mathutils
+
+    import numpy as np
+
+    # extract vert positions
+    verts = mesh.vertices
+    coords = np.array([v.co[:] for v in verts], dtype=np.float32)
+
+    # center mesh by subtracting the centroid of the vertices
+    centroid = coords.mean(axis=0)
+    coords -= centroid
+
+    # y-up to z-up
+    rot = mathutils.Matrix.Rotation(-math.pi / 2, 4, "X")
+    coords = np.array([rot @ mathutils.Vector(c) for c in coords], dtype=np.float32)
+
+    # scale by 100
+    coords *= UNIFORM_SCALE
+    UNIFORM_LOG_SCALE = np.log(UNIFORM_SCALE)
+
+    for attr_name in ("scale_0", "scale_1", "scale_2"):
+        if attr_name in mesh.attributes:
+            attr = mesh.attributes[attr_name]
+
+            data = np.empty(len(attr.data), dtype=np.float32)
+            attr.data.foreach_get("value", data)
+
+            # apply same uniform scale to splat scales, which are log-encoded
+            data += UNIFORM_LOG_SCALE
+
+            attr.data.foreach_set("value", data)
+
+    # write back onto mesh
+    for i, v in enumerate(verts):
+        v.co = coords[i]
 
 
 def append_helper_scene():

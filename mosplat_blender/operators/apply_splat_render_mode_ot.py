@@ -20,9 +20,7 @@ logger = LoggingInterface.configure_logger_instance(__name__)
 
 class ObjectDataPayload(NamedTuple):
     render_mod: Modifier
-    sorter_mod: Modifier
     color_adjust_mod: Modifier
-    merger_mod: Modifier
     mat: Material
 
 
@@ -46,24 +44,33 @@ class Mosplat_OT_apply_splat_render_mode(MosplatOperatorBase):
     def _contexted_execute(self, pkg):
         import bpy
 
+        props = pkg.props
+
         mode: SplatRenderMode = SplatRenderMode.from_variable_name(
-            pkg.props.splat_render_mode
+            props.splat_render_mode
         )
 
         obj = bpy.data.objects.get(SPLAT_PLAYER_OBJ_NAME)
 
         render_mod = apply_modifier_from_node_group(KIRI["render_mod"], obj)
-        sorter_mod = apply_modifier_from_node_group(KIRI["sorter_mod"], obj)
         color_adjust_mod = apply_modifier_from_node_group(KIRI["color_adjust_mod"], obj)
-        merger_mod = apply_modifier_from_node_group(KIRI["merger_mod"], obj)
 
         mat = apply_material(KIRI["mat"], obj)
-        payload = ObjectDataPayload(
-            render_mod, sorter_mod, color_adjust_mod, merger_mod, mat
-        )
+
+        render_mod[KIRI["material_socket"]] = mat
+
+        render_mod.show_viewport = True
+        render_mod.show_render = True
+
+        color_adjust_mod.show_in_editmode = True
+        color_adjust_mod.show_viewport = True
+        color_adjust_mod.show_render = True
+
+        payload = ObjectDataPayload(render_mod, color_adjust_mod, mat)
 
         if mode == SplatRenderMode.POINTCLOUD:
-            apply_pointcloud_render_mode(obj, payload)
+            radius = props.splat_point_radius
+            apply_pointcloud_render_mode(obj, payload, radius)
         else:
             apply_gaussian_render_mode(obj, payload)
 
@@ -78,57 +85,31 @@ class Mosplat_OT_apply_splat_render_mode(MosplatOperatorBase):
         return "FINISHED"
 
 
-def apply_pointcloud_render_mode(obj: Object, payload: ObjectDataPayload):
-    render_mod, sorter_mod, color_adjust_mod, merger_mod, mat = payload
+def apply_pointcloud_render_mode(
+    obj: Object, payload: ObjectDataPayload, point_radius: float
+):
+    render_mod, color_adjust_mod, mat = payload
 
     kiri_pg = getattr(obj, KIRI["property_group"])
     kiri_pg.update_mode = "Show As Point Cloud"
 
+    render_mod[KIRI["point_radius_socket"]] = point_radius
+
     render_mod[KIRI["update_mode_socket"]] = 2  # corresponds to 'Show as Point Cloud'
-    render_mod[KIRI["point_radius_socket"]] = 0.001  # TODO: expose as property
-    render_mod[KIRI["material_socket"]] = mat
-    render_mod.show_viewport = True
-
-    color_adjust_mod.show_viewport = True
-
-    merger_mod.show_viewport = False
-    merger_mod.show_render = False
-
-    sorter_mod.show_viewport = False
-    sorter_mod.show_render = False
-
-    material_render_method = mat.surface_render_method
-
-    logger.debug(f"Material render method: '{material_render_method}'")
-
-    sorter_mod.show_viewport = material_render_method == "BLENDED"
-    sorter_mod.show_render = material_render_method == "BLENDED"
 
 
 def apply_gaussian_render_mode(obj: Object, payload: ObjectDataPayload):
     import bpy
 
-    render_mod, sorter_mod, color_adjust_mod, merger_mod, mat = payload
-
-    render_mod[KIRI["update_mode_socket"]] = 0
-    render_mod.show_viewport = True
-    color_adjust_mod.show_viewport = True
-    merger_mod.show_viewport = False
-    merger_mod.show_render = False
-    sorter_mod.show_viewport = False
-    sorter_mod.show_render = False
+    render_mod, color_adjust_mod, mat = payload
 
     kiri_pg = getattr(obj, KIRI["property_group"])
     kiri_pg.update_mode = "Enable Camera Updates"
 
-    material_render_method = mat.surface_render_method
+    render_mod[KIRI["update_mode_socket"]] = 0  # corresponds to 'Enable Camera Updates'
 
-    logger.debug(f"Material render method: '{material_render_method}'")
-
-    render_mod[KIRI["material_socket"]] = mat
-
+    # run align to view operator
     assert bpy.context.view_layer
-
     bpy.context.view_layer.objects.active = obj
 
     kiri_operators = getattr(bpy.ops, "sna")

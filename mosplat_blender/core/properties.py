@@ -503,6 +503,14 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         update=update_splat_render_mode,
     )
 
+    splat_point_radius: FloatProperty(
+        name="Splat Point Radius",
+        description=f"Radius of points when splats are rendering in '{SplatRenderMode.POINTCLOUD.to_variable_name()}' mode.",
+        default=0.1,
+        options={"SKIP_SAVE"},
+        update=update_splat_render_mode,
+    )
+
     operator_progress: PointerProperty(
         name="Operator Progress",
         type=Mosplat_PG_OperatorProgress,
