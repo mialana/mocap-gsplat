@@ -5,5 +5,3 @@ blender_manifest.toml
 
 *.whl
 *.zip
-
-*.blend

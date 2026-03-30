@@ -167,9 +167,7 @@ class MetaImportInjector(cst.CSTTransformer):
                 m.matches(body[insert_at], m.SimpleStatementLine(body=[m.Expr()]))
                 or m.matches(
                     body[insert_at],
-                    m.SimpleStatementLine(
-                        body=[m.ImportFrom(module=m.Name("__future__"))]
-                    ),
+                    m.SimpleStatementLine(body=[m.ImportFrom(m.Name("__future__"))]),
                 )
             )
         ):

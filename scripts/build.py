@@ -356,7 +356,7 @@ def package(ctx: BuildContext):
                 if file in ignore_filenames or path.suffix in ignore_extensions:
                     continue
 
-                path_in_archive = path.relative_to(ctx.ADDON_SRC_DIR.parent)
+                path_in_archive = path.relative_to(ctx.ADDON_SRC_DIR)
                 zf.write(path, path_in_archive)
 
     print(f"Addon packaged as `{zip_path}`")
