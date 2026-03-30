@@ -62,6 +62,10 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 
         self.install(pkg)
 
+        scene = pkg.context.scene
+        if scene:
+            mosplat_on_frame_change_pc(scene)  # initial execution
+
         return "RUNNING_MODAL"
 
     def install(self, pkg):
@@ -73,10 +77,10 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 
         # prevent duplicate registration of handler
         for idx, handler in enumerate(bpy.app.handlers.frame_change_pre):
-            if handler.__name__ == on_frame_change.__name__:
+            if handler.__name__ == mosplat_on_frame_change_pc.__name__:
                 bpy.app.handlers.frame_change_pre.pop(idx)
 
-        bpy.app.handlers.frame_change_pre.append(on_frame_change)
+        bpy.app.handlers.frame_change_pre.append(mosplat_on_frame_change_pc)
 
         self.logger.debug("Installation complete.")
 
@@ -186,7 +190,8 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
         self.logger.debug("Material setup complete.")
 
 
-def on_frame_change(scene: Scene):
+# prefix function name to prevent any collision with other addons' handlers
+def mosplat_on_frame_change_pc(scene: Scene):
     import bpy
 
     obj: Optional[Object] = bpy.data.objects.get(PLAYER_NAME)

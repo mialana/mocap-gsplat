@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 import os
-from dataclasses import Field, fields
+from dataclasses import fields
 from functools import partial
 from typing import (
     TYPE_CHECKING,

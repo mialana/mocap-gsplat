@@ -11,7 +11,7 @@ misspelled or renamed in one location and not in another.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Dict, Final, TypedDict
 
 _MISSING_: Any = object()  # sentinel variable
 
@@ -65,3 +65,45 @@ PREPROCESS_SCRIPT_FUNCTION_NAME: Final[str] = "preprocess"
 
 VGGT_MAX_IMAGE_SIZE = 518  # expected max size of input images to VGGT model
 VGGT_IMAGE_DIMS_FACTOR = 14  # expected divisible factor of both height & width
+
+SPLAT_PLAYER_OBJ_NAME = "SplatPlaybackManager"
+SPLAT_ATTRIBUTES = [
+    "f_dc_0",
+    "f_dc_1",
+    "f_dc_2",
+    "opacity",
+    "scale_0",
+    "scale_1",
+    "scale_2",
+    "rot_0",
+    "rot_1",
+    "rot_2",
+    "rot_3",
+]
+
+
+class KiriLiteralsType(TypedDict):
+    render_mod: str
+    sorter_mod: str
+    color_adjust_mod: str
+    merger_mod: str
+    mat: str
+    update_mode_socket: str
+    point_radius_socket: str
+    material_socket: str
+    property_group: str
+    align_to_view_operator: str
+
+
+KIRI_LITERALS: Final[KiriLiteralsType] = {
+    "render_mod": "KIRI_3DGS_Render_GN",
+    "sorter_mod": "KIRI_3DGS_Sorter_GN",
+    "color_adjust_mod": "KIRI_3DGS_Adjust_Colour_And_Material",
+    "merger_mod": "KIRI_3DGS_Write F_DC_And_Merge",
+    "mat": "KIRI_3DGS_Render_Material",
+    "update_mode_socket": "Socket_50",  # applied to render modifier
+    "point_radius_socket": "Socket_51",  # applied to render modifier
+    "material_socket": "Socket_61",  # applied to render modifier
+    "property_group": "sna_dgs_object_properties",
+    "align_to_view_operator": "dgs_render_align_active_to_view_30b13",  # in namespace `sna`
+}

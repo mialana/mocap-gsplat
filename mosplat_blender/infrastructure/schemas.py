@@ -439,6 +439,32 @@ class ModelInferenceMode(StrEnum):
     DEPTH_CAM = auto()
 
 
+class SplatTrainingInitTactics(StrEnum):
+    def to_variable_name(self) -> str:
+        return self.name.lower()
+
+    def to_blender_enum_item(self) -> BlenderEnumItem:
+        return (self.to_variable_name(), self.name, self.value)
+
+    CUSTOM = "Use custom tactics to initialize `quats` and `opacities` parameters in training."
+    GSPLAT = "Use tactics from `gsplat` example trainer code to initialize `quats` and `opacities` parameters."
+
+
+class SplatRenderMode(StrEnum):
+    def to_variable_name(self) -> str:
+        return self.name.lower()
+
+    @classmethod
+    def from_variable_name(cls, var: str) -> Self:
+        return cls[var.upper()]
+
+    def to_blender_enum_item(self) -> BlenderEnumItem:
+        return (self.to_variable_name(), self.name, self.value)
+
+    POINTCLOUD = "Preview 3DGS as pointclouds. Point color attributes will still be derived from the 0th order spherical harmiconic values."
+    GAUSSIAN = "Render splat previews using standard 3DGS sorting and rendering."
+
+
 @dataclass(frozen=True)
 class VGGTModelOptions:
     confidence_percentile: float = -1.0

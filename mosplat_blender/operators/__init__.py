@@ -4,6 +4,7 @@ from ..infrastructure.identifiers import OperatorIDEnum
 from ..infrastructure.mixins import PreregristrationFn
 from ..infrastructure.schemas import AddonMeta
 from .apply_preprocess_script_ot import Mosplat_OT_apply_preprocess_script
+from .apply_splat_render_mode_ot import Mosplat_OT_apply_splat_render_mode
 from .base_ot import MosplatOperatorBase, MosplatOperatorMetadata
 from .extract_frame_range_ot import Mosplat_OT_extract_frame_range
 from .fit_timeline_ot import Mosplat_OT_fit_timeline
@@ -60,6 +61,10 @@ operator_registry: Dict[
     Mosplat_OT_install_splat_preview: MosplatOperatorMetadata(
         bl_idname=OperatorIDEnum.INSTALL_SPLAT_PREVIEW,
         bl_description="Installs a handler that runs before animation frame changes and imports the corresponding exported 3DGS PLY file for the frame.",
+    ),
+    Mosplat_OT_apply_splat_render_mode: MosplatOperatorMetadata(
+        bl_idname=OperatorIDEnum.APPLY_SPLAT_RENDER_MODE,
+        bl_description="Apply a render mode to the currently selected splat object if applicable.",
     ),
 }
 

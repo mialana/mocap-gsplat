@@ -33,7 +33,10 @@ from ..infrastructure.schemas import (
     MediaIOMetadata,
     ModelInferenceMode,
     ProcessedFrameRange,
+    SplatRenderMode,
     SplatTrainingConfig,
+    SplatTrainingInitTactics,
+    UnexpectedError,
     UserFacingError,
     VGGTModelOptions,
 )
@@ -78,6 +81,24 @@ LogEntryLevelEnumItems: Final[List[BlenderEnumItem]] = [
 ModelInferenceModeEnumItems: Final[List[BlenderEnumItem]] = [
     member.to_blender_enum_item() for member in ModelInferenceMode
 ]
+
+SplatTrainingInitTacticsEnumItems: Final[List[BlenderEnumItem]] = [
+    member.to_blender_enum_item() for member in SplatTrainingInitTactics
+]
+
+SplatRenderModeEnumItems: Final[List[BlenderEnumItem]] = [
+    member.to_blender_enum_item() for member in SplatRenderMode
+]
+
+
+def update_splat_render_mode(self: Mosplat_PG_Global, context: Context):
+    try:
+        OperatorIDEnum.run(OperatorIDEnum.APPLY_SPLAT_RENDER_MODE)
+    except Exception as e:
+        msg = UnexpectedError.make_msg(
+            f"Error occurred while applying splat rendering mode.", e
+        )
+        self.logger.error(msg)
 
 
 def update_frame_range(self: Mosplat_PG_Global, context: Context):
@@ -249,19 +270,8 @@ class Mosplat_PG_SplatTrainingConfig(MosplatPropertyGroupBase[SplatTrainingConfi
     )
     init_tactics: EnumProperty(
         name="Initialization Tactics",
-        items=(
-            (
-                "custom",
-                "CUSTOM",
-                "Use custom tactics to initialize `quats` and `opacities` parameters in training.",
-            ),
-            (
-                "gsplat",
-                "GSPLAT",
-                "Use tactics from `gsplat` example trainer code to initialize `quats` and `opacities` parameters.",
-            ),
-        ),
-        default="custom",
+        items=SplatTrainingInitTacticsEnumItems,
+        default=SplatTrainingInitTactics.CUSTOM.to_variable_name(),
     )
     scene_size: IntProperty(
         name="Scene Size",
@@ -483,6 +493,14 @@ class Mosplat_PG_Global(MosplatPropertyGroupBase):
         description="Tracks whether the currently selected frame range has had data inference ran on it already.",
         default=False,
         options={"SKIP_SAVE"},
+    )
+
+    splat_render_mode: EnumProperty(
+        name="Splat Render Mode",
+        items=SplatRenderModeEnumItems,
+        default=SplatRenderMode.POINTCLOUD.to_variable_name(),
+        options={"SKIP_SAVE"},
+        update=update_splat_render_mode,
     )
 
     operator_progress: PointerProperty(

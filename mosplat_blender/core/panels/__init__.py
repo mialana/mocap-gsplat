@@ -16,6 +16,7 @@ from .log_entries_pt import (
 )
 from .main_pt import Mosplat_PT_main
 from .preprocess_pt import Mosplat_PT_preprocess
+from .preview_pt import Mosplat_PT_preview
 from .train_pt import Mosplat_PT_train
 
 _ADDON_SHORTNAME = AddonMeta().shortname
@@ -27,6 +28,11 @@ panel_registry: Dict[
         bl_idname=PanelIDEnum.MAIN,
         bl_description=f"Main panel holding all '{_ADDON_SHORTNAME}' panels",
         bl_options={"HIDE_HEADER"},
+    ),
+    Mosplat_PT_preview: MosplatPanelMetadata(
+        bl_idname=PanelIDEnum.PREVIEW,
+        bl_description=f"Customize preview of pointcloud / 3DGS data in Blender viewport.",
+        bl_parent_id=PanelIDEnum.MAIN,
     ),
     Mosplat_PT_preprocess: MosplatPanelMetadata(
         bl_idname=PanelIDEnum.PREPROCESS,

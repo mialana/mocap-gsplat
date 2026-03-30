@@ -1,4 +1,4 @@
-# 2026-02-25 01:29:35.804010
+# 2026-03-30 01:05:02.047169
 # created using 'generate_property_meta_files.py'
 
 
@@ -89,6 +89,7 @@ class Mosplat_PG_Global_Meta(NamedTuple):
     was_frame_range_extracted: PropertyMeta
     was_frame_range_preprocessed: PropertyMeta
     ran_inference_on_frame_range: PropertyMeta
+    splat_render_mode: PropertyMeta
     operator_progress: PropertyMeta
     log_entry_hub: PropertyMeta
     vggt_model_options: PropertyMeta
@@ -309,6 +310,9 @@ MOSPLAT_PG_GLOBAL_META = Mosplat_PG_Global_Meta(
         id="ran_inference_on_frame_range",
         name="Was Frame Range Inferred",
         description="Tracks whether the currently selected frame range has had data inference ran on it already.",
+    ),
+    splat_render_mode=PropertyMeta(
+        id="splat_render_mode", name="Splat Render Mode", description=""
     ),
     operator_progress=PropertyMeta(
         id="operator_progress", name="Operator Progress", description=""

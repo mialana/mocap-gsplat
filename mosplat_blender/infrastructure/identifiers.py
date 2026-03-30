@@ -51,6 +51,7 @@ class OperatorIDEnum(StrEnum):
     INSTALL_POINT_CLOUD_PREVIEW = auto()
     TRAIN_GAUSSIAN_SPLATS = auto()
     INSTALL_SPLAT_PREVIEW = auto()
+    APPLY_SPLAT_RENDER_MODE = auto()
 
 
 class PanelIDEnum(StrEnum):
@@ -75,6 +76,7 @@ class PanelIDEnum(StrEnum):
         return capwords(member.value.removeprefix(member._prefix()).replace("_", " "))
 
     MAIN = auto()
+    PREVIEW = auto()
     PREPROCESS = auto()
     DATA_INFERENCE = auto()
     TRAIN = auto()
