@@ -17,6 +17,7 @@ from .base_ot import MosplatOperatorBase
 
 if TYPE_CHECKING:
     from bpy.types import (
+        Depsgraph,
         Material,
         Mesh,
         Modifier,
@@ -37,7 +38,7 @@ MATERIAL_NAME = "PointCloudMaterial"
 DEFAULT_POINT_RADIUS = 0.1
 CAMERA_COLLECTION_NAME = "pc_cameras"
 CAMERA_NAME_FORMATTER = "pc_camera_{cam_id}"
-CAMERA_DISPLAY_SIZE = 0.15
+CAMERA_DISPLAY_SIZE = 0.1
 
 logger = LoggingInterface.configure_logger_instance(__name__)
 
@@ -220,6 +221,7 @@ class Mosplat_OT_install_point_cloud_preview(MosplatOperatorBase):
 # prefix function name to prevent any collision with other addons' handlers
 def mosplat_on_frame_change_pc(
     scene: Scene,
+    depsgraph: Optional[Depsgraph] = None,
     *,
     ply_file_formatter: ExportedFileFormatterPartial,
     pct_file_formatter: ExportedFileFormatterPartial,
