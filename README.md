@@ -2,7 +2,7 @@
 
 ![Mocap gsplat thumbnail webp](docs/assets/thumbnail.webp)
 
-**Mocap Gsplat** (_Mo(tion)cap(ture) G(aussian)splat_) is a **Gaussian Splatting** pipeline for **3D Motion Capture** data packaged as a **Blender** Python add-on.
+**Mocap Gsplat** [_Mo(tion)cap(ture) G(aussian)splat_] is a **Gaussian Splatting** pipeline for **3D Motion Capture** data packaged as a **Blender** Python add-on.
 
 ## Table of Contents
 
