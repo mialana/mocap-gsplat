@@ -4,6 +4,20 @@
 
 **Mocap Gsplat** (_Mo(tion)cap(ture) G(aussian)splat_) is a **Gaussian Splatting** pipeline for **3D Motion Capture** data packaged as a **Blender** Python add-on.
 
+## Table of Contents
+
+- [(WIP) 3D Gaussian Splatting for Motion Capture Data in Blender](#wip-3d-gaussian-splatting-for-motion-capture-data-in-blender)
+    - [Table of Contents](#table-of-contents)
+    - [Background \& Motivation](#background--motivation)
+    - [Current Achievements](#current-achievements)
+    - [Requirements](#requirements)
+        - [Base Media Extraction and Point Cloud Generation:](#base-media-extraction-and-point-cloud-generation)
+        - [Gaussian Splat Training](#gaussian-splat-training)
+    - [Installation](#installation)
+        - [Pre-packaged Releases (NO CUDA, compatible-anywhere)](#pre-packaged-releases-no-cuda-compatible-anywhere)
+        - [From source (CUDA available)](#from-source-cuda-available)
+    - [Credits](#credits)
+
 ## Background & Motivation
 
 Motion capture data is often exported from **sparse view directions**, say 4-8 cameras directed towards an area of focus.
