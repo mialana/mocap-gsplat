@@ -147,7 +147,7 @@ def scales_from_knn_means(
 def opacities_from_confidence(
     conf: Anno[torch.Tensor, dltype.Float32Tensor["M"]],
 ) -> Anno[torch.Tensor, dltype.Float32Tensor["M"]]:
-    return conf.clamp(EPS, 1.0 - EPS).logit_(EPS)
+    return conf.clamp(EPS, 1.0 - EPS).logit_(EPS)  # convert to logit space
 
 
 @dltype.dltyped()
@@ -540,6 +540,7 @@ def train_3dgs(
     images_0_1 = to_0_1(images)
     images_alpha_0_1 = to_0_1(images_alpha)
 
+    # TODO: switch out with ground-truth extrinsics and intrinsics
     pct = pct.to(device)
     viewmats = w2c_3x4_to_viewmats_4x4(pct.extrinsic)
     intrinsic = pct.intrinsic
@@ -596,7 +597,8 @@ def train_3dgs(
         msk_rgb = msk.expand(-1, 3, -1, -1)
         rgb_loss = (pred_rgb - rgb)[msk_rgb].abs().mean()
 
-        loss = rgb_loss  # TODO: implement PSNR loss and eval method
+        # TODO: loss needs to factor in ground-truth 2D images (probably w/ higher weight than 3D loss)
+        loss = rgb_loss
 
         # penalize alpha values within background
         alpha_loss = pred_alpha[bg_msk].mean()
