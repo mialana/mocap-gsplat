@@ -16,7 +16,24 @@ This distinctly differs from the common source media used for gaussian splatting
 
 Then, **Structure-from-Motion** (SFM) techniques would be applied on that video data to generate a **dense point cloud** and predicted **camera extrinsics and intrinsics**. Notably, **SFM** relies on comparing frames within the input data to reconstruct the 3D structure of the scene / subject, extracting and matching **feature points** that are stable between many viewpoints.
 
-![SFM Feature Point Detection](docs/assets/sfm_feature_point_detection.png)
+<table>
+  <tr>
+    <td style="width:50%">
+      <img src="docs/assets/sfm_feature_point_detection_between_cameras.png" style="width:100%">
+    </td>
+    <td style="width:50%">
+      <img src="docs/assets/sfm_overlay_matched_points.png" style="width:100%">
+    </td>
+  </tr>
+  <tr>
+    <td style="width:50%;text-align:center;">
+      SFM Feature Point Detection Between Cameras
+    </td>
+    <td style="width:50%;text-align:center;">
+      SFM Overlay of Matched Feature Points Example
+    </td>
+  </tr>
+</table>
 
 So now, consider if you were to want to use **Motion Capture** videos as input to 3DGS. The obvious domain difference is in the lack of shared perspective between the different **sparse cameras**, subsequently, making SFM yield non-optimal results in feature point detection. In testing for this project, we found that SFM may often only be able to find less than **10 feature points** within the entire scene.
 
